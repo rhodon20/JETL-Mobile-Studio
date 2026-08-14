@@ -25,7 +25,7 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 | Mapa, datos y consola | Hoja Resultados con pestañas | Implementado |
 | Superficies y movimiento coherentes | Tokens y transiciones compartidas | En curso |
 | Diálogos de configuración | Sistema modal accesible y adaptable | Base implementada |
-| Historial de ejecución | Historial local PWA | Pendiente |
+| Historial de ejecución | Historial local PWA | Implementado v1 |
 | Navegador de flujo | Búsqueda de nodos y atributos | Implementado v1 |
 | Apariencia classic/material | Preferencia visual local | Pendiente |
 | Backend, lotes y filesystem | Alternativas Web API cuando existan | Fuera de paridad directa |
@@ -55,8 +55,9 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 
 ### Fase 4 — Ejecución y diagnóstico
 
-- Historial local de ejecuciones.
-- Estados, duración, errores y acceso al nodo afectado.
+- Historial local de las últimas 30 ejecuciones. Implementado v1.
+- Estados, duración, errores y acceso al nodo afectado. Implementado v1.
+- Ejecución total inequívoca desde el dock y ejecución parcial desde cada nodo. Implementado.
 - Exportación de informes desde Proyecto/Resultados.
 
 ### Fase 5 — Apariencia y pulido

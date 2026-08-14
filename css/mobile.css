@@ -46,13 +46,77 @@
 
     #header .brand {
         width: auto;
+        flex: 0 0 auto;
         margin: 0 !important;
         justify-content: flex-start;
-        font-size: 1rem;
+        font-size: .9rem;
+    }
+
+    #header .brand span { display: none; }
+
+    #quick-search {
+        position: relative;
+        inset: auto;
+        display: flex !important;
+        min-width: 70px;
+        max-width: 230px;
+        flex: 1 1 180px;
+        align-items: center;
+        overflow: visible;
+        border: 1px solid rgba(255, 255, 255, .12);
+        border-radius: 11px;
+        background: #171719;
+        box-shadow: none;
+    }
+
+    #quick-search:focus-within {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, .2);
+    }
+
+    #quick-search > i {
+        display: block;
+        flex: 0 0 auto;
+        margin-left: 10px;
+        color: #85858a;
+        font-size: .78rem;
+    }
+
+    #qs-input {
+        min-width: 0;
+        height: 38px;
+        flex: 1 1 auto;
+        padding: 0 9px;
+        border: 0;
+        background: transparent;
+        font-size: 16px;
+    }
+
+    #qs-results {
+        position: absolute;
+        display: none;
+        top: calc(100% + 8px);
+        left: 0;
+        width: min(300px, calc(100vw - 110px));
+        max-height: min(48dvh, 360px);
+        overflow-y: auto;
+        border: 1px solid rgba(255, 255, 255, .14);
+        border-radius: 12px;
+        background: #252526;
+        box-shadow: 0 14px 35px rgba(0, 0, 0, .48);
+    }
+
+    #quick-search.has-results #qs-results { display: block; }
+
+    .qs-item {
+        min-height: 44px;
+        padding: 8px 11px;
+        touch-action: manipulation;
     }
 
     #header .toolbar {
         width: auto;
+        flex: 0 0 auto;
         margin-left: auto;
         flex-wrap: nowrap;
     }
@@ -340,7 +404,6 @@
     }
 
     #mobile-state-nodes:checked ~ #mobile-dock [data-mobile-view="nodes"],
-    #mobile-state-flow:checked ~ #mobile-dock [data-mobile-view="flow"],
     #mobile-state-results:checked ~ #mobile-dock [data-mobile-view="results"],
     #mobile-state-project:checked ~ #mobile-dock [data-mobile-view="project"] {
         color: #71b9ff;
@@ -528,6 +591,9 @@
         max-height: 78dvh;
         border-radius: 22px 22px 0 0 !important;
     }
+
+    .run-history-item { grid-template-columns: 9px minmax(0, 1fr) 38px; }
+    .run-history-badge { display: none; }
 
     body.modal-open #mobile-dock {
         visibility: hidden;

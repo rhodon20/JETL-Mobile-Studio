@@ -95,13 +95,12 @@
         if (button?.disabled) return;
         if (button) button.disabled = true;
         try {
-            await waitForRuntime('Preparando el motor…');
-            if (typeof window.runEngine === 'function') {
-                await window.runEngine();
-            } else if (typeof runEngine === 'function') {
-                await runEngine();
+            if (typeof window.JETLRunAll === 'function') {
+                await window.JETLRunAll();
             } else {
-                notify('El motor todavía no está listo', 'warning');
+                await waitForRuntime('Preparando el motor…');
+                if (typeof window.runEngine === 'function') await window.runEngine();
+                else notify('El motor todavía no está listo', 'warning');
             }
         } catch (error) {
             console.error('[JETL] El motor no está disponible', error);

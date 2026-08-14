@@ -416,8 +416,6 @@ function renderSidebar(filter) {
         const title = document.createElement('div');
         title.className = 'cat-title';
         title.setAttribute('data-cat-toggle', '1');
-        title.setAttribute('onclick', "event.stopPropagation(); this.nextElementSibling.classList.toggle('open'); this.classList.toggle('active')");
-        title.setAttribute('ontouchend', 'event.preventDefault(); event.stopPropagation(); this.click()');
         title.innerHTML = `<span>${c}</span> <i class="fas fa-chevron-down"></i>`;
 
         const itemsDiv = document.createElement('div');
@@ -430,7 +428,7 @@ function renderSidebar(filter) {
 
         const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
-            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}" onclick="event.stopPropagation(); JETLNativeAddNode('${t.k}')" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()">
+            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}">
                 <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
             </div>`;
         });
@@ -441,6 +439,24 @@ function renderSidebar(filter) {
     });
 }
 function filterTools(val) { renderSidebar(val); }
+
+function createTouchIntentTracker(threshold = 10) {
+    let intent = null;
+    return {
+        start(target, x, y) { intent = target ? { target, x, y, moved: false } : null; },
+        move(x, y) {
+            if (!intent) return;
+            if (Math.hypot(x - intent.x, y - intent.y) > threshold) intent.moved = true;
+        },
+        end() {
+            const target = intent && !intent.moved ? intent.target : null;
+            intent = null;
+            return target;
+        },
+        cancel() { intent = null; }
+    };
+}
+window.JETLCreateTouchIntentTracker = createTouchIntentTracker;
 
 function buildFlowNavigatorEntries(flowData, registry, query = '') {
     const data = flowData && flowData.drawflow && flowData.drawflow.Home
@@ -620,6 +636,10 @@ function initQuickSearch() {
     const results = document.getElementById('qs-results');
     const workspace = document.getElementById('workspace');
 
+    if (!qs || !input || !results || !workspace || qs.dataset.ready === 'true') return;
+    qs.dataset.ready = 'true';
+    const isMobileSearch = () => window.matchMedia('(max-width: 768px)').matches;
+
     workspace.addEventListener('mousemove', (e) => {
         if (qs.style.display !== 'block') {
             qsMousePos = { x: e.clientX, y: e.clientY };
@@ -629,14 +649,14 @@ function initQuickSearch() {
     document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-        if (e.key.length === 1 && e.key.match(/[a-z0-9]/i)) {
+        if (!isMobileSearch() && e.key.length === 1 && e.key.match(/[a-z0-9]/i)) {
             if (qs.style.display !== 'block') {
                 qs.style.top = Math.min(qsMousePos.y, window.innerHeight - 300) + 'px';
                 qs.style.left = Math.min(qsMousePos.x, window.innerWidth - 300) + 'px';
                 qs.style.display = 'block';
-                anime({ targets: qs, opacity: [0, 1], scale: [0.8, 1], duration: 200, easing: 'easeOutQuad' });
                 input.value = '';
                 input.focus();
+                renderMatches('');
             }
         }
         if (e.key === 'Escape') closeQS();
@@ -645,7 +665,11 @@ function initQuickSearch() {
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const sel = results.querySelector('.selected');
-            if (sel) { addNode(sel.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top)); closeQS(); }
+            if (sel) {
+                if (isMobileSearch()) addNodeClick(sel.dataset.k);
+                else addNode(sel.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
+                closeQS();
+            }
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             const current = results.querySelector('.selected');
@@ -659,9 +683,8 @@ function initQuickSearch() {
         }
     });
 
-    input.addEventListener('keyup', (e) => {
-        if (['ArrowUp', 'ArrowDown', 'Enter'].includes(e.key)) return;
-        const val = input.value.toLowerCase();
+    function renderMatches(value) {
+        const val = String(value || '').trim().toLocaleLowerCase('es');
         results.innerHTML = '';
         const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => t.label.toLowerCase().includes(val) || t.cat.toLowerCase().includes(val));
 
@@ -673,18 +696,31 @@ function initQuickSearch() {
             results.appendChild(item);
         });
 
-        anime({ targets: '.qs-item', opacity: [0, 1], translateX: [10, 0], delay: anime.stagger(30), duration: 300, easing: 'easeOutQuad' });
+        qs.classList.toggle('has-results', matches.length > 0);
+    }
+
+    input.addEventListener('input', () => renderMatches(input.value));
+    input.addEventListener('focus', () => {
+        if (isMobileSearch()) renderMatches(input.value);
     });
 
     function closeQS() {
-        anime({ targets: qs, opacity: 0, scale: 0.9, duration: 150, easing: 'easeInQuad', complete: () => { qs.style.display = 'none'; input.value = ''; document.activeElement.blur(); } });
+        qs.classList.remove('has-results');
+        results.innerHTML = '';
+        input.value = '';
+        input.blur();
+        if (!isMobileSearch()) qs.style.display = 'none';
     }
 
-    document.addEventListener('click', (e) => { if (qs.style.display === 'block' && !qs.contains(e.target)) closeQS(); });
+    document.addEventListener('click', (e) => {
+        const open = qs.style.display === 'block' || (isMobileSearch() && qs.classList.contains('has-results'));
+        if (open && !qs.contains(e.target)) closeQS();
+    });
     results.addEventListener('click', (e) => {
         const item = e.target.closest('.qs-item');
         if (!item) return;
-        addNode(item.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
+        if (isMobileSearch()) addNodeClick(item.dataset.k);
+        else addNode(item.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
         closeQS();
     });
 }
@@ -763,6 +799,116 @@ function buildRunReport(label, status, errorMessage) {
         nodes
     };
 }
+
+const RUN_HISTORY_KEY = 'jetl_run_history_v1';
+const RUN_HISTORY_LIMIT = 30;
+
+function loadRunHistory() {
+    try {
+        const raw = SafeStorage.load(RUN_HISTORY_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.warn('[JETL] No se pudo leer el historial de ejecuciones', error);
+        return [];
+    }
+}
+
+function publishRunReport(report) {
+    window.lastRunReport = report;
+    try {
+        const history = loadRunHistory();
+        history.unshift(report);
+        SafeStorage.save(RUN_HISTORY_KEY, JSON.stringify(history.slice(0, RUN_HISTORY_LIMIT)));
+    } catch (error) {
+        console.warn('[JETL] No se pudo guardar el historial de ejecuciones', error);
+    }
+    return report;
+}
+
+function getRunHistoryFocusId(report) {
+    const partial = String(report?.label || '').match(/Parcial\s+#(.+)/i);
+    if (partial) return partial[1];
+    const executed = (report?.nodes || []).find((node) => !node.cached) || (report?.nodes || [])[0];
+    return executed ? String(executed.id) : '';
+}
+
+function renderRunHistory() {
+    const list = document.getElementById('run-history-list');
+    if (!list) return;
+    const history = loadRunHistory();
+    if (!history.length) {
+        list.innerHTML = `<div class="run-history-empty"><i class="fas fa-clock-rotate-left"></i><strong>Todavía no hay ejecuciones</strong><span>Las ejecuciones completas y parciales aparecerán aquí.</span></div>`;
+        return;
+    }
+    const statusLabels = { ok: 'Completada', error: 'Error', cancelled: 'Cancelada', unknown: 'Sin estado' };
+    list.innerHTML = history.map((report) => {
+        const focusId = getRunHistoryFocusId(report);
+        const date = new Date(report.generated_at || report.run_id || Date.now());
+        const summary = report.summary || {};
+        return `<article class="run-history-item run-status-${escapeFlowNavigatorHTML(report.status || 'unknown')}">
+            <span class="run-history-status" aria-hidden="true"></span>
+            <div class="run-history-copy">
+                <strong>${escapeFlowNavigatorHTML(report.label || 'Ejecución')}</strong>
+                <small>${escapeFlowNavigatorHTML(date.toLocaleString('es-ES'))} · ${summary.nodes || 0} nodos · ${Math.round(summary.total_ms || 0)} ms</small>
+                ${report.error ? `<span class="run-history-error">${escapeFlowNavigatorHTML(report.error)}</span>` : ''}
+            </div>
+            <span class="run-history-badge">${escapeFlowNavigatorHTML(statusLabels[report.status] || report.status || 'Sin estado')}</span>
+            ${focusId ? `<button type="button" class="run-history-focus" data-run-node-id="${escapeFlowNavigatorHTML(focusId)}" aria-label="Localizar nodo ${escapeFlowNavigatorHTML(focusId)}"><i class="fas fa-crosshairs"></i></button>` : ''}
+        </article>`;
+    }).join('');
+}
+
+function closeRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal.is-open')) document.body.classList.remove('modal-open');
+}
+
+function initRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal || modal.dataset.ready === 'true') return;
+    modal.dataset.ready = 'true';
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal || event.target.closest('[data-run-history-close]')) closeRunHistory();
+        const clear = event.target.closest('[data-run-history-clear]');
+        if (clear) {
+            SafeStorage.clear(RUN_HISTORY_KEY);
+            renderRunHistory();
+            showToast('Historial borrado', 'success');
+        }
+        const focus = event.target.closest('[data-run-node-id]');
+        if (focus) {
+            const id = focus.getAttribute('data-run-node-id');
+            closeRunHistory();
+            window.JETLNativeNav?.('flow');
+            requestAnimationFrame(() => focusFlowNode(id));
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) closeRunHistory();
+    });
+}
+
+function openRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal) return false;
+    initRunHistory();
+    window.JETLNativeNav?.('flow');
+    renderRunHistory();
+    modal.style.display = 'flex';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    return true;
+}
+
+window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render: renderRunHistory };
+window.JETLOpenRunHistory = openRunHistory;
+window.JETLCloseRunHistory = closeRunHistory;
 
 function downloadRunReport(format = 'json') {
     const report = window.lastRunReport || buildRunReport('Manual', 'unknown', null);
@@ -920,6 +1066,7 @@ function initEngineDelegation() {
     const sidebar = document.getElementById('sidebar-content');
     if (sidebar) {
         let lastTouchSelection = 0;
+        const touchIntent = createTouchIntentTracker(10);
         const activateSidebarItem = (e) => {
             const catTitle = e.target.closest('.cat-title[data-cat-toggle]');
             if (catTitle) {
@@ -938,11 +1085,27 @@ function initEngineDelegation() {
             return true;
         };
 
+        sidebar.addEventListener('touchstart', (e) => {
+            const touch = e.touches && e.touches[0];
+            const target = e.target.closest('.node-item, .cat-title[data-cat-toggle]');
+            touchIntent.start(target, touch?.clientX || 0, touch?.clientY || 0);
+        }, { passive: true });
+
+        sidebar.addEventListener('touchmove', (e) => {
+            const touch = e.touches && e.touches[0];
+            if (!touch) return;
+            touchIntent.move(touch.clientX, touch.clientY);
+        }, { passive: true });
+
         sidebar.addEventListener('touchend', (e) => {
-            if (!activateSidebarItem(e)) return;
+            const target = touchIntent.end();
+            if (!target || !target.isConnected) return;
+            if (!activateSidebarItem({ target })) return;
             lastTouchSelection = Date.now();
             e.preventDefault();
         }, { passive: false });
+
+        sidebar.addEventListener('touchcancel', () => touchIntent.cancel(), { passive: true });
 
         sidebar.addEventListener('click', (e) => {
             if (Date.now() - lastTouchSelection < 700) return;
@@ -994,6 +1157,7 @@ function initEngineDelegation() {
 
 async function runEngine() {
     window.isEngineCancelled = false;
+    currentRunTimestamp = Date.now();
     const loader = document.getElementById('loader');
     const cancelBtn = document.getElementById('loader-cancel');
     loader.style.display = 'flex';
@@ -1005,14 +1169,13 @@ async function runEngine() {
         : window.JETLRuntimeReady;
     if (runtime && !(await runtime)) {
         const runtimeError = window.__JETL_RUNTIME_ERROR;
+        publishRunReport(buildRunReport('Ejecución Total', 'error', runtimeError?.message || 'El motor no pudo cargarse'));
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");
         loader.style.display = 'none';
         if (cancelBtn) cancelBtn.style.display = 'none';
         return;
     }
-
-    currentRunTimestamp = Date.now();
 
     document.querySelectorAll('.count-badge').forEach(b => b.style.display = 'none');
     document.querySelectorAll('.eye-btn').forEach(b => b.classList.remove('active'));
@@ -1023,25 +1186,32 @@ async function runEngine() {
     const nodes = Object.values(exportData);
     const roots = nodes.filter(n => TOOL_REGISTRY[n.name].in === 0);
 
-    if (roots.length === 0) { log("Error: Añade un Reader", "err"); loader.style.display = 'none'; if (cancelBtn) cancelBtn.style.display = 'none'; return; }
+    if (roots.length === 0) {
+        publishRunReport(buildRunReport('Ejecución Total', 'error', 'Añade un Reader para ejecutar el flujo'));
+        log("Error: Añade un Reader", "err");
+        showToast("Añade un Reader", "warning");
+        loader.style.display = 'none';
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        return;
+    }
 
     try {
         for (const r of roots) await processNode(r.id, exportData);
         if (window.isEngineCancelled) throw new Error("Ejecución cancelada por el usuario.");
         log("--- FIN EXITOSO ---");
         if (typeof logRunSummary === 'function') logRunSummary('Ejecución Total');
-        window.lastRunReport = buildRunReport('Ejecución Total', 'ok', null);
+        publishRunReport(buildRunReport('Ejecución Total', 'ok', null));
         showToast("Proceso completado", "success");
         updateBadges();
         if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
     } catch (e) {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
-            window.lastRunReport = buildRunReport('Ejecución Total', 'cancelled', null);
+            publishRunReport(buildRunReport('Ejecución Total', 'cancelled', null));
             log("Ejecución cancelada por el usuario.", "warn");
             showToast("Ejecución cancelada", "warning");
         } else {
-            window.lastRunReport = buildRunReport('Ejecución Total', 'error', e && e.message ? e.message : String(e));
+            publishRunReport(buildRunReport('Ejecución Total', 'error', e && e.message ? e.message : String(e)));
             log("FATAL: " + e.message, "err");
             showToast("Error en ejecución", "error");
         }
@@ -1064,6 +1234,7 @@ function cancelEngineRun() {
 
 async function runEnginePartial(targetId) {
     window.isEngineCancelled = false;
+    currentRunTimestamp = Date.now();
     const loader = document.getElementById('loader');
     const cancelBtn = document.getElementById('loader-cancel');
     loader.style.display = 'flex';
@@ -1074,6 +1245,7 @@ async function runEnginePartial(targetId) {
         : window.JETLRuntimeReady;
     if (runtime && !(await runtime)) {
         const runtimeError = window.__JETL_RUNTIME_ERROR;
+        publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', runtimeError?.message || 'El motor no pudo cargarse'));
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");
         loader.style.display = 'none';
@@ -1082,8 +1254,6 @@ async function runEnginePartial(targetId) {
     }
 
     log(`--- Ejecución Parcial hasta nodo #${targetId} ---`);
-
-    currentRunTimestamp = Date.now();
 
     try {
         const exportData = editor.export().drawflow.Home.data;
@@ -1097,7 +1267,7 @@ async function runEnginePartial(targetId) {
 
         log("--- Parcial Completado ---");
         if (typeof logRunSummary === 'function') logRunSummary(`Parcial #${targetId}`);
-        window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'ok', null);
+        publishRunReport(buildRunReport(`Parcial #${targetId}`, 'ok', null));
         showToast("Nodo actualizado", "success");
 
         updateBadges();
@@ -1120,11 +1290,11 @@ async function runEnginePartial(targetId) {
     } catch (e) {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
-            window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'cancelled', null);
+            publishRunReport(buildRunReport(`Parcial #${targetId}`, 'cancelled', null));
             log("Ejecución parcial cancelada por el usuario.", "warn");
             showToast("Ejecución parcial cancelada", "warning");
         } else {
-            window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'error', e && e.message ? e.message : String(e));
+            publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', e && e.message ? e.message : String(e)));
             log("Error Parcial: " + e.message, "err");
             showToast("Error en ejecución parcial", "error");
         }

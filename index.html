@@ -109,8 +109,8 @@
                 reportJETLBootError('El editor todavía no permite añadir nodos');
             }
         };
-        window.JETLNativeRun = async function () {
-            window.JETLMarkInteraction('run');
+        window.JETLRunAll = async function () {
+            window.JETLMarkInteraction('run:all');
             var runtime = typeof window.JETLEnsureRuntime === 'function'
                 ? window.JETLEnsureRuntime()
                 : window.JETLRuntimeReady;
@@ -118,6 +118,7 @@
             if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
             reportJETLBootError('El motor no está disponible');
         };
+        window.JETLNativeRun = window.JETLRunAll;
         window.JETLNativeResultTab = async function (view) {
             if (!['map', 'table', 'logs'].includes(view)) return false;
             window.JETLMarkInteraction('results:' + view);
@@ -680,6 +681,10 @@
             z-index: 2000;
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
+        }
+
+        #quick-search > i {
+            display: none;
         }
 
         #qs-input {
@@ -1436,6 +1441,27 @@ body.modal-open {
     width: min(680px, calc(100vw - 32px));
 }
 
+.run-history-content { width: min(720px, calc(100vw - 32px)); }
+.run-history-toolbar { min-height:44px; padding:7px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#96969b; font-size:.75rem; border-bottom:1px solid var(--surface-border); }
+.run-history-toolbar button, .run-history-focus { border:0; border-radius:9px; color:#c9c9cd; background:rgba(255,255,255,.07); cursor:pointer; }
+.run-history-toolbar button { min-height:32px; padding:0 10px; }
+.run-history-list { min-height:0; max-height:58dvh; padding:10px; overflow-y:auto; }
+.run-history-item { display:grid; grid-template-columns:9px minmax(0,1fr) auto 38px; align-items:center; gap:11px; min-height:64px; padding:10px 11px; border-bottom:1px solid rgba(255,255,255,.07); }
+.run-history-status { width:9px; height:9px; border-radius:50%; background:#8b8b90; }
+.run-status-ok .run-history-status { background:#2ecc71; }
+.run-status-error .run-history-status { background:#e05a5a; }
+.run-status-cancelled .run-history-status { background:#e0a84d; }
+.run-history-copy { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.run-history-copy strong { color:#f1f1f2; font-size:.88rem; }
+.run-history-copy small { color:#929298; font-size:.71rem; }
+.run-history-error { color:#f08b8b; font-size:.72rem; overflow-wrap:anywhere; }
+.run-history-badge { padding:4px 8px; border-radius:999px; color:#b9bbc0; background:rgba(255,255,255,.06); font-size:.68rem; }
+.run-history-focus { width:38px; height:38px; }
+.run-history-empty { min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#8f8f94; text-align:center; }
+.run-history-empty i { font-size:1.5rem; color:#66afe3; }
+.run-history-empty strong { color:#d7d7da; }
+.run-history-empty span { font-size:.78rem; }
+
 .flow-navigator-search {
     flex: 0 0 auto;
     margin: 14px 16px 8px;
@@ -1723,13 +1749,39 @@ body.modal-open {
 
     #header .brand {
         width: auto;
+        flex: 0 0 auto;
         margin: 0 !important;
         justify-content: flex-start;
-        font-size: 1rem;
+        font-size: .9rem;
     }
+
+    #header .brand span { display: none; }
+
+    #quick-search {
+        position: relative;
+        inset: auto;
+        display: flex !important;
+        min-width: 70px;
+        max-width: 230px;
+        flex: 1 1 180px;
+        align-items: center;
+        overflow: visible;
+        border: 1px solid rgba(255, 255, 255, .12);
+        border-radius: 11px;
+        background: #171719;
+        box-shadow: none;
+    }
+
+    #quick-search:focus-within { border-color: #3498db; box-shadow: 0 0 0 3px rgba(52, 152, 219, .2); }
+    #quick-search > i { display:block; flex:0 0 auto; margin-left:10px; color:#85858a; font-size:.78rem; }
+    #qs-input { min-width:0; height:38px; flex:1 1 auto; padding:0 9px; border:0; background:transparent; font-size:16px; }
+    #qs-results { position:absolute; display:none; top:calc(100% + 8px); left:0; width:min(300px, calc(100vw - 110px)); max-height:min(48dvh, 360px); overflow-y:auto; border:1px solid rgba(255,255,255,.14); border-radius:12px; background:#252526; box-shadow:0 14px 35px rgba(0,0,0,.48); }
+    #quick-search.has-results #qs-results { display:block; }
+    .qs-item { min-height:44px; padding:8px 11px; touch-action:manipulation; }
 
     #header .toolbar {
         width: auto;
+        flex: 0 0 auto;
         margin-left: auto;
         flex-wrap: nowrap;
     }
@@ -2017,7 +2069,6 @@ body.modal-open {
     }
 
     #mobile-state-nodes:checked ~ #mobile-dock [data-mobile-view="nodes"],
-    #mobile-state-flow:checked ~ #mobile-dock [data-mobile-view="flow"],
     #mobile-state-results:checked ~ #mobile-dock [data-mobile-view="results"],
     #mobile-state-project:checked ~ #mobile-dock [data-mobile-view="project"] {
         color: #71b9ff;
@@ -2206,6 +2257,9 @@ body.modal-open {
         border-radius: 22px 22px 0 0 !important;
     }
 
+    .run-history-item { grid-template-columns: 9px minmax(0, 1fr) 38px; }
+    .run-history-badge { display: none; }
+
     body.modal-open #mobile-dock {
         visibility: hidden;
         pointer-events: none;
@@ -2244,16 +2298,16 @@ body.modal-open {
     <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-results">
     <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-project">
 
-    <div id="quick-search">
-        <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
-        <div id="qs-results"></div>
-    </div>
-
     <div id="header">
         <button class="btn" data-ui-action="toggle-sidebar"><i class="fas fa-bars"></i></button>
         <div class="brand" style="margin-left:10px">
             <div class="status-dot" id="sys-status" title="Sistema Listo"></div>&nbsp;JETL Studio
             <span>v2026.03.05</span>
+        </div>
+        <div id="quick-search" role="search">
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="qs-input" placeholder="Buscar nodo" aria-label="Buscar y añadir un nodo" autocomplete="off">
+            <div id="qs-results" role="listbox" aria-label="Nodos disponibles"></div>
         </div>
         <div class="toolbar">
             <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)" onclick="event.stopPropagation(); if(typeof undo==='function') undo()" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()"><i class="fas fa-undo"></i></button>
@@ -2368,11 +2422,11 @@ body.modal-open {
         <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos" aria-pressed="false" onclick="JETLNativeNav('nodes')">
             <i class="fas fa-shapes"></i><span>Nodos</span>
         </button>
-        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo" aria-pressed="true" onclick="JETLNativeNav('flow')">
-            <i class="fas fa-diagram-project"></i><span>Flujo</span>
+        <button type="button" class="mobile-dock-btn" id="mobile-history" aria-label="Abrir historial de ejecuciones" onclick="event.stopPropagation(); JETLOpenRunHistory()">
+            <i class="fas fa-clock-rotate-left"></i><span>Historial</span>
         </button>
-        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="JETLNativeRun()">
-            <i class="fas fa-play"></i><span>Ejecutar</span>
+        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar todo el flujo" title="Ejecutar todo el flujo" onclick="event.stopPropagation(); JETLRunAll()">
+            <i class="fas fa-play"></i><span>Ejecutar todo</span>
         </button>
         <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados" aria-pressed="false" onclick="JETLNativeNav('results')">
             <i class="fas fa-chart-area"></i><span>Resultados</span>
@@ -2452,6 +2506,24 @@ body.modal-open {
             </div>
             <div id="flow-navigator-summary" class="flow-navigator-summary" aria-live="polite"></div>
             <div id="flow-navigator-list" class="flow-navigator-list"></div>
+        </div>
+    </div>
+    <div id="run-history-modal" class="modal" role="dialog" aria-modal="true"
+        aria-labelledby="run-history-title" aria-hidden="true">
+        <div class="modal-content run-history-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-clock-rotate-left"></i><div>
+                    <strong id="run-history-title">Historial de ejecuciones</strong>
+                    <small>Últimas 30 ejecuciones completas y parciales</small>
+                </div></div>
+                <button class="modal-close" type="button" data-run-history-close aria-label="Cerrar"
+                    onclick="event.stopPropagation(); JETLCloseRunHistory()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="run-history-toolbar">
+                <span>Guardado localmente en este dispositivo</span>
+                <button type="button" data-run-history-clear><i class="fas fa-trash-can"></i> Borrar</button>
+            </div>
+            <div id="run-history-list" class="run-history-list" aria-live="polite"></div>
         </div>
     </div>
     <div id="packages-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="packages-modal-title">
@@ -3380,11 +3452,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-14"
+    <script defer src="js/engine.js?v=20260814-15"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
-    <script defer src="js/mobile.js?v=20260814-9"
+    <script defer src="js/mobile.js?v=20260814-10"
         onload="window.JETLBootModuleLoaded(14, 14, &quot;listo&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
 

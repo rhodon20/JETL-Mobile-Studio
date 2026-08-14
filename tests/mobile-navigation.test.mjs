@@ -46,7 +46,7 @@ function bootNavigation() {
     elements.set('logs', createElement('logs'));
     elements.set('table-container', createElement('table-container'));
 
-    const buttons = ['nodes', 'flow', 'results', 'project'].map((view) => {
+    const buttons = ['nodes', 'results', 'project'].map((view) => {
         const button = createElement(`button-${view}`);
         button.dataset.mobileView = view;
         const getAttribute = button.getAttribute.bind(button);
@@ -117,10 +117,13 @@ function expectView(env, view) {
 }
 
 test('cada destino móvil tiene un botón directo y una regla CSS de respaldo', () => {
-    for (const view of ['nodes', 'flow', 'results', 'project']) {
+    for (const view of ['nodes', 'results', 'project']) {
         assert.match(index, new RegExp(`<input[^>]+id="mobile-state-${view}"`));
         assert.match(index, new RegExp(`<button[^>]+data-mobile-view="${view}"[^>]+onclick="JETLNativeNav\\('${view}'\\)"`));
     }
+    assert.match(index, /id="mobile-state-flow"/);
+    assert.match(index, /id="mobile-history"[^>]+JETLOpenRunHistory/);
+    assert.doesNotMatch(index, /data-mobile-view="flow"/);
     assert.match(index, /#mobile-state-nodes:checked ~ #layout #sidebar/);
     assert.match(index, /body\.mobile-nodes-open #sidebar/);
     assert.match(index, /#mobile-state-results:checked ~ #bottom-panel/);
@@ -130,7 +133,11 @@ test('cada destino móvil tiene un botón directo y una regla CSS de respaldo', 
 test('la navegación no captura ni cancela fases del mismo gesto', () => {
     assert.doesNotMatch(headScript, /addEventListener\(['"](?:pointerdown|touchstart|touchend|mousedown|click)['"]/);
     assert.doesNotMatch(mobile, /addEventListener\(['"](?:pointerdown|touchstart|touchend)['"]/);
-    assert.doesNotMatch(index.match(/<nav id="mobile-dock"[\s\S]*?<\/nav>/)?.[0] ?? '', /ontouch|preventDefault|stopPropagation/);
+    const dock = index.match(/<nav id="mobile-dock"[\s\S]*?<\/nav>/)?.[0] ?? '';
+    assert.doesNotMatch(dock, /ontouch|preventDefault/);
+    for (const tag of dock.match(/<button[^>]+data-mobile-view[^>]+>/g) ?? []) {
+        assert.doesNotMatch(tag, /stopPropagation/);
+    }
     assert.doesNotMatch(index.match(/<label id="sidebar-overlay"[^>]*>/)?.[0] ?? '', /data-ui-action/);
 });
 
