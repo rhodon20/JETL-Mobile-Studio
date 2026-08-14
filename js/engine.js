@@ -137,9 +137,43 @@ function resolvePort(parentRes, parentPort) {
 
 let jetlAppInitialized = false;
 
+function setJETLStartupStatus(state, message) {
+    const dot = document.getElementById('sys-status');
+    if (!dot) return;
+    const colors = { loading: '#f1c40f', ready: '#2ecc71', error: '#e74c3c' };
+    dot.style.background = colors[state] || colors.loading;
+    dot.title = message || 'JETL Studio';
+    dot.setAttribute('aria-label', message || 'JETL Studio');
+}
+
+function ensureJETLMap() {
+    if (map) return map;
+    const mapElement = document.getElementById('map');
+    if (!mapElement) throw new Error('No se encontró el contenedor del mapa');
+    if (typeof L === 'undefined') throw new Error('Leaflet no está disponible');
+
+    map = L.map(mapElement, { renderer: L.canvas() }).setView([40.416, -3.703], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM contributors'
+    }).addTo(map);
+    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
+    return map;
+}
+window.ensureJETLMap = ensureJETLMap;
+
 function initializeJETLApp() {
     if (jetlAppInitialized) return;
     jetlAppInitialized = true;
+    setJETLStartupStatus('loading', 'Iniciando JETL Studio');
+
+    try {
+        // El catálogo es independiente del mapa y debe estar disponible de inmediato.
+        renderSidebar('');
+
+        if (typeof Drawflow === 'undefined') throw new Error('Drawflow no está disponible');
+        const drawflowElement = document.getElementById('drawflow');
+        if (!drawflowElement) throw new Error('No se encontró el lienzo de flujo');
+
     try {
         const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
         Object.defineProperty(HTMLInputElement.prototype, 'value', {
@@ -150,11 +184,7 @@ function initializeJETLApp() {
         });
     } catch (e) { console.warn("No se pudo aplicar el parche de input file", e); }
 
-    map = L.map('map', { renderer: L.canvas() }).setView([40.416, -3.703], 6);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM contributors' }).addTo(map);
-    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
-
-    editor = new Drawflow(document.getElementById("drawflow"));
+    editor = new Drawflow(drawflowElement);
     editor.reroute = true;
     editor.reroute_fix_curvature = true;
     editor.start();
@@ -209,8 +239,7 @@ function initializeJETLApp() {
         }
     });
 
-    renderSidebar('');
-    document.getElementById('sys-status').style.background = '#2ecc71';
+    setJETLStartupStatus('ready', 'Sistema listo');
     createGeoWorker();
     initQuickSearch();
 
@@ -227,6 +256,14 @@ function initializeJETLApp() {
     }
     if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
         setTimeout(() => JETLSchemaUI.refreshAll(), 0);
+    }
+    } catch (error) {
+        jetlAppInitialized = false;
+        setJETLStartupStatus('error', `Error de inicio: ${error.message || error}`);
+        console.error('[JETL] Error durante la inicialización', error);
+        if (typeof window.showToast === 'function') {
+            window.showToast(`No se pudo iniciar JETL Studio: ${error.message || error}`, 'error');
+        }
     }
 }
 

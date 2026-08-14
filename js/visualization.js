@@ -473,6 +473,7 @@ function resolveNodeDisplayData(nodeId, preferredPort = null) {
 window.resolveNodeDisplayData = resolveNodeDisplayData;
 
 async function showOnMap(id, preferredPort = null, askPort = false) {
+    if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
     setMapPerfIndicator(null);
     let meta = executionData[id];
     if (!meta || !meta.data) { showToast("Nodo sin datos procesados", "error"); return; }
@@ -1065,6 +1066,7 @@ function switchTab(t) {
     if (document.body.classList.contains('panel-collapsed')) togglePanelHeight();
 
     if (t === 'map') {
+        if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
         setTimeout(() => {
             map.invalidateSize();
             if (selectedFeatureIndex !== null && currentNodeId) syncMapFocus(currentNodeId);

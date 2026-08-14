@@ -42,6 +42,7 @@
             const overlay = document.getElementById('sidebar-overlay');
             if (overlay) overlay.style.display = 'block';
         } else if (view === 'results') {
+            try { window.ensureJETLMap?.(); } catch (error) { console.warn('[JETL] No se pudo iniciar el mapa', error); }
             document.body.classList.add('mobile-results-open');
         } else if (view === 'project') {
             document.body.classList.add('mobile-sheet-open');
