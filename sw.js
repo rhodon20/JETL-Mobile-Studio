@@ -1,9 +1,11 @@
-const CACHE_NAME = 'jetl-cache-v2026-3';
+const CACHE_NAME = 'jetl-mobile-cache-v1';
 const coreAssets = [
     './',
     './index.html',
     './manifest.json',
     './icons/icon.svg',
+    './css/mobile.css',
+    './js/mobile.js',
 
     // Vendor Libs
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',

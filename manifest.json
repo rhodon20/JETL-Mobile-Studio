@@ -2,8 +2,12 @@
   "name": "JETL Studio",
   "short_name": "JETL",
   "description": "Herramienta Open Source para construccion de flujos ETL geoespaciales offline",
+  "id": "./",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
   "background_color": "#121212",
   "theme_color": "#202020",
   "icons": [
@@ -18,5 +22,13 @@
     "utilities",
     "productivity",
     "map"
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo flujo",
+      "short_name": "Nuevo",
+      "url": "./index.html?new=1",
+      "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
   ]
 }

@@ -1,4 +1,3 @@
-<meta name='viewport' content='width=device-width, initial-scale=1' />
 <!DOCTYPE html>
 <html lang="es">
 
@@ -8,6 +7,9 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
     <meta name="theme-color" content="#202020">
     <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="JETL">
     <title>JETL Studio v2026.03.05 - Open Source PWA</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -979,6 +981,7 @@
             color: #aaa;
         }
     </style>
+    <link rel="stylesheet" href="css/mobile.css">
 </head>
 
 <body>
@@ -1105,6 +1108,41 @@
             </div>
         </div>
     </div>
+
+    <nav id="mobile-dock" aria-label="Navegación principal">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos">
+            <i class="fas fa-shapes"></i><span>Nodos</span>
+        </button>
+        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo">
+            <i class="fas fa-diagram-project"></i><span>Flujo</span>
+        </button>
+        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo">
+            <i class="fas fa-play"></i><span>Ejecutar</span>
+        </button>
+        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados">
+            <i class="fas fa-chart-area"></i><span>Resultados</span>
+        </button>
+        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto">
+            <i class="fas fa-folder-open"></i><span>Proyecto</span>
+        </button>
+    </nav>
+
+    <div id="mobile-scrim" aria-hidden="true"></div>
+    <section id="mobile-project-sheet" aria-hidden="true" aria-label="Acciones del proyecto">
+        <div class="mobile-sheet-handle"></div>
+        <div class="mobile-sheet-header">
+            <div><small>ESPACIO DE TRABAJO</small><strong>Proyecto</strong></div>
+            <button type="button" class="mobile-sheet-close" data-mobile-close aria-label="Cerrar"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="mobile-project-grid">
+            <button type="button" data-ui-action="save-project"><i class="fas fa-save"></i><span>Guardar</span></button>
+            <button type="button" data-ui-action="open-project"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
+            <button type="button" data-ui-action="open-templates"><i class="fas fa-layer-group"></i><span>Plantillas</span></button>
+            <button type="button" data-ui-action="open-params"><i class="fas fa-sliders-h"></i><span>Parámetros</span></button>
+            <button type="button" data-ui-action="undo"><i class="fas fa-undo"></i><span>Deshacer</span></button>
+            <button type="button" data-ui-action="redo"><i class="fas fa-redo"></i><span>Rehacer</span></button>
+        </div>
+    </section>
     <div id="ctx-menu"
         style="display:none; position:absolute; z-index:9000; background:#252526; border:1px solid #444; box-shadow:0 5px 15px rgba(0,0,0,0.5); border-radius:4px; min-width:150px; overflow:hidden;">
         <div class="ctx-item" data-ui-action="ctx-run"><i class="fas fa-play"></i> Ejecutar hasta aquí</div>
@@ -1182,6 +1220,7 @@
     <script src="js/templates.js"></script>
     <script src="js/packages.js"></script>
     <script src="js/smoke.js"></script>
+    <script src="js/mobile.js"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
