@@ -762,37 +762,137 @@ function countOutputsFromResult(data) {
     return out;
 }
 
+let activeRunTrace = null;
+
+function buildExecutionPlan(graphData) {
+    const data = graphData || {};
+    const ids = Object.keys(data).map(String);
+    const indegree = new Map(ids.map((id) => [id, 0]));
+    const children = new Map(ids.map((id) => [id, []]));
+    ids.forEach((id) => {
+        const inputs = data[id]?.inputs || {};
+        Object.values(inputs).forEach((input) => {
+            (input.connections || []).forEach((connection) => {
+                const parentId = String(connection.node);
+                if (!indegree.has(parentId)) return;
+                indegree.set(id, indegree.get(id) + 1);
+                children.get(parentId).push(id);
+            });
+        });
+    });
+
+    let frontier = ids.filter((id) => indegree.get(id) === 0);
+    const levels = [];
+    const order = [];
+    while (frontier.length) {
+        const level = frontier.slice().sort((a, b) => Number(a) - Number(b));
+        levels.push(level);
+        order.push(...level);
+        const next = [];
+        level.forEach((id) => {
+            children.get(id).forEach((childId) => {
+                indegree.set(childId, indegree.get(childId) - 1);
+                if (indegree.get(childId) === 0) next.push(childId);
+            });
+        });
+        frontier = next;
+    }
+    if (order.length !== ids.length) {
+        const cyclicIds = ids.filter((id) => !order.includes(id));
+        throw new Error(`El flujo contiene un ciclo entre los nodos ${cyclicIds.map((id) => '#' + id).join(', ')}`);
+    }
+    return { order, levels };
+}
+window.JETLBuildExecutionPlan = buildExecutionPlan;
+
+function collectRequiredNodeIds(targetId, graphData) {
+    const data = graphData || {};
+    const required = new Set();
+    const visit = (id) => {
+        const key = String(id);
+        if (required.has(key) || !data[key]) return;
+        required.add(key);
+        Object.values(data[key].inputs || {}).forEach((input) => {
+            (input.connections || []).forEach((connection) => visit(connection.node));
+        });
+    };
+    visit(targetId);
+    return [...required];
+}
+
+function beginRunTrace(label, scope, plannedIds) {
+    activeRunTrace = {
+        label,
+        scope,
+        startedAt: Date.now(),
+        finishedAt: null,
+        plannedIds: (plannedIds || []).map(String),
+        nodes: new Map()
+    };
+    return activeRunTrace;
+}
+
+function markRunTraceNode(nodeId, patch) {
+    if (!activeRunTrace) return;
+    const id = String(nodeId);
+    const previous = activeRunTrace.nodes.get(id) || { id, started_at: new Date().toISOString() };
+    if (['ok', 'cached'].includes(previous.status) && ['ok', 'cached'].includes(patch?.status)) return;
+    activeRunTrace.nodes.set(id, { ...previous, ...(patch || {}), id });
+}
+
+function finishRunTrace() {
+    if (activeRunTrace && !activeRunTrace.finishedAt) activeRunTrace.finishedAt = Date.now();
+}
+
+window.JETLRunTrace = { node: markRunTraceNode };
+
 function buildRunReport(label, status, errorMessage) {
     const exportData = (editor && typeof editor.export === 'function')
         ? (((editor.export() || {}).drawflow || {}).Home || {}).data || {}
         : {};
-    const entries = Object.entries(executionData || {});
-    const nodes = entries.map(([id, meta]) => {
-        const node = exportData[id];
+    finishRunTrace();
+    const trace = activeRunTrace;
+    const nodes = Object.entries(exportData).map(([id, node]) => {
+        const meta = executionData ? executionData[id] : null;
+        const event = trace?.nodes?.get(String(id)) || null;
         const nodeName = node ? node.name : '';
         const tool = nodeName && window.TOOL_REGISTRY ? window.TOOL_REGISTRY[nodeName] : null;
         return {
             id: String(id),
             node: nodeName || 'unknown',
             label: tool ? tool.label : nodeName || 'unknown',
-            ms: (meta && meta._ms) || 0,
-            count: countFeaturesFromResult(meta ? meta.data : null),
-            outputs: countOutputsFromResult(meta ? meta.data : null),
-            cached: !!(meta && meta._runId !== currentRunTimestamp)
+            category: tool?.cat || '',
+            status: event?.status || 'not_run',
+            ms: event ? Number(event?.ms ?? (meta && meta._ms) ?? 0) : 0,
+            count: event ? countFeaturesFromResult(meta ? meta.data : null) : 0,
+            outputs: event ? countOutputsFromResult(meta ? meta.data : null) : {},
+            cached: event?.status === 'cached',
+            error: event?.error || null
         };
     }).sort((a, b) => b.ms - a.ms);
 
     const totalMs = nodes.reduce((acc, n) => acc + (n.ms || 0), 0);
     const totalFeatures = nodes.reduce((acc, n) => acc + (n.count || 0), 0);
+    const startedAt = trace?.startedAt || currentRunTimestamp || Date.now();
+    const finishedAt = trace?.finishedAt || Date.now();
     return {
-        version: '1.0',
+        version: '2.0',
         generated_at: new Date().toISOString(),
         run_id: currentRunTimestamp || Date.now(),
         label: label || 'Run',
+        scope: trace?.scope || 'manual',
+        started_at: new Date(startedAt).toISOString(),
+        finished_at: new Date(finishedAt).toISOString(),
+        duration_ms: Math.max(0, finishedAt - startedAt),
         status: status || 'ok',
         error: errorMessage || null,
         summary: {
             nodes: nodes.length,
+            planned_nodes: trace?.plannedIds?.length || nodes.length,
+            processed_nodes: nodes.filter((node) => !['not_run', 'pending'].includes(node.status)).length,
+            executed_nodes: nodes.filter((node) => node.status === 'ok').length,
+            cached_nodes: nodes.filter((node) => node.status === 'cached').length,
+            error_nodes: nodes.filter((node) => node.status === 'error').length,
             total_ms: totalMs,
             total_features: totalFeatures
         },
@@ -802,12 +902,17 @@ function buildRunReport(label, status, errorMessage) {
 
 const RUN_HISTORY_KEY = 'jetl_run_history_v1';
 const RUN_HISTORY_LIMIT = 30;
+let selectedRunHistoryId = null;
+let runHistoryNodeFilter = '';
 
 function loadRunHistory() {
     try {
         const raw = SafeStorage.load(RUN_HISTORY_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed.map((report, index) => ({
+            ...report,
+            history_id: report?.history_id || `legacy_${report?.run_id || report?.generated_at || index}_${index}`
+        })) : [];
     } catch (error) {
         console.warn('[JETL] No se pudo leer el historial de ejecuciones', error);
         return [];
@@ -815,48 +920,89 @@ function loadRunHistory() {
 }
 
 function publishRunReport(report) {
-    window.lastRunReport = report;
+    const entry = {
+        ...report,
+        history_id: report?.history_id || `run_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        captured_at: new Date().toISOString()
+    };
+    window.lastRunReport = entry;
     try {
         const history = loadRunHistory();
-        history.unshift(report);
+        history.unshift(entry);
         SafeStorage.save(RUN_HISTORY_KEY, JSON.stringify(history.slice(0, RUN_HISTORY_LIMIT)));
+        selectedRunHistoryId = entry.history_id;
     } catch (error) {
         console.warn('[JETL] No se pudo guardar el historial de ejecuciones', error);
     }
-    return report;
+    return entry;
 }
 
-function getRunHistoryFocusId(report) {
-    const partial = String(report?.label || '').match(/Parcial\s+#(.+)/i);
-    if (partial) return partial[1];
-    const executed = (report?.nodes || []).find((node) => !node.cached) || (report?.nodes || [])[0];
-    return executed ? String(executed.id) : '';
+function formatRunDuration(ms) {
+    const value = Number(ms || 0);
+    return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)} s` : `${Math.round(value)} ms`;
 }
 
 function renderRunHistory() {
     const list = document.getElementById('run-history-list');
-    if (!list) return;
+    const detail = document.getElementById('run-history-detail');
+    const count = document.getElementById('run-history-count');
+    if (!list || !detail) return;
     const history = loadRunHistory();
+    if (count) count.textContent = `${history.length} ejecución${history.length === 1 ? '' : 'es'}`;
     if (!history.length) {
-        list.innerHTML = `<div class="run-history-empty"><i class="fas fa-clock-rotate-left"></i><strong>Todavía no hay ejecuciones</strong><span>Las ejecuciones completas y parciales aparecerán aquí.</span></div>`;
+        list.innerHTML = '';
+        detail.innerHTML = `<div class="run-history-empty"><i class="fas fa-clock-rotate-left"></i><strong>Todavía no hay ejecuciones</strong><span>Las ejecuciones completas y parciales aparecerán aquí.</span></div>`;
         return;
+    }
+    if (!selectedRunHistoryId || !history.some((report) => report.history_id === selectedRunHistoryId)) {
+        selectedRunHistoryId = history[0].history_id;
     }
     const statusLabels = { ok: 'Completada', error: 'Error', cancelled: 'Cancelada', unknown: 'Sin estado' };
     list.innerHTML = history.map((report) => {
-        const focusId = getRunHistoryFocusId(report);
         const date = new Date(report.generated_at || report.run_id || Date.now());
         const summary = report.summary || {};
-        return `<article class="run-history-item run-status-${escapeFlowNavigatorHTML(report.status || 'unknown')}">
+        const active = report.history_id === selectedRunHistoryId;
+        return `<button type="button" class="run-history-item run-status-${escapeFlowNavigatorHTML(report.status || 'unknown')}${active ? ' active' : ''}" data-run-history-id="${escapeFlowNavigatorHTML(report.history_id)}">
             <span class="run-history-status" aria-hidden="true"></span>
             <div class="run-history-copy">
                 <strong>${escapeFlowNavigatorHTML(report.label || 'Ejecución')}</strong>
-                <small>${escapeFlowNavigatorHTML(date.toLocaleString('es-ES'))} · ${summary.nodes || 0} nodos · ${Math.round(summary.total_ms || 0)} ms</small>
-                ${report.error ? `<span class="run-history-error">${escapeFlowNavigatorHTML(report.error)}</span>` : ''}
+                <small>${escapeFlowNavigatorHTML(date.toLocaleString('es-ES'))} · ${summary.processed_nodes ?? summary.nodes ?? 0}/${summary.planned_nodes ?? summary.nodes ?? 0} nodos</small>
             </div>
             <span class="run-history-badge">${escapeFlowNavigatorHTML(statusLabels[report.status] || report.status || 'Sin estado')}</span>
-            ${focusId ? `<button type="button" class="run-history-focus" data-run-node-id="${escapeFlowNavigatorHTML(focusId)}" aria-label="Localizar nodo ${escapeFlowNavigatorHTML(focusId)}"><i class="fas fa-crosshairs"></i></button>` : ''}
-        </article>`;
+            <strong class="run-history-duration">${formatRunDuration(report.duration_ms ?? summary.total_ms)}</strong>
+        </button>`;
     }).join('');
+
+    const selected = history.find((report) => report.history_id === selectedRunHistoryId) || history[0];
+    const summary = selected.summary || {};
+    const needle = runHistoryNodeFilter.trim().toLocaleLowerCase('es');
+    const nodes = (selected.nodes || []).filter((node) => !needle || [node.id, node.label, node.node, node.category, node.status]
+        .join(' ').toLocaleLowerCase('es').includes(needle));
+    const nodeRows = nodes.map((node) => {
+        const outputs = Object.entries(node.outputs || {}).map(([port, value]) => `${port}: ${value}`).join(' · ') || '—';
+        const state = node.status === 'ok' ? 'Ejecutado' : node.status === 'cached' ? 'Caché' : node.status === 'error' ? 'Error' : 'No ejecutado';
+        return `<tr data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">
+            <td><button type="button" class="run-history-node-link" data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">${escapeFlowNavigatorHTML(node.label)} <small>#${escapeFlowNavigatorHTML(node.id)}</small></button>${node.error ? `<span class="run-history-node-error">${escapeFlowNavigatorHTML(node.error)}</span>` : ''}</td>
+            <td><span class="run-node-state run-node-${escapeFlowNavigatorHTML(node.status)}">${state}</span></td>
+            <td>${node.count || 0}<small>${escapeFlowNavigatorHTML(outputs)}</small></td>
+            <td>${formatRunDuration(node.ms)}</td>
+        </tr>`;
+    }).join('');
+    detail.innerHTML = `<div class="run-history-detail-head">
+        <div><strong>${escapeFlowNavigatorHTML(selected.label || 'Ejecución')}</strong><small>${escapeFlowNavigatorHTML(new Date(selected.started_at || selected.generated_at).toLocaleString('es-ES'))}</small></div>
+        <span class="run-history-badge">${escapeFlowNavigatorHTML(statusLabels[selected.status] || selected.status || 'Sin estado')}</span>
+    </div>
+    <div class="run-history-kpis">
+        <div><span>Duración</span><strong>${formatRunDuration(selected.duration_ms ?? summary.total_ms)}</strong></div>
+        <div><span>Procesados</span><strong>${summary.processed_nodes ?? summary.nodes ?? 0}/${summary.planned_nodes ?? summary.nodes ?? 0}</strong></div>
+        <div><span>Ejecutados</span><strong>${summary.executed_nodes ?? 0}</strong></div>
+        <div><span>Caché</span><strong>${summary.cached_nodes ?? 0}</strong></div>
+        <div><span>Features</span><strong>${summary.total_features ?? 0}</strong></div>
+        <div><span>Errores</span><strong>${summary.error_nodes ?? (selected.status === 'error' ? 1 : 0)}</strong></div>
+    </div>
+    ${selected.error ? `<div class="run-history-error"><i class="fas fa-triangle-exclamation"></i>${escapeFlowNavigatorHTML(selected.error)}</div>` : ''}
+    <label class="run-history-filter"><i class="fas fa-filter"></i><input id="run-history-node-filter" type="search" value="${escapeFlowNavigatorHTML(runHistoryNodeFilter)}" placeholder="Filtrar nodos…"><span>${nodes.length}/${(selected.nodes || []).length}</span></label>
+    <div class="run-history-table-wrap"><table class="run-history-node-table"><thead><tr><th>Nodo</th><th>Estado</th><th>Features / salidas</th><th>Tiempo</th></tr></thead><tbody>${nodeRows || '<tr><td colspan="4">Sin nodos coincidentes</td></tr>'}</tbody></table></div>`;
 }
 
 function closeRunHistory() {
@@ -877,8 +1023,21 @@ function initRunHistory() {
         const clear = event.target.closest('[data-run-history-clear]');
         if (clear) {
             SafeStorage.clear(RUN_HISTORY_KEY);
+            selectedRunHistoryId = null;
+            runHistoryNodeFilter = '';
             renderRunHistory();
             showToast('Historial borrado', 'success');
+        }
+        const historyItem = event.target.closest('[data-run-history-id]');
+        if (historyItem) {
+            selectedRunHistoryId = historyItem.getAttribute('data-run-history-id');
+            runHistoryNodeFilter = '';
+            renderRunHistory();
+        }
+        const exportButton = event.target.closest('[data-run-history-export]');
+        if (exportButton) {
+            const selected = loadRunHistory().find((report) => report.history_id === selectedRunHistoryId) || loadRunHistory()[0];
+            if (selected) downloadRunReport(exportButton.getAttribute('data-run-history-export'), selected);
         }
         const focus = event.target.closest('[data-run-node-id]');
         if (focus) {
@@ -887,6 +1046,18 @@ function initRunHistory() {
             window.JETLNativeNav?.('flow');
             requestAnimationFrame(() => focusFlowNode(id));
         }
+    });
+    modal.addEventListener('input', (event) => {
+        if (event.target?.id !== 'run-history-node-filter') return;
+        runHistoryNodeFilter = event.target.value || '';
+        renderRunHistory();
+        requestAnimationFrame(() => {
+            const input = document.getElementById('run-history-node-filter');
+            if (input) {
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
     });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && modal.classList.contains('is-open')) closeRunHistory();
@@ -898,6 +1069,8 @@ function openRunHistory() {
     if (!modal) return false;
     initRunHistory();
     window.JETLNativeNav?.('flow');
+    selectedRunHistoryId = loadRunHistory()[0]?.history_id || null;
+    runHistoryNodeFilter = '';
     renderRunHistory();
     modal.style.display = 'flex';
     modal.classList.add('is-open');
@@ -910,8 +1083,8 @@ window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render
 window.JETLOpenRunHistory = openRunHistory;
 window.JETLCloseRunHistory = closeRunHistory;
 
-function downloadRunReport(format = 'json') {
-    const report = window.lastRunReport || buildRunReport('Manual', 'unknown', null);
+function downloadRunReport(format = 'json', reportOverride = null) {
+    const report = reportOverride || window.lastRunReport || buildRunReport('Manual', 'unknown', null);
     if (!report) {
         if (typeof showToast === 'function') showToast('Sin run report disponible', 'warn');
         return;
@@ -922,11 +1095,14 @@ function downloadRunReport(format = 'json') {
     if (format === 'csv') {
         mime = 'text/csv';
         filename = filename.replace(/\.json$/, '.csv');
-        const head = 'id,node,label,ms,count,output_1,output_2,output_3,cached';
+        const head = 'id,node,label,category,status,error,ms,count,output_1,output_2,output_3,cached';
         const rows = (report.nodes || []).map(n => [
             n.id,
             `"${String(n.node || '').replace(/"/g, '""')}"`,
             `"${String(n.label || '').replace(/"/g, '""')}"`,
+            `"${String(n.category || '').replace(/"/g, '""')}"`,
+            n.status || 'unknown',
+            `"${String(n.error || '').replace(/"/g, '""')}"`,
             n.ms || 0,
             n.count || 0,
             (n.outputs && n.outputs.output_1) || 0,
@@ -958,13 +1134,70 @@ function drag(e) { e.dataTransfer.setData("node", e.target.dataset.k); }
 function drop(e) { e.preventDefault(); const k = e.dataTransfer.getData("node"); if (k) addNode(k, e.clientX, e.clientY); }
 function allowDrop(e) { e.preventDefault(); }
 
+function getSingleSelectedCanvasNodeId() {
+    const selected = Array.from(document.querySelectorAll('.drawflow-node.selected'));
+    if (selected.length === 1 && selected[0].id) return selected[0].id.replace('node-', '');
+    const editorSelection = editor?.node_selected?.id;
+    return editorSelection ? String(editorSelection).replace('node-', '') : null;
+}
+
+function getConnectedNodePlacement(sourceId, fallbackRect) {
+    const source = _getGraphDataSafe()[String(sourceId)];
+    if (!source || !editor?.precanvas) {
+        return { x: fallbackRect.width / 2 + fallbackRect.left, y: fallbackRect.height / 2 + fallbackRect.top };
+    }
+    const canvasRect = editor.precanvas.getBoundingClientRect();
+    const zoom = Number(editor.zoom || 1);
+    return {
+        x: canvasRect.left + (Number(source.pos_x || 0) + 300) * zoom,
+        y: canvasRect.top + Number(source.pos_y || 0) * zoom
+    };
+}
+
+function connectNewNodeFromSelection(sourceId, targetId) {
+    if (!sourceId || !targetId || typeof editor?.addConnection !== 'function') return false;
+    const data = _getGraphDataSafe();
+    const source = data[String(sourceId)];
+    const target = data[String(targetId)];
+    if (!source || !target) return false;
+    const outputPort = Object.keys(source.outputs || {})[0];
+    const inputPort = Object.keys(target.inputs || {}).find((port) => !(target.inputs[port].connections || []).length);
+    if (!outputPort || !inputPort) return false;
+    try {
+        editor.addConnection(String(sourceId), String(targetId), outputPort, inputPort);
+        return true;
+    } catch (error) {
+        console.warn('[JETL] No se pudo autoconectar el nodo nuevo', error);
+        return false;
+    }
+}
+window.JETLConnectNewNodeFromSelection = connectNewNodeFromSelection;
+
+function selectCanvasNode(nodeId) {
+    const node = document.getElementById('node-' + nodeId);
+    if (!node) return;
+    document.querySelectorAll('.drawflow-node.selected').forEach((element) => element.classList.remove('selected'));
+    node.classList.add('selected');
+    editor.node_selected = node;
+    editor.dispatch?.('nodeSelected', String(nodeId));
+}
+
 function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
-    addNode(k, rect.width / 2 + rect.left, rect.height / 2 + rect.top);
+    const sourceId = getSingleSelectedCanvasNodeId();
+    const placement = sourceId ? getConnectedNodePlacement(sourceId, rect) : {
+        x: rect.width / 2 + rect.left,
+        y: rect.height / 2 + rect.top
+    };
+    const id = addNode(k, placement.x, placement.y);
+    const connected = sourceId ? connectNewNodeFromSelection(sourceId, id) : false;
+    selectCanvasNode(id);
+    if (connected && typeof showToast === 'function') showToast('Nodo añadido y conectado', 'success');
     if (window.innerWidth < 768) {
         window.JETLNativeNav?.('flow');
         window.JETLMobile?.fitFlowToViewport();
     }
+    return id;
 }
 
 function addNode(k, x, y) {
@@ -1158,6 +1391,8 @@ function initEngineDelegation() {
 async function runEngine() {
     window.isEngineCancelled = false;
     currentRunTimestamp = Date.now();
+    const initialGraph = _getGraphDataSafe();
+    beginRunTrace('Ejecución Total', 'full', Object.keys(initialGraph));
     const loader = document.getElementById('loader');
     const cancelBtn = document.getElementById('loader-cancel');
     loader.style.display = 'flex';
@@ -1196,7 +1431,16 @@ async function runEngine() {
     }
 
     try {
-        for (const r of roots) await processNode(r.id, exportData);
+        const plan = buildExecutionPlan(exportData);
+        for (let levelIndex = 0; levelIndex < plan.levels.length; levelIndex += 1) {
+            const level = plan.levels[levelIndex];
+            const loaderMsg = document.getElementById('loader-msg');
+            if (loaderMsg) loaderMsg.innerText = `Ejecutando nivel ${levelIndex + 1}/${plan.levels.length}…`;
+            for (const nodeId of level) {
+                if (window.isEngineCancelled) throw new Error("Ejecución cancelada por el usuario.");
+                await processNode(nodeId, exportData);
+            }
+        }
         if (window.isEngineCancelled) throw new Error("Ejecución cancelada por el usuario.");
         log("--- FIN EXITOSO ---");
         if (typeof logRunSummary === 'function') logRunSummary('Ejecución Total');
@@ -1235,6 +1479,8 @@ function cancelEngineRun() {
 async function runEnginePartial(targetId) {
     window.isEngineCancelled = false;
     currentRunTimestamp = Date.now();
+    const initialGraph = _getGraphDataSafe();
+    beginRunTrace(`Parcial #${targetId}`, 'partial', collectRequiredNodeIds(targetId, initialGraph));
     const loader = document.getElementById('loader');
     const cancelBtn = document.getElementById('loader-cancel');
     loader.style.display = 'flex';

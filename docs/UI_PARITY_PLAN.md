@@ -25,7 +25,7 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 | Mapa, datos y consola | Hoja Resultados con pestañas | Implementado |
 | Superficies y movimiento coherentes | Tokens y transiciones compartidas | En curso |
 | Diálogos de configuración | Sistema modal accesible y adaptable | Base implementada |
-| Historial de ejecución | Historial local PWA | Implementado v1 |
+| Historial de ejecución | Maestro/detalle local con KPIs, nodos, errores y exportación | Implementado v2 |
 | Navegador de flujo | Búsqueda de nodos y atributos | Implementado v1 |
 | Apariencia classic/material | Preferencia visual local | Pendiente |
 | Backend, lotes y filesystem | Alternativas Web API cuando existan | Fuera de paridad directa |
@@ -52,13 +52,23 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 - Buscador global de nodos y atributos. Implementado v1.
 - Centrado y selección desde resultados. Implementado v1.
 - Miniresumen del flujo en proyectos grandes. Implementado v1 con recuento de nodos, conexiones y categorías.
+- Inserción encadenada: con una única selección, el nodo nuevo se coloca a la
+  derecha, se conecta al primer puerto compatible y pasa a ser la selección.
+  Implementado.
 
 ### Fase 4 — Ejecución y diagnóstico
 
-- Historial local de las últimas 30 ejecuciones. Implementado v1.
-- Estados, duración, errores y acceso al nodo afectado. Implementado v1.
-- Ejecución total inequívoca desde el dock y ejecución parcial desde cada nodo. Implementado.
+- Historial local de las últimas 30 ejecuciones. Implementado v2.
+- Maestro/detalle con KPIs, estado, duración, caché, features, salidas, errores,
+  filtro y acceso al nodo afectado. Implementado v2.
+- Ejecución total topológica de todos los nodos —incluidas ramas y componentes
+  desconectados— desde el dock; ejecución parcial desde cada nodo. Implementado.
+- Detección explícita de ciclos antes de ejecutar. Implementado.
 - Exportación de informes desde Proyecto/Resultados.
+
+La cobertura funcional completa se mantiene en
+[`DESKTOP_PARITY_MATRIX.md`](./DESKTOP_PARITY_MATRIX.md); este plan deja de ser
+una lista implícita y cada evolución de Studio debe actualizar esa matriz.
 
 ### Fase 5 — Apariencia y pulido
 

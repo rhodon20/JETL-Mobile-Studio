@@ -592,8 +592,24 @@
         border-radius: 22px 22px 0 0 !important;
     }
 
-    .run-history-item { grid-template-columns: 9px minmax(0, 1fr) 38px; }
-    .run-history-badge { display: none; }
+    .run-history-content { max-height: 84dvh; }
+
+    .run-history-layout {
+        height: min(70dvh, 690px);
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(118px, 30%) minmax(0, 1fr);
+    }
+
+    .run-history-list {
+        padding: 6px;
+        border-right: 0;
+        border-bottom: 1px solid var(--surface-border);
+    }
+
+    .run-history-item { grid-template-columns: 9px minmax(0, 1fr) auto; min-height: 58px; }
+    .run-history-item .run-history-badge { display: none; }
+    .run-history-kpis { grid-template-columns: repeat(3, minmax(82px, 1fr)); overflow: visible; }
+    .run-history-node-table { min-width: 560px; }
 
     body.modal-open #mobile-dock {
         visibility: hidden;
