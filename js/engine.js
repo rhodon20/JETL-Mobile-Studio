@@ -281,7 +281,10 @@ function initializeJETLApp() {
     }
 }
 
-if (document.readyState === 'loading') {
+// Los scripts de arranque se sirven con `defer`. Durante su ejecución el
+// documento ya puede estar en `interactive`, aunque DOMContentLoaded todavía
+// no se haya emitido y queden módulos posteriores por ejecutar.
+if (document.readyState === 'loading' || document.readyState === 'interactive') {
     document.addEventListener('DOMContentLoaded', initializeJETLApp, { once: true });
 } else {
     queueMicrotask(initializeJETLApp);
