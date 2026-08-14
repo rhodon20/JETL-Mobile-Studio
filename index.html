@@ -987,29 +987,73 @@
 
         /* Loading Overlay */
         #loader {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            position: fixed;
+            inset: 0;
             z-index: 9999;
             display: none;
             justify-content: center;
-            align-items: center;
-            flex-direction: column;
+            align-items: flex-start;
+            padding: max(12px, env(safe-area-inset-top)) 12px;
             color: white;
-            backdrop-filter: blur(2px);
+            background: transparent;
+            pointer-events: none;
         }
 
+        .run-monitor-card {
+            width: min(460px, calc(100vw - 24px));
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,.14);
+            border-radius: 14px;
+            background: rgba(30,30,32,.96);
+            box-shadow: 0 14px 38px rgba(0,0,0,.48);
+            backdrop-filter: blur(14px);
+            pointer-events: auto;
+        }
+
+        .run-monitor-head, .run-monitor-head>div, .run-monitor-meta, .run-monitor-actions { display:flex; align-items:center; }
+        .run-monitor-head { gap:10px; }
+        .run-monitor-head>div { min-width:0; flex:1; justify-content:space-between; gap:12px; }
+        .run-monitor-head strong { font-size:.82rem; }
+        #loader-elapsed, .run-monitor-meta { color:#96969b; font-size:.7rem; font-variant-numeric:tabular-nums; }
+        #loader-msg { margin-top:8px; color:#e2e2e5; font-size:.78rem; overflow-wrap:anywhere; }
+        .run-monitor-progress { height:5px; margin-top:9px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.09); }
+        #loader-progress-bar { display:block; width:0; height:100%; border-radius:inherit; background:var(--accent); transition:width .18s ease; }
+        .run-monitor-meta { min-height:24px; justify-content:space-between; gap:12px; }
+        .run-monitor-actions { justify-content:flex-end; gap:7px; }
+        .run-monitor-actions button { min-height:34px; padding:0 11px; border:1px solid rgba(255,255,255,.12); border-radius:9px; color:#ddd; background:rgba(255,255,255,.07); cursor:pointer; }
+        #loader-cancel { color:#ffb0aa; background:rgba(192,57,43,.14); }
+        #loader-focus-error { color:#9dcef0; }
+        #loader[data-status="error"] .run-monitor-card { border-color:rgba(231,76,60,.38); }
+        #loader[data-status="error"] .spinner { animation:none; border-color:rgba(231,76,60,.3); border-top-color:#e05a5a; }
+
+        .drawflow .drawflow-node[data-run-state]::after {
+            content:"";
+            position:absolute;
+            top:-6px;
+            left:10px;
+            width:10px;
+            height:10px;
+            z-index:4;
+            border:2px solid #1e1e20;
+            border-radius:50%;
+            background:#777;
+        }
+        .drawflow .drawflow-node.jetl-run-running { border-color:rgba(52,152,219,.72)!important; box-shadow:0 0 0 2px rgba(52,152,219,.18),0 12px 30px rgba(0,0,0,.38)!important; }
+        .drawflow .drawflow-node.jetl-run-running::after { background:#3498db; animation:run-node-pulse 1s ease-in-out infinite; }
+        .drawflow .drawflow-node.jetl-run-ok::after { background:#2ecc71; }
+        .drawflow .drawflow-node.jetl-run-cached::after { background:#66afe3; }
+        .drawflow .drawflow-node.jetl-run-error::after { background:#e05a5a; }
+        .drawflow .drawflow-node.jetl-run-cancelled::after { background:#e0a84d; }
+        @keyframes run-node-pulse { 50% { transform:scale(1.35); box-shadow:0 0 0 5px rgba(52,152,219,.12); } }
+
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--accent);
+            width: 20px;
+            height: 20px;
+            flex: 0 0 20px;
+            border: 3px solid rgba(255,255,255,.18);
+            border-top: 3px solid var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 10px;
         }
 
         @keyframes spin {
@@ -1464,9 +1508,9 @@ body.modal-open {
 .run-history-badge { padding:4px 8px; border-radius:999px; color:#b9bbc0; background:rgba(255,255,255,.06); font-size:.68rem; }
 .run-history-duration{color:#d9d9dc;font-size:.72rem;font-variant-numeric:tabular-nums}
 .run-history-detail{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}.run-history-detail-head{padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--surface-border)}.run-history-detail-head>div{min-width:0;display:flex;flex-direction:column;gap:3px}.run-history-detail-head strong{color:#f4f4f5}.run-history-detail-head small{color:#939399;font-size:.72rem}
-.run-history-kpis{padding:10px 12px;display:grid;grid-template-columns:repeat(6,minmax(72px,1fr));gap:7px;overflow-x:auto}.run-history-kpis>div{min-width:72px;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.035)}.run-history-kpis span,.run-history-kpis strong{display:block}.run-history-kpis span{color:#8f8f95;font-size:.64rem}.run-history-kpis strong{margin-top:3px;color:#eeeef0;font-size:.85rem}
+.run-history-kpis{padding:10px 12px;display:grid;grid-template-columns:repeat(7,minmax(72px,1fr));gap:7px;overflow-x:auto}.run-history-kpis>div{min-width:72px;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.035)}.run-history-kpis span,.run-history-kpis strong{display:block}.run-history-kpis span{color:#8f8f95;font-size:.64rem}.run-history-kpis strong{margin-top:3px;color:#eeeef0;font-size:.85rem}
 .run-history-error{margin:0 12px 9px;padding:9px 11px;display:flex;gap:8px;color:#faa;background:rgba(192,57,43,.12);border:1px solid rgba(231,76,60,.25);border-radius:9px;font-size:.73rem;overflow-wrap:anywhere}.run-history-filter{margin:0 12px 9px;min-height:38px;display:flex;align-items:center;gap:8px;padding:0 10px;color:#89898f;border:1px solid var(--surface-border);border-radius:9px;background:#171719}.run-history-filter input{min-width:0;flex:1;border:0;outline:0;color:#eee;background:transparent;font:inherit;font-size:16px}.run-history-filter span{font-size:.68rem;font-variant-numeric:tabular-nums}
-.run-history-table-wrap{min-height:0;flex:1;overflow:auto}.run-history-node-table{width:100%;border-collapse:collapse;font-size:.74rem}.run-history-node-table th,.run-history-node-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;vertical-align:top}.run-history-node-table th{position:sticky;top:0;z-index:1;color:#9c9ca1;background:var(--surface-1)}.run-history-node-table td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}.run-history-node-table td>small{display:block;margin-top:3px;color:#85858b;font-size:.62rem}.run-history-node-link{padding:0;border:0;color:#dcdce0;background:transparent;text-align:left;cursor:pointer}.run-history-node-link small{color:#85858b}.run-history-node-error{display:block;margin-top:3px;color:#f08b8b;font-size:.65rem}.run-node-state{display:inline-block;padding:3px 6px;border-radius:999px;color:#aaa;background:rgba(255,255,255,.06);font-size:.62rem}.run-node-ok{color:#68d895;background:rgba(46,204,113,.12)}.run-node-cached{color:#79bff0;background:rgba(52,152,219,.12)}.run-node-error{color:#f08b8b;background:rgba(231,76,60,.12)}
+.run-history-table-wrap{min-height:0;flex:1;overflow:auto}.run-history-node-table{width:100%;border-collapse:collapse;font-size:.74rem}.run-history-node-table th,.run-history-node-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;vertical-align:top}.run-history-node-table th{position:sticky;top:0;z-index:1;color:#9c9ca1;background:var(--surface-1)}.run-history-node-table td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}.run-history-node-table td>small{display:block;margin-top:3px;color:#85858b;font-size:.62rem}.run-history-node-link{padding:0;border:0;color:#dcdce0;background:transparent;text-align:left;cursor:pointer}.run-history-node-link small{color:#85858b}.run-history-node-error{display:block;margin-top:3px;color:#f08b8b;font-size:.65rem}.run-node-state{display:inline-block;padding:3px 6px;border-radius:999px;color:#aaa;background:rgba(255,255,255,.06);font-size:.62rem}.run-node-ok{color:#68d895;background:rgba(46,204,113,.12)}.run-node-cached{color:#79bff0;background:rgba(52,152,219,.12)}.run-node-error{color:#f08b8b;background:rgba(231,76,60,.12)}.run-node-cancelled{color:#e0b766;background:rgba(224,168,77,.12)}
 .run-history-empty { min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#8f8f94; text-align:center; }
 .run-history-empty i { font-size:1.5rem; color:#66afe3; }
 .run-history-empty strong { color:#d7d7da; }
@@ -2255,6 +2299,9 @@ body.modal-open {
         text-align: center;
     }
 
+    #loader { align-items:flex-end; padding:12px 12px calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 12px); }
+    .run-monitor-card { width:100%; }
+
     .modal {
         align-items: flex-end;
         padding: 8px 8px var(--mobile-safe-bottom);
@@ -2300,12 +2347,21 @@ body.modal-open {
         Iniciando JETL Studio…
     </div>
 
-    <div id="loader">
-        <div class="spinner"></div>
-        <div id="loader-msg">Procesando...</div>
-        <button id="loader-cancel"
-            style="display:none; margin-top:15px; background:var(--danger); border:none; padding:8px 16px; color:white; cursor:pointer; border-radius:4px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"
-            data-ui-action="cancel-run">Cancelar Operación</button>
+    <div id="loader" role="status" aria-live="polite" aria-label="Estado de la ejecución">
+        <div class="run-monitor-card">
+            <div class="run-monitor-head">
+                <div class="spinner"></div>
+                <div><strong id="loader-title">Ejecución</strong><span id="loader-elapsed">0 ms</span></div>
+            </div>
+            <div id="loader-msg">Preparando flujo…</div>
+            <div class="run-monitor-progress" aria-hidden="true"><span id="loader-progress-bar"></span></div>
+            <div class="run-monitor-meta"><span id="loader-progress-text">0/0 nodos</span><span id="loader-node-time"></span></div>
+            <div class="run-monitor-actions">
+                <button id="loader-focus-error" type="button" data-ui-action="focus-run-error" hidden><i class="fas fa-location-crosshairs"></i> Ver nodo con error</button>
+                <button id="loader-cancel" type="button" data-ui-action="cancel-run">Cancelar</button>
+                <button id="loader-close" type="button" data-ui-action="close-run-monitor" hidden>Cerrar</button>
+            </div>
+        </div>
     </div>
     <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
     <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-flow" checked>
@@ -3470,11 +3526,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(11, 14, &quot;processNode.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/state/history.js&quot;)"></script>
 
-    <script defer src="js/processNode.js?v=20260814-7"
+    <script defer src="js/processNode.js?v=20260814-8"
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-17"
+    <script defer src="js/engine.js?v=20260814-18"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 

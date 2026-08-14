@@ -28,7 +28,7 @@ sistema de archivos.
 | Exportar informe JSON/CSV | Implementado | Exportar la ejecución seleccionada |
 | Perfiles normal/baja memoria/automático | Parcial | Exponer perfil efectivo y justificar la selección |
 | Ejecución por lotes y workspace runner | Pendiente web | Diseñar cola persistente compatible con las APIs web |
-| Diagnóstico progresivo durante el run | Parcial | Mostrar nodo activo, avance real y cancelación consistente |
+| Diagnóstico progresivo durante el run | Implementado v1 | Estado por nodo, avance real, tiempos, cancelación y salto al error |
 
 ## Datos y visualización
 

@@ -107,8 +107,9 @@ async function processNode(id, allNodes) {
         if (typeof anim_CableFlow === 'function') anim_CableFlow(id);
 
     } catch (e) {
+        const cancelled = !!window.isEngineCancelled || e?.cancelled || e?.name === 'CancelledError';
         window.JETLRunTrace?.node(id, {
-            status: 'error',
+            status: cancelled ? 'cancelled' : 'error',
             ms: Math.max(0, Math.round(performance.now() - t0)),
             error: e && e.message ? e.message : String(e)
         });

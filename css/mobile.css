@@ -580,6 +580,13 @@
         text-align: center;
     }
 
+    #loader {
+        align-items: flex-end;
+        padding: 12px 12px calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 12px);
+    }
+
+    .run-monitor-card { width: 100%; }
+
     .modal {
         align-items: flex-end;
         padding: 8px 8px var(--mobile-safe-bottom);

@@ -16,6 +16,34 @@
     background: var(--node);
 }
 
+.drawflow .drawflow-node[data-run-state]::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 10px;
+    width: 10px;
+    height: 10px;
+    z-index: 4;
+    border: 2px solid var(--surface-1);
+    border-radius: 50%;
+    background: #777;
+}
+
+.drawflow .drawflow-node.jetl-run-running {
+    border-color: rgba(52, 152, 219, .72) !important;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, .18), 0 12px 30px rgba(0, 0, 0, .38) !important;
+}
+
+.drawflow .drawflow-node.jetl-run-running::after { background: #3498db; animation: run-node-pulse 1s ease-in-out infinite; }
+.drawflow .drawflow-node.jetl-run-ok::after { background: #2ecc71; }
+.drawflow .drawflow-node.jetl-run-cached::after { background: #66afe3; }
+.drawflow .drawflow-node.jetl-run-error::after { background: #e05a5a; }
+.drawflow .drawflow-node.jetl-run-cancelled::after { background: #e0a84d; }
+
+@keyframes run-node-pulse {
+    50% { transform: scale(1.35); box-shadow: 0 0 0 5px rgba(52, 152, 219, .12); }
+}
+
 .drawflow .drawflow-node {
     width: 240px;
     min-height: 0;
@@ -411,7 +439,7 @@ body.modal-open {
 .run-history-detail-head > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .run-history-detail-head strong { color: #f4f4f5; }
 .run-history-detail-head small { color: #939399; font-size: .72rem; }
-.run-history-kpis { padding: 10px 12px; display: grid; grid-template-columns: repeat(6, minmax(72px, 1fr)); gap: 7px; overflow-x: auto; }
+.run-history-kpis { padding: 10px 12px; display: grid; grid-template-columns: repeat(7, minmax(72px, 1fr)); gap: 7px; overflow-x: auto; }
 .run-history-kpis > div { min-width: 72px; padding: 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: rgba(255,255,255,.035); }
 .run-history-kpis span, .run-history-kpis strong { display: block; }
 .run-history-kpis span { color: #8f8f95; font-size: .64rem; }
@@ -434,6 +462,7 @@ body.modal-open {
 .run-node-ok { color: #68d895; background: rgba(46,204,113,.12); }
 .run-node-cached { color: #79bff0; background: rgba(52,152,219,.12); }
 .run-node-error { color: #f08b8b; background: rgba(231,76,60,.12); }
+.run-node-cancelled { color: #e0b766; background: rgba(224,168,77,.12); }
 
 .run-history-empty {
     min-height: 230px;

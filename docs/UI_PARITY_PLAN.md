@@ -64,6 +64,8 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 - Ejecución total topológica de todos los nodos —incluidas ramas y componentes
   desconectados— desde el dock; ejecución parcial desde cada nodo. Implementado.
 - Detección explícita de ciclos antes de ejecutar. Implementado.
+- Monitor de ejecución en tiempo real con nodo activo, progreso, tiempos,
+  estados de caché/error/cancelación y salto al nodo afectado. Implementado v1.
 - Exportación de informes desde Proyecto/Resultados.
 
 La cobertura funcional completa se mantiene en

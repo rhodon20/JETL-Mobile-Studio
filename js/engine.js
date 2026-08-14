@@ -781,6 +781,150 @@ function countOutputsFromResult(data) {
 }
 
 let activeRunTrace = null;
+let activeRunMonitor = null;
+
+const RUN_NODE_CLASSES = ['jetl-run-pending', 'jetl-run-running', 'jetl-run-ok', 'jetl-run-cached', 'jetl-run-error', 'jetl-run-cancelled'];
+
+function formatLiveDuration(ms) {
+    const value = Math.max(0, Number(ms || 0));
+    return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)} s` : `${Math.round(value)} ms`;
+}
+
+function setCanvasNodeRunState(nodeId, status) {
+    const node = document.getElementById('node-' + nodeId);
+    if (!node) return;
+    node.classList.remove(...RUN_NODE_CLASSES);
+    if (status) {
+        node.classList.add(`jetl-run-${status}`);
+        node.dataset.runState = status;
+    } else {
+        delete node.dataset.runState;
+    }
+}
+
+function updateRunMonitorClock() {
+    if (!activeRunMonitor) return;
+    const elapsed = document.getElementById('loader-elapsed');
+    const nodeTime = document.getElementById('loader-node-time');
+    if (elapsed) elapsed.textContent = formatLiveDuration(Date.now() - activeRunMonitor.startedAt);
+    if (nodeTime) nodeTime.textContent = activeRunMonitor.currentStartedAt
+        ? `Nodo actual: ${formatLiveDuration(Date.now() - activeRunMonitor.currentStartedAt)}` : '';
+}
+
+function renderRunMonitor() {
+    if (!activeRunMonitor) return;
+    const total = activeRunMonitor.plannedIds.length;
+    const done = activeRunMonitor.completedIds.size;
+    const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    const progressText = document.getElementById('loader-progress-text');
+    const progressBar = document.getElementById('loader-progress-bar');
+    if (progressText) progressText.textContent = `${done}/${total} nodos · ${progress}%`;
+    if (progressBar) progressBar.style.width = `${progress}%`;
+    updateRunMonitorClock();
+}
+
+function startRunMonitor(label, plannedIds) {
+    if (activeRunMonitor?.timer) clearInterval(activeRunMonitor.timer);
+    if (activeRunMonitor?.closeTimer) clearTimeout(activeRunMonitor.closeTimer);
+    const ids = (plannedIds || []).map(String);
+    document.querySelectorAll('.drawflow-node').forEach((node) => {
+        node.classList.remove(...RUN_NODE_CLASSES);
+        delete node.dataset.runState;
+    });
+    ids.forEach((id) => setCanvasNodeRunState(id, 'pending'));
+    activeRunMonitor = { label, plannedIds: ids, completedIds: new Set(), startedAt: Date.now(), currentNodeId: null, currentStartedAt: null, errorNodeId: null, timer: null, closeTimer: null };
+    const loader = document.getElementById('loader');
+    const title = document.getElementById('loader-title');
+    const message = document.getElementById('loader-msg');
+    const cancel = document.getElementById('loader-cancel');
+    const close = document.getElementById('loader-close');
+    const focusError = document.getElementById('loader-focus-error');
+    if (loader) { loader.style.display = 'flex'; loader.dataset.status = 'running'; }
+    if (title) title.textContent = label;
+    if (message) message.textContent = 'Preparando flujo…';
+    if (cancel) cancel.hidden = false;
+    if (close) close.hidden = true;
+    if (focusError) focusError.hidden = true;
+    renderRunMonitor();
+    activeRunMonitor.timer = setInterval(updateRunMonitorClock, 100);
+}
+
+function updateRunMonitorNode(nodeId, patch) {
+    if (!activeRunMonitor || !patch?.status) return;
+    const id = String(nodeId);
+    const graphNode = _getGraphDataSafe()[id];
+    const tool = graphNode?.name ? window.TOOL_REGISTRY?.[graphNode.name] : null;
+    const label = tool?.label || graphNode?.name || `Nodo #${id}`;
+    const terminal = ['ok', 'cached', 'error', 'cancelled'].includes(patch.status);
+    if (patch.status === 'running') {
+        activeRunMonitor.currentNodeId = id;
+        activeRunMonitor.currentStartedAt = Date.now();
+    }
+    if (terminal) {
+        activeRunMonitor.completedIds.add(id);
+        if (activeRunMonitor.currentNodeId === id) activeRunMonitor.currentStartedAt = null;
+    }
+    if (patch.status === 'error') activeRunMonitor.errorNodeId = id;
+    setCanvasNodeRunState(id, patch.status);
+    const message = document.getElementById('loader-msg');
+    if (message) {
+        if (patch.status === 'running') message.textContent = `Ejecutando ${label} (#${id})`;
+        else if (patch.status === 'cached') message.textContent = `${label} recuperado de caché`;
+        else if (patch.status === 'error') message.textContent = `Error en ${label}: ${patch.error || 'error desconocido'}`;
+        else if (patch.status === 'ok') message.textContent = `${label} completado en ${formatLiveDuration(patch.ms)}`;
+    }
+    renderRunMonitor();
+}
+
+function finishRunMonitor(status, errorNodeId = null) {
+    if (!activeRunMonitor) return;
+    if (activeRunMonitor.timer) clearInterval(activeRunMonitor.timer);
+    activeRunMonitor.timer = null;
+    if (status === 'cancelled') {
+        activeRunMonitor.plannedIds.forEach((id) => {
+            if (!activeRunMonitor.completedIds.has(id)) setCanvasNodeRunState(id, 'cancelled');
+        });
+    }
+    const loader = document.getElementById('loader');
+    const message = document.getElementById('loader-msg');
+    const cancel = document.getElementById('loader-cancel');
+    const close = document.getElementById('loader-close');
+    const focusError = document.getElementById('loader-focus-error');
+    const resolvedErrorId = errorNodeId || activeRunMonitor.errorNodeId;
+    if (loader) loader.dataset.status = status;
+    if (cancel) cancel.hidden = true;
+    if (close) close.hidden = status !== 'error';
+    if (focusError) {
+        focusError.hidden = status !== 'error' || !resolvedErrorId;
+        focusError.dataset.nodeId = resolvedErrorId || '';
+    }
+    if (message) {
+        if (status === 'ok') message.textContent = 'Flujo completado';
+        else if (status === 'cancelled') message.textContent = 'Ejecución cancelada';
+        else if (status === 'error' && !resolvedErrorId) message.textContent = 'La ejecución terminó con error';
+    }
+    renderRunMonitor();
+    if (status !== 'error') {
+        const monitor = activeRunMonitor;
+        monitor.closeTimer = setTimeout(() => {
+            if (activeRunMonitor === monitor) closeRunMonitor();
+        }, status === 'ok' ? 700 : 1200);
+    }
+}
+
+function closeRunMonitor() {
+    if (activeRunMonitor?.timer) clearInterval(activeRunMonitor.timer);
+    if (activeRunMonitor?.closeTimer) clearTimeout(activeRunMonitor.closeTimer);
+    const loader = document.getElementById('loader');
+    if (loader) loader.style.display = 'none';
+    activeRunMonitor = null;
+}
+
+function getRunErrorNodeId() {
+    if (!activeRunTrace) return null;
+    for (const [id, event] of activeRunTrace.nodes.entries()) if (event.status === 'error') return id;
+    return null;
+}
 
 function buildExecutionPlan(graphData) {
     const data = graphData || {};
@@ -847,6 +991,7 @@ function beginRunTrace(label, scope, plannedIds) {
         plannedIds: (plannedIds || []).map(String),
         nodes: new Map()
     };
+    startRunMonitor(label, activeRunTrace.plannedIds);
     return activeRunTrace;
 }
 
@@ -855,7 +1000,12 @@ function markRunTraceNode(nodeId, patch) {
     const id = String(nodeId);
     const previous = activeRunTrace.nodes.get(id) || { id, started_at: new Date().toISOString() };
     if (['ok', 'cached'].includes(previous.status) && ['ok', 'cached'].includes(patch?.status)) return;
-    activeRunTrace.nodes.set(id, { ...previous, ...(patch || {}), id });
+    const now = new Date().toISOString();
+    const nextPatch = { ...(patch || {}) };
+    if (nextPatch.status === 'running') nextPatch.started_at = previous.started_at || now;
+    if (['ok', 'cached', 'error', 'cancelled'].includes(nextPatch.status)) nextPatch.finished_at = now;
+    activeRunTrace.nodes.set(id, { ...previous, ...nextPatch, id });
+    updateRunMonitorNode(id, nextPatch);
 }
 
 function finishRunTrace() {
@@ -885,7 +1035,9 @@ function buildRunReport(label, status, errorMessage) {
             count: event ? countFeaturesFromResult(meta ? meta.data : null) : 0,
             outputs: event ? countOutputsFromResult(meta ? meta.data : null) : {},
             cached: event?.status === 'cached',
-            error: event?.error || null
+            error: event?.error || null,
+            started_at: event?.started_at || null,
+            finished_at: event?.finished_at || null
         };
     }).sort((a, b) => b.ms - a.ms);
 
@@ -911,6 +1063,7 @@ function buildRunReport(label, status, errorMessage) {
             executed_nodes: nodes.filter((node) => node.status === 'ok').length,
             cached_nodes: nodes.filter((node) => node.status === 'cached').length,
             error_nodes: nodes.filter((node) => node.status === 'error').length,
+            cancelled_nodes: nodes.filter((node) => node.status === 'cancelled').length,
             total_ms: totalMs,
             total_features: totalFeatures
         },
@@ -998,7 +1151,7 @@ function renderRunHistory() {
         .join(' ').toLocaleLowerCase('es').includes(needle));
     const nodeRows = nodes.map((node) => {
         const outputs = Object.entries(node.outputs || {}).map(([port, value]) => `${port}: ${value}`).join(' · ') || '—';
-        const state = node.status === 'ok' ? 'Ejecutado' : node.status === 'cached' ? 'Caché' : node.status === 'error' ? 'Error' : 'No ejecutado';
+        const state = node.status === 'ok' ? 'Ejecutado' : node.status === 'cached' ? 'Caché' : node.status === 'error' ? 'Error' : node.status === 'cancelled' ? 'Cancelado' : 'No ejecutado';
         return `<tr data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">
             <td><button type="button" class="run-history-node-link" data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">${escapeFlowNavigatorHTML(node.label)} <small>#${escapeFlowNavigatorHTML(node.id)}</small></button>${node.error ? `<span class="run-history-node-error">${escapeFlowNavigatorHTML(node.error)}</span>` : ''}</td>
             <td><span class="run-node-state run-node-${escapeFlowNavigatorHTML(node.status)}">${state}</span></td>
@@ -1017,6 +1170,7 @@ function renderRunHistory() {
         <div><span>Caché</span><strong>${summary.cached_nodes ?? 0}</strong></div>
         <div><span>Features</span><strong>${summary.total_features ?? 0}</strong></div>
         <div><span>Errores</span><strong>${summary.error_nodes ?? (selected.status === 'error' ? 1 : 0)}</strong></div>
+        <div><span>Cancelados</span><strong>${summary.cancelled_nodes ?? 0}</strong></div>
     </div>
     ${selected.error ? `<div class="run-history-error"><i class="fas fa-triangle-exclamation"></i>${escapeFlowNavigatorHTML(selected.error)}</div>` : ''}
     <label class="run-history-filter"><i class="fas fa-filter"></i><input id="run-history-node-filter" type="search" value="${escapeFlowNavigatorHTML(runHistoryNodeFilter)}" placeholder="Filtrar nodos…"><span>${nodes.length}/${(selected.nodes || []).length}</span></label>
@@ -1353,6 +1507,13 @@ function initEngineDelegation() {
         const action = actionEl.getAttribute('data-ui-action');
 
         if (action === 'cancel-run') cancelEngineRun();
+        else if (action === 'close-run-monitor') closeRunMonitor();
+        else if (action === 'focus-run-error') {
+            const nodeId = actionEl.dataset.nodeId;
+            closeRunMonitor();
+            window.JETLNativeNav?.('flow');
+            if (nodeId) requestAnimationFrame(() => focusFlowNode(nodeId));
+        }
         else if (action === 'toggle-sidebar') toggleSidebar();
         else if (action === 'undo' && typeof undo === 'function') undo();
         else if (action === 'redo' && typeof redo === 'function') redo();
@@ -1500,10 +1661,6 @@ async function runEngine() {
     currentRunTimestamp = Date.now();
     const initialGraph = _getGraphDataSafe();
     beginRunTrace('Ejecución Total', 'full', Object.keys(initialGraph));
-    const loader = document.getElementById('loader');
-    const cancelBtn = document.getElementById('loader-cancel');
-    loader.style.display = 'flex';
-    if (cancelBtn) cancelBtn.style.display = 'block';
     log("--- INICIANDO EJECUCIÓN TOTAL ---");
 
     const runtime = typeof window.JETLEnsureRuntime === 'function'
@@ -1514,8 +1671,7 @@ async function runEngine() {
         publishRunReport(buildRunReport('Ejecución Total', 'error', runtimeError?.message || 'El motor no pudo cargarse'));
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");
-        loader.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
+        finishRunMonitor('error');
         return;
     }
 
@@ -1532,8 +1688,7 @@ async function runEngine() {
         publishRunReport(buildRunReport('Ejecución Total', 'error', 'Añade un Reader para ejecutar el flujo'));
         log("Error: Añade un Reader", "err");
         showToast("Añade un Reader", "warning");
-        loader.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
+        finishRunMonitor('error');
         return;
     }
 
@@ -1552,6 +1707,7 @@ async function runEngine() {
         log("--- FIN EXITOSO ---");
         if (typeof logRunSummary === 'function') logRunSummary('Ejecución Total');
         publishRunReport(buildRunReport('Ejecución Total', 'ok', null));
+        finishRunMonitor('ok');
         showToast("Proceso completado", "success");
         updateBadges();
         if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
@@ -1559,16 +1715,16 @@ async function runEngine() {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
             publishRunReport(buildRunReport('Ejecución Total', 'cancelled', null));
+            finishRunMonitor('cancelled');
             log("Ejecución cancelada por el usuario.", "warn");
             showToast("Ejecución cancelada", "warning");
         } else {
             publishRunReport(buildRunReport('Ejecución Total', 'error', e && e.message ? e.message : String(e)));
+            finishRunMonitor('error', getRunErrorNodeId());
             log("FATAL: " + e.message, "err");
             showToast("Error en ejecución", "error");
         }
     }
-    loader.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function cancelEngineRun() {
@@ -1580,7 +1736,7 @@ function cancelEngineRun() {
     const loaderMsg = document.getElementById('loader-msg');
     if (loaderMsg) loaderMsg.innerText = "Deteniendo...";
     const cancelBtn = document.getElementById('loader-cancel');
-    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.hidden = true;
 }
 
 async function runEnginePartial(targetId) {
@@ -1588,10 +1744,6 @@ async function runEnginePartial(targetId) {
     currentRunTimestamp = Date.now();
     const initialGraph = _getGraphDataSafe();
     beginRunTrace(`Parcial #${targetId}`, 'partial', collectRequiredNodeIds(targetId, initialGraph));
-    const loader = document.getElementById('loader');
-    const cancelBtn = document.getElementById('loader-cancel');
-    loader.style.display = 'flex';
-    if (cancelBtn) cancelBtn.style.display = 'block';
 
     const runtime = typeof window.JETLEnsureRuntime === 'function'
         ? window.JETLEnsureRuntime()
@@ -1601,8 +1753,7 @@ async function runEnginePartial(targetId) {
         publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', runtimeError?.message || 'El motor no pudo cargarse'));
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");
-        loader.style.display = 'none';
-        if (cancelBtn) cancelBtn.style.display = 'none';
+        finishRunMonitor('error');
         return;
     }
 
@@ -1621,6 +1772,7 @@ async function runEnginePartial(targetId) {
         log("--- Parcial Completado ---");
         if (typeof logRunSummary === 'function') logRunSummary(`Parcial #${targetId}`);
         publishRunReport(buildRunReport(`Parcial #${targetId}`, 'ok', null));
+        finishRunMonitor('ok');
         showToast("Nodo actualizado", "success");
 
         updateBadges();
@@ -1644,16 +1796,16 @@ async function runEnginePartial(targetId) {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
             publishRunReport(buildRunReport(`Parcial #${targetId}`, 'cancelled', null));
+            finishRunMonitor('cancelled');
             log("Ejecución parcial cancelada por el usuario.", "warn");
             showToast("Ejecución parcial cancelada", "warning");
         } else {
             publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', e && e.message ? e.message : String(e)));
+            finishRunMonitor('error', getRunErrorNodeId());
             log("Error Parcial: " + e.message, "err");
             showToast("Error en ejecución parcial", "error");
         }
     }
-    loader.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function saveProject() {

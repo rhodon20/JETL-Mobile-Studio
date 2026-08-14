@@ -196,3 +196,49 @@ test('el historial ofrece detalle, KPIs, filtro y exportación por ejecución', 
     assert.match(engine, /class="run-history-node-table"/);
     assert.match(engine, /function downloadRunReport\(format = 'json', reportOverride = null\)/);
 });
+
+test('el monitor refleja progreso, nodo activo y error navegable', () => {
+    const start = engine.indexOf('let activeRunMonitor = null');
+    const end = engine.indexOf('function buildExecutionPlan', start);
+    assert.ok(start >= 0 && end > start, 'falta el monitor de ejecución');
+    const makeClassList = () => {
+        const values = new Set();
+        return { values, add(...names) { names.forEach((name) => values.add(name)); }, remove(...names) { names.forEach((name) => values.delete(name)); } };
+    };
+    const nodes = ['1', '2'].map((id) => ({ id: `node-${id}`, classList: makeClassList(), dataset: {} }));
+    const ids = ['loader', 'loader-title', 'loader-elapsed', 'loader-msg', 'loader-cancel', 'loader-close', 'loader-focus-error', 'loader-progress-text', 'loader-progress-bar', 'loader-node-time'];
+    const elements = Object.fromEntries(ids.map((id) => [id, { id, style: {}, dataset: {}, hidden: false, textContent: '' }]));
+    const graph = { 1: { name: 'reader' }, 2: { name: 'writer' } };
+    const context = {
+        window: { TOOL_REGISTRY: { reader: { label: 'Reader' }, writer: { label: 'Writer' } } },
+        document: {
+            querySelectorAll(selector) { return selector === '.drawflow-node' ? nodes : []; },
+            getElementById(id) { return nodes.find((node) => node.id === id) || elements[id] || null; }
+        },
+        _getGraphDataSafe() { return graph; },
+        setInterval() { return 1; }, clearInterval() {}, setTimeout() { return 2; }, clearTimeout() {},
+        Date, Math, Number, String, Set
+    };
+    vm.runInNewContext(`${engine.slice(start, end)}; window.startMonitor=startRunMonitor; window.updateMonitor=updateRunMonitorNode; window.finishMonitor=finishRunMonitor;`, context);
+    context.window.startMonitor('Ejecución Total', ['1', '2']);
+    assert.equal(elements.loader.style.display, 'flex');
+    assert.ok(nodes[0].classList.values.has('jetl-run-pending'));
+    context.window.updateMonitor('1', { status: 'running', ms: 0 });
+    assert.ok(nodes[0].classList.values.has('jetl-run-running'));
+    assert.match(elements['loader-msg'].textContent, /Reader/);
+    context.window.updateMonitor('1', { status: 'ok', ms: 24 });
+    assert.equal(elements['loader-progress-text'].textContent, '1/2 nodos · 50%');
+    context.window.updateMonitor('2', { status: 'error', ms: 5, error: 'fallo controlado' });
+    context.window.finishMonitor('error', '2');
+    assert.equal(elements['loader-focus-error'].hidden, false);
+    assert.equal(elements['loader-focus-error'].dataset.nodeId, '2');
+    assert.ok(nodes[1].classList.values.has('jetl-run-error'));
+});
+
+test('la cancelación se registra sin convertirla en un error de nodo', () => {
+    const processNode = readFileSync(new URL('../js/processNode.js', import.meta.url), 'utf8');
+    assert.match(processNode, /cancelled \? 'cancelled' : 'error'/);
+    assert.match(engine, /finishRunMonitor\('cancelled'\)/);
+    assert.match(engine, /cancelled_nodes:/);
+    assert.match(engine, /<span>Cancelados<\/span>/);
+});
