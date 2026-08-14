@@ -8,6 +8,8 @@
     }
 
     function setActive(view) {
+        const nativeState = document.getElementById(`mobile-state-${view}`);
+        if (nativeState) nativeState.checked = true;
         document.querySelectorAll('[data-mobile-view]').forEach((button) => {
             button.classList.toggle('active', button.dataset.mobileView === view);
         });

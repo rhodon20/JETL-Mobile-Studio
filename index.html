@@ -66,6 +66,8 @@
         window.JETLNativeNav = function (view) {
             if (!document.body) return;
             window.JETLMarkInteraction('nav:' + view);
+            var nativeState = document.getElementById('mobile-state-' + view);
+            if (nativeState) nativeState.checked = true;
             var sidebar = document.getElementById('sidebar');
             var overlay = document.getElementById('sidebar-overlay');
             var project = document.getElementById('mobile-project-sheet');
@@ -1493,6 +1495,14 @@ body.modal-open {
     display: none;
 }
 
+.mobile-view-state {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
 @media (max-width: 768px) {
     html,
     body {
@@ -1575,6 +1585,14 @@ body.modal-open {
         box-shadow: 14px 0 40px rgba(0, 0, 0, .45);
     }
 
+    #mobile-state-nodes:checked ~ #layout #sidebar {
+        transform: translateX(0) !important;
+    }
+
+    #mobile-state-nodes:checked ~ #layout #sidebar-overlay {
+        display: block !important;
+    }
+
     #sidebar-search {
         padding: 14px;
     }
@@ -1635,6 +1653,13 @@ body.modal-open {
     }
 
     body.mobile-results-open #bottom-panel {
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) !important;
+        transition-delay: 0s;
+    }
+
+    #mobile-state-results:checked ~ #bottom-panel {
         visibility: visible;
         pointer-events: auto;
         transform: translate3d(0, 0, 0) !important;
@@ -1745,6 +1770,9 @@ body.modal-open {
         font-size: .67rem;
         font-weight: 650;
         touch-action: manipulation;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     .mobile-dock-btn i {
@@ -1752,6 +1780,14 @@ body.modal-open {
     }
 
     .mobile-dock-btn.active {
+        color: #71b9ff;
+        background: rgba(52, 152, 219, .13);
+    }
+
+    #mobile-state-nodes:checked ~ #mobile-dock [for="mobile-state-nodes"],
+    #mobile-state-flow:checked ~ #mobile-dock [for="mobile-state-flow"],
+    #mobile-state-results:checked ~ #mobile-dock [for="mobile-state-results"],
+    #mobile-state-project:checked ~ #mobile-dock [for="mobile-state-project"] {
         color: #71b9ff;
         background: rgba(52, 152, 219, .13);
     }
@@ -1788,6 +1824,12 @@ body.modal-open {
         pointer-events: auto;
     }
 
+    #mobile-state-project:checked ~ #mobile-scrim,
+    #mobile-state-results:checked ~ #mobile-scrim {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
     #mobile-project-sheet {
         display: block;
         position: fixed;
@@ -1804,6 +1846,10 @@ body.modal-open {
     }
 
     body.mobile-sheet-open #mobile-project-sheet {
+        transform: translateY(0);
+    }
+
+    #mobile-state-project:checked ~ #mobile-project-sheet {
         transform: translateY(0);
     }
 
@@ -1847,6 +1893,8 @@ body.modal-open {
         border-radius: 50%;
         color: #ddd;
         background: #303034;
+        display: grid;
+        place-items: center;
     }
 
     .mobile-project-grid {
@@ -1932,7 +1980,10 @@ body.modal-open {
             data-ui-action="cancel-run">Cancelar Operación</button>
     </div>
     <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
-    <div id="interaction-diagnostic" role="status" aria-live="polite">TOUCH-11 · esperando toque</div>
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-flow" checked>
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-nodes">
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-results">
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-project">
 
     <div id="quick-search">
         <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
@@ -1979,9 +2030,9 @@ body.modal-open {
             </div>
             <div id="sidebar-content"></div>
         </div>
-        <div id="sidebar-overlay" data-ui-action="toggle-sidebar"
+        <label id="sidebar-overlay" for="mobile-state-flow" data-ui-action="toggle-sidebar"
             style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:40;">
-        </div>
+        </label>
 
         <div id="workspace">
             <div id="drawflow"  ></div>
@@ -2052,29 +2103,29 @@ body.modal-open {
     </div>
 
     <nav id="mobile-dock" aria-label="Navegación principal">
-        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos" onclick="event.stopPropagation(); JETLNativeNav('nodes')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('nodes')">
+        <label class="mobile-dock-btn" for="mobile-state-nodes" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos">
             <i class="fas fa-shapes"></i><span>Nodos</span>
-        </button>
-        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')">
+        </label>
+        <label class="mobile-dock-btn" for="mobile-state-flow" data-mobile-view="flow" aria-label="Ver flujo">
             <i class="fas fa-diagram-project"></i><span>Flujo</span>
-        </button>
+        </label>
         <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="event.stopPropagation(); JETLNativeRun()" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeRun()">
             <i class="fas fa-play"></i><span>Ejecutar</span>
         </button>
-        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados" onclick="event.stopPropagation(); JETLNativeNav('results')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('results')">
+        <label class="mobile-dock-btn" for="mobile-state-results" data-mobile-view="results" aria-label="Abrir resultados">
             <i class="fas fa-chart-area"></i><span>Resultados</span>
-        </button>
-        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto" onclick="event.stopPropagation(); JETLNativeNav('project')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('project')">
+        </label>
+        <label class="mobile-dock-btn" for="mobile-state-project" data-mobile-view="project" aria-label="Abrir acciones del proyecto">
             <i class="fas fa-folder-open"></i><span>Proyecto</span>
-        </button>
+        </label>
     </nav>
 
-    <div id="mobile-scrim" aria-hidden="true" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')"></div>
+    <label id="mobile-scrim" for="mobile-state-flow" aria-hidden="true"></label>
     <section id="mobile-project-sheet" aria-hidden="true" aria-label="Acciones del proyecto">
         <div class="mobile-sheet-handle"></div>
         <div class="mobile-sheet-header">
             <div><small>ESPACIO DE TRABAJO</small><strong>Proyecto</strong></div>
-            <button type="button" class="mobile-sheet-close" data-mobile-close aria-label="Cerrar" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')"><i class="fas fa-times"></i></button>
+            <label class="mobile-sheet-close" for="mobile-state-flow" data-mobile-close aria-label="Cerrar"><i class="fas fa-times"></i></label>
         </div>
         <div class="mobile-project-grid">
             <button type="button" data-ui-action="save-project"><i class="fas fa-save"></i><span>Guardar</span></button>
@@ -3049,7 +3100,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
-    <script defer src="js/mobile.js?v=20260814-7"
+    <script defer src="js/mobile.js?v=20260814-8"
         onload="window.JETLBootModuleLoaded(14, 14, &quot;listo&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
 
