@@ -12,6 +12,18 @@
     <meta name="apple-mobile-web-app-title" content="JETL">
     <title>JETL Studio v2026.03.05 - Open Source PWA</title>
 
+    <script>
+        // Registrar la actualización antes de descargar las librerías GIS. Así una
+        // versión antigua del PWA no puede impedir que llegue la corrección.
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').then((registration) => {
+                registration.update().catch(() => {});
+            }).catch((error) => {
+                console.warn('ServiceWorker registration failed:', error);
+            });
+        }
+    </script>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print"
         onload="this.media='all'">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css" media="print"
@@ -25,18 +37,7 @@
     </noscript>
 
     <!-- Drawflow es la única dependencia necesaria para pintar el editor.
-         El resto de motores GIS se descarga en paralelo y nunca bloquea la UI. -->
-    <script src="js/vendor/leaflet.js" async></script>
-    <script src="js/vendor/turf.min.js" async></script>
-    <script src="js/vendor/shp.js" async></script>
-    <script src="js/vendor/geotiff.js" async></script>
-    <script src="js/vendor/geoblaze.web.min.js" async></script>
-    <script src="js/vendor/osmtogeojson.js" async></script>
-    <script src="js/vendor/proj4.js" async></script>
-    <script src="js/vendor/wellknown.js" async></script>
-    <script src="js/vendor/geopackage.min.js" async></script>
-    <script src="js/vendor/parquet.min.js" async></script>
-    <script src="js/vendor/anime.min.js" async></script>
+         Los motores GIS se cargan después de montar la interfaz. -->
 
     <style>
         /* --- CORE VARS --- */
@@ -1259,23 +1260,39 @@
     <script src="js/mobile.js"></script>
 
     <script>
-        if ('serviceWorker' in navigator) {
-            const registerJETLServiceWorker = () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                        registration.update().catch(() => {});
-                    })
-                    .catch(error => {
-                        console.warn('ServiceWorker registration failed: ', error);
-                    });
+        // Safari puede ejecutar varios scripts `async` pesados mientras todavía
+        // analiza el HTML. Cargarlos de uno en uno después del primer render evita
+        // que 3+ MB de motores GIS bloqueen el arranque de la interfaz.
+        const JETL_DEFERRED_LIBRARIES = [
+            'js/vendor/leaflet.js',
+            'js/vendor/turf.min.js',
+            'js/vendor/anime.min.js',
+            'js/vendor/shp.js',
+            'js/vendor/geotiff.js',
+            'js/vendor/geoblaze.web.min.js',
+            'js/vendor/osmtogeojson.js',
+            'js/vendor/proj4.js',
+            'js/vendor/wellknown.js',
+            'js/vendor/geopackage.min.js',
+            'js/vendor/parquet.min.js'
+        ];
+
+        function loadJETLDeferredLibraries() {
+            let index = 0;
+            const loadNext = () => {
+                if (index >= JETL_DEFERRED_LIBRARIES.length) return;
+                const script = document.createElement('script');
+                script.src = JETL_DEFERRED_LIBRARIES[index++];
+                script.onload = loadNext;
+                script.onerror = loadNext;
+                document.body.appendChild(script);
             };
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', registerJETLServiceWorker, { once: true });
-            } else {
-                registerJETLServiceWorker();
-            }
+            loadNext();
         }
+
+        window.addEventListener('load', () => {
+            requestAnimationFrame(() => setTimeout(loadJETLDeferredLibraries, 0));
+        }, { once: true });
     </script>
 </body>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v9';
+const CACHE_NAME = 'jetl-mobile-cache-v10';
 const coreAssets = [
     './',
     './index.html',
@@ -79,25 +79,23 @@ self.addEventListener('fetch', event => {
     if (event.request.mode === 'navigate') {
         event.respondWith(
             caches.match('./index.html').then(cached => {
-                const networkUpdate = fetch(event.request)
+                const networkResponse = Promise.race([
+                    fetch(event.request, { cache: 'no-store' })
                     .then(response => {
                         if (response && response.ok) {
                             caches.open(CACHE_NAME).then(cache => cache.put('./index.html', response.clone()));
                         }
                         return response;
                     })
-                    .catch(() => null);
+                    .catch(() => null),
+                    new Promise(resolve => setTimeout(() => resolve(null), 4000))
+                ]);
 
-                // Una navegación nunca debe quedar bloqueada esperando la red.
-                if (cached) {
-                    networkUpdate.then(() => undefined);
-                    return cached;
-                }
-                return Promise.race([
-                    networkUpdate,
-                    new Promise(resolve => setTimeout(() => resolve(null), 8000))
-                ]).then(response => {
+                // Preferir una versión fresca, pero no dejar nunca la navegación
+                // bloqueada: a los 4 s se usa la copia local ya validada.
+                return networkResponse.then(response => {
                     if (response) return response;
+                    if (cached) return cached;
                     return caches.match('./').then(rootCached => rootCached || new Response(
                         '<!doctype html><meta name="viewport" content="width=device-width"><body style="background:#121212;color:#fff;font-family:sans-serif;padding:24px"><h1>JETL Studio</h1><p>Sin conexión. Vuelve a intentarlo cuando dispongas de red.</p></body>',
                         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
