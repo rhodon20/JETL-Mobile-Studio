@@ -27,10 +27,16 @@
                 diagnostic.style.color = '#ff8a80';
             }
         }
-        window.JETLBootModuleLoaded = (loaded, total, name) => {
-            window.__JETL_BOOT.stage = `modules:${loaded}/${total}:${name}`;
+        window.JETLBootModuleLoaded = (loaded, total, nextName) => {
+            window.__JETL_BOOT.stage = loaded >= total
+                ? 'modules-ready'
+                : `modules:${loaded}/${total}:next:${nextName}`;
             const diagnostic = document.getElementById('boot-diagnostic');
-            if (diagnostic) diagnostic.textContent = `Cargando módulos (${loaded}/${total})…`;
+            if (diagnostic) {
+                diagnostic.textContent = loaded >= total
+                    ? 'Preparando el editor…'
+                    : `Cargando ${nextName} (${loaded}/${total})…`;
+            }
         };
         window.addEventListener('error', (event) => {
             reportJETLBootError(event.message || 'Error de JavaScript');
@@ -2173,7 +2179,6 @@ body.modal-open {
         }
 
         if (typeof window !== 'undefined') {
-            window.addEventListener('load', () => setTimeout(ensureSmokeApiLoaded, 120));
             window.ensureSmokeApiLoaded = ensureSmokeApiLoaded;
             window.ensureSmokeApiLoadedAsync = ensureSmokeApiLoadedAsync;
         }
@@ -2793,38 +2798,73 @@ body.modal-open {
     }
 })();
 
-window.JETLBootModuleLoaded(1, 6, "core-inline");
+window.JETLBootModuleLoaded(1, 13, "readers.js");
     </script>
 
-    <script defer src="js/boot/nodes-a.bundle.js?v=20260814-4"
-        onload="window.JETLBootModuleLoaded(2, 6, &quot;nodes-a.bundle.js&quot;)"
-        onerror="reportJETLBootError(&quot;No se pudo descargar nodes-a.bundle.js&quot;)"></script>
+    <script defer src="js/nodes/readers.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(2, 13, &quot;geometry.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
 
-    <script defer src="js/boot/nodes-b.bundle.js?v=20260814-4"
-        onload="window.JETLBootModuleLoaded(3, 6, &quot;nodes-b.bundle.js&quot;)"
-        onerror="reportJETLBootError(&quot;No se pudo descargar nodes-b.bundle.js&quot;)"></script>
+    <script defer src="js/nodes/geometry.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(3, 13, &quot;utils.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/geometry.js&quot;)"></script>
 
-    <script defer src="js/boot/editor.bundle.js?v=20260814-4"
-        onload="window.JETLBootModuleLoaded(4, 6, &quot;editor.bundle.js&quot;)"
-        onerror="reportJETLBootError(&quot;No se pudo descargar editor.bundle.js&quot;)"></script>
+    <script defer src="js/nodes/utils.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(4, 13, &quot;spatial.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/utils.js&quot;)"></script>
 
-    <script defer src="js/boot/features.bundle.js?v=20260814-4"
-        onload="window.JETLBootModuleLoaded(5, 6, &quot;features.bundle.js&quot;)"
-        onerror="reportJETLBootError(&quot;No se pudo descargar features.bundle.js&quot;)"></script>
+    <script defer src="js/nodes/spatial.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(5, 13, &quot;attributes.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/spatial.js&quot;)"></script>
 
-    <script defer src="js/boot/extras.bundle.js?v=20260814-4"
-        onload="window.JETLBootModuleLoaded(6, 6, &quot;extras.bundle.js&quot;)"
-        onerror="reportJETLBootError(&quot;No se pudo descargar extras.bundle.js&quot;)"></script>
+    <script defer src="js/nodes/attributes.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(6, 13, &quot;raster.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
+
+    <script defer src="js/nodes/raster.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(7, 13, &quot;writers.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/raster.js&quot;)"></script>
+
+    <script defer src="js/nodes/writers.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(8, 13, &quot;tools.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/writers.js&quot;)"></script>
+
+    <script defer src="js/tools.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(9, 13, &quot;workerPool.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/tools.js&quot;)"></script>
+
+    <script defer src="js/core/workerPool.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(10, 13, &quot;history.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/core/workerPool.js&quot;)"></script>
+
+    <script defer src="js/state/history.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(11, 13, &quot;engine.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/state/history.js&quot;)"></script>
+
+    <script defer src="js/engine.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(12, 13, &quot;mobile.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
+
+    <script defer src="js/mobile.js?v=20260814-5"
+        onload="window.JETLBootModuleLoaded(13, 13, &quot;listo&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
 
     <script>
-        window.__JETL_BOOT.stage = "modules:1/6:core-inline";
+        window.__JETL_BOOT.stage = "modules:1/13:next:readers.js";
         const bootDiagnostic = document.getElementById('boot-diagnostic');
-        if (bootDiagnostic) bootDiagnostic.textContent = "Cargando módulos (1/6)…";
+        if (bootDiagnostic) bootDiagnostic.textContent = "Cargando readers.js (1/13)…";
 
         // Safari puede ejecutar varios scripts `async` pesados mientras todavía
         // analiza el HTML. Cargarlos de uno en uno después del primer render evita
         // que 3+ MB de motores GIS bloqueen el arranque de la interfaz.
-        const JETL_DEFERRED_LIBRARIES = [
+        const JETL_POST_BOOT_SCRIPTS = [
+            'js/schemaUI.js',
+            'js/processNode.js',
+            'js/visualization.js',
+            'js/templates.js',
+            'js/packages.js',
+            'js/modalSystem.js',
+            'js/smoke.js',
             'js/vendor/leaflet.js',
             'js/vendor/turf.min.js',
             'js/vendor/anime.min.js',
@@ -2852,12 +2892,12 @@ window.JETLBootModuleLoaded(1, 6, "core-inline");
             });
         }
 
-        function loadJETLDeferredLibraries() {
+        function loadJETLPostBootScripts() {
             let index = 0;
             const loadNext = () => {
-                if (index >= JETL_DEFERRED_LIBRARIES.length) return;
+                if (index >= JETL_POST_BOOT_SCRIPTS.length) return;
                 const script = document.createElement('script');
-                script.src = JETL_DEFERRED_LIBRARIES[index++];
+                script.src = JETL_POST_BOOT_SCRIPTS[index++];
                 script.onload = loadNext;
                 script.onerror = loadNext;
                 document.body.appendChild(script);
@@ -2868,7 +2908,7 @@ window.JETLBootModuleLoaded(1, 6, "core-inline");
         window.addEventListener('load', () => {
             requestAnimationFrame(() => setTimeout(() => {
                 loadJETLDeferredStyles();
-                loadJETLDeferredLibraries();
+                loadJETLPostBootScripts();
             }, 0));
         }, { once: true });
     </script>
