@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v3';
+const CACHE_NAME = 'jetl-mobile-cache-v4';
 const coreAssets = [
     './',
     './index.html',
@@ -10,8 +10,6 @@ const coreAssets = [
     './js/modalSystem.js',
 
     // Vendor Libs
-    'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-    'https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css',
     './js/vendor/leaflet.js',
     './js/vendor/turf.min.js',
     './js/vendor/drawflow.min.js',
