@@ -709,7 +709,14 @@ function initEngineDelegation() {
         }
         else if (action === 'export-run-report') downloadRunReport('json');
         else if (action === 'export-run-report-csv') downloadRunReport('csv');
-        else if (action === 'open-templates' && typeof openTemplatesModal === 'function') openTemplatesModal();
+        else if (action === 'open-templates') {
+            if (typeof openTemplatesModal === 'function') openTemplatesModal();
+            else window.JETLEnsureExtras?.().then(() => window.openTemplatesModal?.());
+        }
+        else if (action === 'open-packages') {
+            if (typeof openPackagesModal === 'function') openPackagesModal();
+            else window.JETLEnsureExtras?.().then(() => window.openPackagesModal?.());
+        }
         else if (action === 'apply-template-demo' && typeof applyTemplate === 'function') applyTemplate('demo');
         else if (action === 'zoom-all') zoomToAllLayers();
         else if (action === 'tab-map') switchTab('map', e);

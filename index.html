@@ -3063,7 +3063,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-11"
+    <script defer src="js/engine.js?v=20260814-12"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3085,12 +3085,12 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         // Sólo se cargan módulos de interfaz después del primer render. Los
         // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
         // el hilo principal estaba congelando la interacción en Safari móvil.
-        const JETL_POST_BOOT_SCRIPTS = [
+        const JETL_EXTRA_SCRIPTS = [
             'js/schemaUI.js',
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_POST_BOOT_VERSION = '20260814-11';
+        const JETL_EXTRAS_VERSION = '20260814-12';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',
@@ -3145,23 +3145,23 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         }
         window.JETLEnsureRuntime = loadJETLRuntime;
 
-        function loadJETLPostBootScripts() {
-            let index = 0;
-            const loadNext = () => {
-                if (index >= JETL_POST_BOOT_SCRIPTS.length) return;
+        let jetlExtrasPromise = null;
+        function loadJETLExtras() {
+            if (jetlExtrasPromise) return jetlExtrasPromise;
+            jetlExtrasPromise = JETL_EXTRA_SCRIPTS.reduce((chain, src) => chain.then(() => new Promise((resolve) => {
                 const script = document.createElement('script');
-                script.src = JETL_POST_BOOT_SCRIPTS[index++] + '?v=' + JETL_POST_BOOT_VERSION;
-                script.onload = loadNext;
-                script.onerror = loadNext;
+                script.src = src + '?v=' + JETL_EXTRAS_VERSION;
+                script.onload = () => resolve(true);
+                script.onerror = () => resolve(false);
                 document.body.appendChild(script);
-            };
-            loadNext();
+            })), Promise.resolve()).then(() => true);
+            return jetlExtrasPromise;
         }
+        window.JETLEnsureExtras = loadJETLExtras;
 
         window.addEventListener('load', () => {
             requestAnimationFrame(() => setTimeout(() => {
                 loadJETLDeferredStyles();
-                loadJETLPostBootScripts();
             }, 0));
         }, { once: true });
     </script>

@@ -85,7 +85,8 @@ test('un modal visible converge tras una sola mutación de clase', () => {
     assert.equal(body.classList.contains('modal-open'), true);
 });
 
-test('la página fuerza una versión nueva de los módulos post-arranque', () => {
-    assert.match(index, /const JETL_POST_BOOT_VERSION = '20260814-11'/);
-    assert.match(index, /script\.src = JETL_POST_BOOT_SCRIPTS\[index\+\+\] \+ '\?v=' \+ JETL_POST_BOOT_VERSION/);
+test('los módulos auxiliares tienen versión nueva y sólo carga explícita', () => {
+    assert.match(index, /const JETL_EXTRAS_VERSION = '20260814-12'/);
+    assert.match(index, /script\.src = src \+ '\?v=' \+ JETL_EXTRAS_VERSION/);
+    assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);
 });

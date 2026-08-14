@@ -150,8 +150,14 @@ test('las librerías GIS no se cargan automáticamente al terminar la página', 
     assert.match(index, /window\.JETLEnsureRuntime = loadJETLRuntime/);
 });
 
-test('el observador de modales no forma parte del arranque automático', () => {
-    const postBoot = index.match(/const JETL_POST_BOOT_SCRIPTS = \[([\s\S]*?)\];/)?.[1] ?? '';
-    assert.ok(postBoot, 'No se encontró la lista post-arranque');
-    assert.doesNotMatch(postBoot, /modalSystem/);
+test('ningún módulo auxiliar forma parte del arranque automático', () => {
+    const extras = index.match(/const JETL_EXTRA_SCRIPTS = \[([\s\S]*?)\];/)?.[1] ?? '';
+    assert.ok(extras, 'No se encontró la lista de módulos auxiliares');
+    assert.match(extras, /schemaUI/);
+    assert.match(extras, /templates/);
+    assert.match(extras, /packages/);
+    assert.doesNotMatch(extras, /modalSystem/);
+    const loadHandler = index.match(/window\.addEventListener\('load',[\s\S]*?\}, \{ once: true \}\);/)?.[0] ?? '';
+    assert.doesNotMatch(loadHandler, /loadJETLExtras/);
+    assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);
 });
