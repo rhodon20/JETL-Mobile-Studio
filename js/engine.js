@@ -397,6 +397,8 @@ function renderSidebar(filter) {
         const title = document.createElement('div');
         title.className = 'cat-title';
         title.setAttribute('data-cat-toggle', '1');
+        title.setAttribute('onclick', "event.stopPropagation(); this.nextElementSibling.classList.toggle('open'); this.classList.toggle('active')");
+        title.setAttribute('ontouchend', 'event.preventDefault(); event.stopPropagation(); this.click()');
         title.innerHTML = `<span>${c}</span> <i class="fas fa-chevron-down"></i>`;
 
         const itemsDiv = document.createElement('div');
@@ -409,7 +411,7 @@ function renderSidebar(filter) {
 
         const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
-            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}">
+            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}" onclick="event.stopPropagation(); JETLNativeAddNode('${t.k}')" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()">
                 <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
             </div>`;
         });

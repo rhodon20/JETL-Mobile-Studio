@@ -215,7 +215,7 @@
         grid-template-columns: repeat(5, 1fr);
         align-items: stretch;
         position: fixed;
-        z-index: 9500;
+        z-index: 2147483647;
         left: 0;
         right: 0;
         bottom: 0;
@@ -226,6 +226,8 @@
         box-shadow: 0 -10px 28px rgba(0, 0, 0, .28);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        pointer-events: auto !important;
+        isolation: isolate;
     }
 
     .mobile-dock-btn {

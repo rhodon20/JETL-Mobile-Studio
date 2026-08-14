@@ -38,6 +38,56 @@
                     : `Cargando ${nextName} (${loaded}/${total})…`;
             }
         };
+        window.JETLMarkInteraction = function (action) {
+            window.__JETL_LAST_INTERACTION = { action: action, at: Date.now() };
+            var dot = document.getElementById('sys-status');
+            if (!dot) return;
+            dot.setAttribute('data-last-action', action);
+            dot.style.boxShadow = '0 0 0 4px rgba(52,152,219,.28)';
+            window.setTimeout(function () { dot.style.boxShadow = ''; }, 220);
+        };
+        window.JETLNativeNav = function (view) {
+            if (!document.body) return;
+            window.JETLMarkInteraction('nav:' + view);
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebar-overlay');
+            var project = document.getElementById('mobile-project-sheet');
+            document.body.classList.remove('mobile-results-open', 'mobile-sheet-open');
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) overlay.style.display = 'none';
+            if (project) project.setAttribute('aria-hidden', 'true');
+
+            if (view === 'nodes') {
+                if (sidebar) sidebar.classList.add('open');
+                if (overlay) overlay.style.display = 'block';
+            } else if (view === 'results') {
+                document.body.classList.add('mobile-results-open');
+                Promise.resolve(window.JETLRuntimeReady).then(function (ready) {
+                    if (ready !== false && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
+                }).catch(function (error) { console.error('[JETL] Visor no disponible', error); });
+            } else if (view === 'project') {
+                document.body.classList.add('mobile-sheet-open');
+                if (project) project.setAttribute('aria-hidden', 'false');
+            }
+
+            document.querySelectorAll('[data-mobile-view]').forEach(function (button) {
+                button.classList.toggle('active', button.getAttribute('data-mobile-view') === view);
+            });
+        };
+        window.JETLNativeAddNode = function (key) {
+            window.JETLMarkInteraction('add:' + key);
+            if (typeof window.addNodeClick === 'function') {
+                window.addNodeClick(key);
+            } else {
+                reportJETLBootError('El editor todavía no permite añadir nodos');
+            }
+        };
+        window.JETLNativeRun = async function () {
+            window.JETLMarkInteraction('run');
+            var ready = window.JETLRuntimeReady ? await window.JETLRuntimeReady : true;
+            if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
+            reportJETLBootError('El motor no está disponible');
+        };
         window.addEventListener('error', (event) => {
             reportJETLBootError(event.message || 'Error de JavaScript');
         });
@@ -1569,7 +1619,7 @@ body.modal-open {
         grid-template-columns: repeat(5, 1fr);
         align-items: stretch;
         position: fixed;
-        z-index: 9500;
+        z-index: 2147483647;
         left: 0;
         right: 0;
         bottom: 0;
@@ -1580,6 +1630,8 @@ body.modal-open {
         box-shadow: 0 -10px 28px rgba(0, 0, 0, .28);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
+        pointer-events: auto !important;
+        isolation: isolate;
     }
 
     .mobile-dock-btn {
@@ -1797,8 +1849,8 @@ body.modal-open {
             <span>v2026.03.05</span>
         </div>
         <div class="toolbar">
-            <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-            <button class="btn" data-ui-action="redo" title="Rehacer (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)" onclick="event.stopPropagation(); if(typeof undo==='function') undo()" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()"><i class="fas fa-undo"></i></button>
+            <button class="btn" data-ui-action="redo" title="Rehacer (Ctrl+Y)" onclick="event.stopPropagation(); if(typeof redo==='function') redo()" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()"><i class="fas fa-redo"></i></button>
             <button class="btn" data-ui-action="clear-canvas" title="Borrar todo"><i class="fas fa-trash-alt"></i></button>
             <button class="btn" data-ui-action="save-project" title="Guardar Proyecto (.jetl)"><i
                     class="fas fa-save"></i></button>
@@ -1903,29 +1955,29 @@ body.modal-open {
     </div>
 
     <nav id="mobile-dock" aria-label="Navegación principal">
-        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos" onclick="event.stopPropagation(); JETLNativeNav('nodes')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('nodes')">
             <i class="fas fa-shapes"></i><span>Nodos</span>
         </button>
-        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo">
+        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')">
             <i class="fas fa-diagram-project"></i><span>Flujo</span>
         </button>
-        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo">
+        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="event.stopPropagation(); JETLNativeRun()" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeRun()">
             <i class="fas fa-play"></i><span>Ejecutar</span>
         </button>
-        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados" onclick="event.stopPropagation(); JETLNativeNav('results')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('results')">
             <i class="fas fa-chart-area"></i><span>Resultados</span>
         </button>
-        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto" onclick="event.stopPropagation(); JETLNativeNav('project')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('project')">
             <i class="fas fa-folder-open"></i><span>Proyecto</span>
         </button>
     </nav>
 
-    <div id="mobile-scrim" aria-hidden="true"></div>
+    <div id="mobile-scrim" aria-hidden="true" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')"></div>
     <section id="mobile-project-sheet" aria-hidden="true" aria-label="Acciones del proyecto">
         <div class="mobile-sheet-handle"></div>
         <div class="mobile-sheet-header">
             <div><small>ESPACIO DE TRABAJO</small><strong>Proyecto</strong></div>
-            <button type="button" class="mobile-sheet-close" data-mobile-close aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            <button type="button" class="mobile-sheet-close" data-mobile-close aria-label="Cerrar" onclick="event.stopPropagation(); JETLNativeNav('flow')" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeNav('flow')"><i class="fas fa-times"></i></button>
         </div>
         <div class="mobile-project-grid">
             <button type="button" data-ui-action="save-project"><i class="fas fa-save"></i><span>Guardar</span></button>
@@ -2895,7 +2947,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-7"
+    <script defer src="js/engine.js?v=20260814-8"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
