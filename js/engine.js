@@ -163,6 +163,7 @@ window.ensureJETLMap = ensureJETLMap;
 
 function initializeJETLApp() {
     if (jetlAppInitialized) return;
+    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'initializing-editor';
     jetlAppInitialized = true;
     setJETLStartupStatus('loading', 'Iniciando JETL Studio');
 
@@ -240,6 +241,7 @@ function initializeJETLApp() {
     });
 
     setJETLStartupStatus('ready', 'Sistema listo');
+    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
     createGeoWorker();
     initQuickSearch();
 

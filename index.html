@@ -13,14 +13,28 @@
     <title>JETL Studio v2026.03.05 - Open Source PWA</title>
 
     <script>
-        // Registrar la actualización antes de descargar las librerías GIS. Así una
-        // versión antigua del PWA no puede impedir que llegue la corrección.
+        // Desactivar temporalmente la capa PWA. Safari estaba quedándose atrapado
+        // antes de entregar el documento, por lo que la aplicación no podía ni
+        // siquiera mostrar un error de inicio.
+        window.__JETL_BOOT = { stage: 'head', startedAt: Date.now(), error: null };
+        window.addEventListener('error', (event) => {
+            window.__JETL_BOOT.error = event.message || 'Error de JavaScript';
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason;
+            window.__JETL_BOOT.error = reason && reason.message ? reason.message : String(reason || 'Promise rechazada');
+        });
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').then((registration) => {
-                registration.update().catch(() => {});
-            }).catch((error) => {
-                console.warn('ServiceWorker registration failed:', error);
-            });
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                registrations.forEach((registration) => {
+                    if (registration.scope.includes('/JETL-Mobile-Studio/')) registration.unregister();
+                });
+            }).catch(() => {});
+        }
+        if ('caches' in window) {
+            caches.keys().then((names) => Promise.all(
+                names.filter((name) => name.startsWith('jetl-')).map((name) => caches.delete(name))
+            )).catch(() => {});
         }
     </script>
 
@@ -997,6 +1011,11 @@
 
 <body>
 
+    <div id="boot-diagnostic" role="status" aria-live="polite"
+        style="position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;background:#121212;color:#ddd;font:15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        Iniciando JETL Studio…
+    </div>
+
     <div id="loader">
         <div class="spinner"></div>
         <div id="loader-msg">Procesando...</div>
@@ -1260,6 +1279,10 @@
     <script src="js/mobile.js"></script>
 
     <script>
+        window.__JETL_BOOT.stage = 'scripts-loaded';
+        const bootDiagnostic = document.getElementById('boot-diagnostic');
+        if (bootDiagnostic) bootDiagnostic.remove();
+
         // Safari puede ejecutar varios scripts `async` pesados mientras todavía
         // analiza el HTML. Cargarlos de uno en uno después del primer render evita
         // que 3+ MB de motores GIS bloqueen el arranque de la interfaz.
