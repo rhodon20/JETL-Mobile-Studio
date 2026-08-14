@@ -88,6 +88,44 @@
             if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
             reportJETLBootError('El motor no está disponible');
         };
+        (function installDockCapture() {
+            var lastCaptureAt = 0;
+            var dockActions = ['nodes', 'flow', 'run', 'results', 'project'];
+
+            function getPoint(event) {
+                var touch = event.changedTouches && event.changedTouches[0];
+                return touch
+                    ? { x: touch.clientX, y: touch.clientY }
+                    : { x: event.clientX, y: event.clientY };
+            }
+
+            function captureDockAction(event) {
+                var dock = document.getElementById('mobile-dock');
+                if (!dock || window.innerWidth > 768) return;
+                var point = getPoint(event);
+                var rect = dock.getBoundingClientRect();
+                if (point.x < rect.left || point.x > rect.right || point.y < rect.top || point.y > rect.bottom) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+
+                var now = Date.now();
+                if (now - lastCaptureAt < 550) return;
+                lastCaptureAt = now;
+
+                var relativeX = Math.max(0, Math.min(rect.width - 1, point.x - rect.left));
+                var index = Math.min(4, Math.floor(relativeX / (rect.width / 5)));
+                var action = dockActions[index];
+                window.JETLMarkInteraction('capture:' + action);
+                if (action === 'run') window.JETLNativeRun();
+                else window.JETLNativeNav(action);
+            }
+
+            window.addEventListener('touchend', captureDockAction, { capture: true, passive: false });
+            window.addEventListener('click', captureDockAction, true);
+            window.JETLCaptureDockAction = captureDockAction;
+        })();
         window.addEventListener('error', (event) => {
             reportJETLBootError(event.message || 'Error de JavaScript');
         });
