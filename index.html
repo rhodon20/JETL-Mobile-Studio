@@ -24,18 +24,20 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     </noscript>
 
-    <script src="js/vendor/leaflet.js"></script>
-    <script src="js/vendor/turf.min.js"></script>
+    <!-- Drawflow es la única dependencia necesaria para pintar el editor.
+         El resto de motores GIS se descarga en paralelo y nunca bloquea la UI. -->
+    <script src="js/vendor/leaflet.js" async></script>
+    <script src="js/vendor/turf.min.js" async></script>
     <script src="js/vendor/drawflow.min.js"></script>
-    <script src="js/vendor/shp.js"></script>
-    <script src="js/vendor/geoblaze.web.min.js"></script>
-    <script src="js/vendor/geotiff.js"></script>
-    <script src="js/vendor/osmtogeojson.js"></script>
-    <script src="js/vendor/proj4.js"></script>
-    <script src="js/vendor/wellknown.js"></script>
-    <script src="js/vendor/geopackage.min.js"></script>
-    <script src="js/vendor/parquet.min.js"></script>
-    <script src="js/vendor/anime.min.js"></script>
+    <script src="js/vendor/shp.js" async></script>
+    <script src="js/vendor/geotiff.js" async></script>
+    <script src="js/vendor/geoblaze.web.min.js" async></script>
+    <script src="js/vendor/osmtogeojson.js" async></script>
+    <script src="js/vendor/proj4.js" async></script>
+    <script src="js/vendor/wellknown.js" async></script>
+    <script src="js/vendor/geopackage.min.js" async></script>
+    <script src="js/vendor/parquet.min.js" async></script>
+    <script src="js/vendor/anime.min.js" async></script>
 
     <style>
         /* --- CORE VARS --- */

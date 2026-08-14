@@ -273,6 +273,11 @@ if (document.readyState === 'loading') {
     queueMicrotask(initializeJETLApp);
 }
 
+// Permite reintentar el arranque si una dependencia esencial llegó tarde.
+window.addEventListener('load', () => {
+    if (!jetlAppInitialized) initializeJETLApp();
+}, { once: true });
+
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');
     container.innerHTML = '';
