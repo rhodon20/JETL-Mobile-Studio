@@ -255,3 +255,11 @@ test('la ejecución no dispara la animación legacy de cables ni oculta el nodo 
     assert.match(workerPool, /loader'\)\?\.dataset\.status === 'running'/);
     assert.match(workerPool, /loaderMsg && !liveMonitor/);
 });
+
+test('el monitor evita indicadores rotatorios que Safari pueda deformar', () => {
+    assert.match(index, /class="run-monitor-indicator"/);
+    assert.match(index, /#loader\[data-status="error"\] \.run-monitor-indicator/);
+    assert.doesNotMatch(index, /class="spinner"/);
+    assert.doesNotMatch(index, /@keyframes\s+spin/);
+    assert.doesNotMatch(index, /animation:\s*spin/);
+});

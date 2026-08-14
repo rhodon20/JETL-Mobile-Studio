@@ -1024,7 +1024,10 @@
         #loader-cancel { color:#ffb0aa; background:rgba(192,57,43,.14); }
         #loader-focus-error { color:#9dcef0; }
         #loader[data-status="error"] .run-monitor-card { border-color:rgba(231,76,60,.38); }
-        #loader[data-status="error"] .spinner { animation:none; border-color:rgba(231,76,60,.3); border-top-color:#e05a5a; }
+        .run-monitor-indicator { width:10px; height:10px; flex:0 0 10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px rgba(52,152,219,.12); }
+        #loader[data-status="ok"] .run-monitor-indicator { background:#2ecc71; box-shadow:0 0 0 4px rgba(46,204,113,.12); }
+        #loader[data-status="error"] .run-monitor-indicator { background:#e05a5a; box-shadow:0 0 0 4px rgba(224,90,90,.12); }
+        #loader[data-status="cancelled"] .run-monitor-indicator { background:#e0a84d; box-shadow:0 0 0 4px rgba(224,168,77,.12); }
 
         .drawflow .drawflow-node[data-run-state]::after {
             content:"";
@@ -1045,26 +1048,6 @@
         .drawflow .drawflow-node.jetl-run-error::after { background:#e05a5a; }
         .drawflow .drawflow-node.jetl-run-cancelled::after { background:#e0a84d; }
         @keyframes run-node-pulse { 50% { transform:scale(1.35); box-shadow:0 0 0 5px rgba(52,152,219,.12); } }
-
-        .spinner {
-            width: 20px;
-            height: 20px;
-            flex: 0 0 20px;
-            border: 3px solid rgba(255,255,255,.18);
-            border-top: 3px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
 
         /* Symbology Panel */
         #symbology-panel {
@@ -2350,7 +2333,7 @@ body.modal-open {
     <div id="loader" role="status" aria-live="polite" aria-label="Estado de la ejecución">
         <div class="run-monitor-card">
             <div class="run-monitor-head">
-                <div class="spinner"></div>
+                <span class="run-monitor-indicator" aria-hidden="true"></span>
                 <div><strong id="loader-title">Ejecución</strong><span id="loader-elapsed">0 ms</span></div>
             </div>
             <div id="loader-msg">Preparando flujo…</div>

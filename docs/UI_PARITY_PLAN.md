@@ -11,7 +11,8 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 - El lienzo y los nodos Drawflow mantienen geometría, puertos y comportamiento.
 - Todas las operaciones posibles permanecen locales y compatibles con PWA.
 - En móvil, los paneles secundarios se presentan como hojas y nunca bloquean la
-  barra de navegación de forma accidental.
+  barra de navegación de forma accidental. Los editores de nodos conservan, en
+  cambio, el contrato modal de Desktop.
 - Movimiento limitado a opacidad y `transform`, respetando
   `prefers-reduced-motion`.
 
@@ -46,6 +47,20 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 - Botón Mostrar/Ocultar siempre visible, con estado y etiquetas accesibles.
 - Cabecera, cuerpo y pie consistentes en los modales existentes.
 - Cierre con Escape, clic en backdrop, trampa de foco y restauración del foco.
+
+#### Editor modal de nodos (referencia Desktop)
+
+La referencia funcional es `JETL-Desktop/docs/guides/MODAL_EDITOR_GUIDE.md`:
+
+- El nodo mantiene en el canvas una representación compacta con resumen y una
+  acción explícita para abrir el editor.
+- La configuración completa se conserva como JSON en un campo oculto del nodo.
+- El editor es un modal con cabecera, cuerpo desplazable y pie con
+  **Cancelar** y **Guardar y cerrar**.
+- Guardar actualiza el JSON y el resumen compacto; cancelar no modifica el nodo.
+- En pantallas amplias el diálogo permanece centrado. En teléfonos se adapta a
+  casi toda la superficie disponible, sin convertirse en inspector lateral ni
+  en hoja inferior.
 
 ### Fase 3 — Navegación del flujo
 
