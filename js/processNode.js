@@ -95,15 +95,15 @@ async function processNode(id, allNodes) {
         result = await tool.run(id, safeInputs, dom);
         result = normalizeResult(result);
 
-        anim_NodeSuccess(id);
-        anim_CableFlow(id);
+        if (typeof anim_NodeSuccess === 'function') anim_NodeSuccess(id);
+        if (typeof anim_CableFlow === 'function') anim_CableFlow(id);
 
     } catch (e) {
         log(`[${tool.label}] ERROR: ${e.message}`, "err");
         if (dom) {
             dom.style.boxShadow = "0 0 0 2px #c0392b";
             dom.style.opacity = '1';
-            anim_NodeError(id);
+            if (typeof anim_NodeError === 'function') anim_NodeError(id);
         }
         throw e;
     }

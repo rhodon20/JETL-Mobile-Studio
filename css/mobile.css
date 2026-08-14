@@ -68,10 +68,14 @@
     }
 
     #layout {
+        flex: 1 1 auto;
+        width: 100%;
         min-height: 0;
     }
 
     #workspace {
+        min-width: 0;
+        min-height: 0;
         width: 100%;
     }
 
@@ -114,21 +118,26 @@
     }
 
     #bottom-panel {
-        position: fixed;
-        z-index: 1200;
+        position: fixed !important;
+        z-index: 1200 !important;
         left: 0;
         right: 0;
         bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
-        height: min(58dvh, 560px);
+        height: min(58dvh, 560px) !important;
         border-radius: 22px 22px 0 0;
         border: 1px solid var(--border);
-        transform: translateY(calc(100% + 4px));
-        transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+        visibility: hidden;
+        pointer-events: none;
+        transform: translate3d(0, calc(100% + 4px), 0) !important;
+        transition: transform .26s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .26s;
         box-shadow: 0 -18px 50px rgba(0, 0, 0, .45);
     }
 
     body.mobile-results-open #bottom-panel {
-        transform: translateY(0);
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) !important;
+        transition-delay: 0s;
     }
 
     #panel-tabs {
@@ -138,8 +147,23 @@
         overflow-x: auto;
     }
 
-    #panel-tabs > div {
-        min-width: max-content;
+    #panel-tabs .panel-tabs-main {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    #panel-tabs .panel-tabs-actions,
+    #panel-tabs .btn[data-ui-action="zoom-all"],
+    #btn-map-expand {
+        display: none;
+    }
+
+    #panel-tabs .tab-btn {
+        min-width: 0;
+        justify-content: center;
     }
 
     .tab-btn,
@@ -147,6 +171,11 @@
         min-height: 42px;
         border-radius: 10px;
         padding: 0 13px;
+    }
+
+    .drawflow .drawflow-node {
+        width: min(240px, calc(100vw - 40px));
+        max-width: calc(100vw - 40px);
     }
 
     #table-toolbar {

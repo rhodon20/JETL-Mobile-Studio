@@ -186,6 +186,7 @@ function initializeJETLApp() {
     } catch (e) { console.warn("No se pudo aplicar el parche de input file", e); }
 
     editor = new Drawflow(drawflowElement);
+    window.JETLEditor = editor;
     editor.reroute = true;
     editor.reroute_fix_curvature = true;
     editor.start();
@@ -706,6 +707,15 @@ async function runEngine() {
     if (cancelBtn) cancelBtn.style.display = 'block';
     log("--- INICIANDO EJECUCIÓN TOTAL ---");
 
+    if (window.JETLRuntimeReady && !(await window.JETLRuntimeReady)) {
+        const runtimeError = window.__JETL_RUNTIME_ERROR;
+        log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
+        showToast("No se pudo preparar el motor", "error");
+        loader.style.display = 'none';
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        return;
+    }
+
     currentRunTimestamp = Date.now();
 
     document.querySelectorAll('.count-badge').forEach(b => b.style.display = 'none');
@@ -762,6 +772,15 @@ async function runEnginePartial(targetId) {
     const cancelBtn = document.getElementById('loader-cancel');
     loader.style.display = 'flex';
     if (cancelBtn) cancelBtn.style.display = 'block';
+
+    if (window.JETLRuntimeReady && !(await window.JETLRuntimeReady)) {
+        const runtimeError = window.__JETL_RUNTIME_ERROR;
+        log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
+        showToast("No se pudo preparar el motor", "error");
+        loader.style.display = 'none';
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        return;
+    }
 
     log(`--- Ejecución Parcial hasta nodo #${targetId} ---`);
 
