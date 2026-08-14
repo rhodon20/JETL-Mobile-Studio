@@ -91,12 +91,18 @@
         (function installDockCapture() {
             var lastCaptureAt = 0;
             var dockActions = ['nodes', 'flow', 'run', 'results', 'project'];
+            var diagnosticBuild = 'TOUCH-10';
 
             function getPoint(event) {
-                var touch = event.changedTouches && event.changedTouches[0];
+                var touch = (event.touches && event.touches[0]) || (event.changedTouches && event.changedTouches[0]);
                 return touch
                     ? { x: touch.clientX, y: touch.clientY }
                     : { x: event.clientX, y: event.clientY };
+            }
+
+            function showDiagnostic(message) {
+                var diagnostic = document.getElementById('interaction-diagnostic');
+                if (diagnostic) diagnostic.textContent = diagnosticBuild + ' · ' + message;
             }
 
             function captureDockAction(event) {
@@ -117,11 +123,15 @@
                 var relativeX = Math.max(0, Math.min(rect.width - 1, point.x - rect.left));
                 var index = Math.min(4, Math.floor(relativeX / (rect.width / 5)));
                 var action = dockActions[index];
+                showDiagnostic(event.type + ' → ' + action);
                 window.JETLMarkInteraction('capture:' + action);
                 if (action === 'run') window.JETLNativeRun();
                 else window.JETLNativeNav(action);
             }
 
+            window.addEventListener('pointerdown', captureDockAction, true);
+            window.addEventListener('touchstart', captureDockAction, { capture: true, passive: false });
+            window.addEventListener('mousedown', captureDockAction, true);
             window.addEventListener('touchend', captureDockAction, { capture: true, passive: false });
             window.addEventListener('click', captureDockAction, true);
             window.JETLCaptureDockAction = captureDockAction;
@@ -1448,7 +1458,8 @@ body.modal-open {
 
 #mobile-dock,
 #mobile-scrim,
-#mobile-project-sheet {
+#mobile-project-sheet,
+#interaction-diagnostic {
     display: none;
 }
 
@@ -1672,6 +1683,23 @@ body.modal-open {
         isolation: isolate;
     }
 
+    #interaction-diagnostic {
+        display: block;
+        position: fixed;
+        z-index: 2147483647;
+        right: 8px;
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 8px);
+        max-width: calc(100vw - 16px);
+        padding: 4px 8px;
+        border: 1px solid rgba(255, 255, 255, .16);
+        border-radius: 999px;
+        color: #aeb2b9;
+        background: rgba(18, 18, 19, .88);
+        font-size: 10px;
+        line-height: 1.2;
+        pointer-events: none;
+    }
+
     .mobile-dock-btn {
         min-width: 0;
         border: 0;
@@ -1874,6 +1902,7 @@ body.modal-open {
             data-ui-action="cancel-run">Cancelar Operación</button>
     </div>
     <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
+    <div id="interaction-diagnostic" role="status" aria-live="polite">TOUCH-10 · esperando toque</div>
 
     <div id="quick-search">
         <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
