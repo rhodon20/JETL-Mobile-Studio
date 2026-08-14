@@ -47,6 +47,13 @@ test('quicksearch está en la cabecera entre marca y acciones', () => {
     assert.match(engine, /if \(isMobileSearch\(\)\) addNodeClick\(item\.dataset\.k\)/);
 });
 
+test('abrir un editor de nodo carga su módulo diferido en el primer toque', () => {
+    assert.match(engine, /schemaAction === 'calc-open-editor'/);
+    assert.match(engine, /schemaAction === 'formatter-open-editor'/);
+    assert.match(engine, /window\.JETLEnsureExtras\?\.\(\)\.then/);
+    assert.match(engine, /window\.JETLSchemaUI\.openFormatterEditor\(nodeId\)/);
+});
+
 test('el historial persiste y limita las ejecuciones registradas', () => {
     const start = engine.indexOf("const RUN_HISTORY_KEY");
     const end = engine.indexOf('function renderRunHistory', start);

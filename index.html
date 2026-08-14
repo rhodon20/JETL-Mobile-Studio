@@ -3578,7 +3578,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-18"
+    <script defer src="js/engine.js?v=20260814-19"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3601,6 +3601,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
         // el hilo principal estaba congelando la interacción en Safari móvil.
         const JETL_EXTRA_SCRIPTS = [
+            'js/modalSystem.js',
             'js/schemaUI.js',
             'js/templates.js',
             'js/packages.js'

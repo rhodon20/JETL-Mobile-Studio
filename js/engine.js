@@ -1502,6 +1502,23 @@ function addNode(k, x, y) {
 
 function initEngineDelegation() {
     document.addEventListener('click', (e) => {
+        const schemaActionEl = e.target.closest('[data-schema-action]');
+        const schemaAction = schemaActionEl?.getAttribute('data-schema-action');
+        if (schemaActionEl && !window.JETLSchemaUI &&
+            (schemaAction === 'calc-open-editor' || schemaAction === 'formatter-open-editor')) {
+            e.preventDefault();
+            const nodeId = schemaActionEl.closest('.drawflow-node')?.id.replace('node-', '');
+            window.JETLEnsureExtras?.().then(() => {
+                if (!nodeId || !window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
+                if (schemaAction === 'calc-open-editor') window.JETLSchemaUI.openCalcEditor(nodeId);
+                else window.JETLSchemaUI.openFormatterEditor(nodeId);
+            }).catch((error) => {
+                console.error('[JETL] Error abriendo editor de nodo', error);
+                if (typeof showToast === 'function') showToast('No se pudo abrir el editor del nodo', 'error');
+            });
+            return;
+        }
+
         const actionEl = e.target.closest('[data-ui-action]');
         if (!actionEl) return;
         const action = actionEl.getAttribute('data-ui-action');

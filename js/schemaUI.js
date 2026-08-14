@@ -908,6 +908,7 @@
         appendJoinPair,
         appendRenamerPair,
         insertCalcField,
+        openCalcEditor,
         openFormatterEditor
     };
 })();

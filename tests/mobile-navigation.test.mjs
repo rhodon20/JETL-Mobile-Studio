@@ -193,7 +193,7 @@ test('ningún módulo auxiliar forma parte del arranque automático', () => {
     assert.match(extras, /schemaUI/);
     assert.match(extras, /templates/);
     assert.match(extras, /packages/);
-    assert.doesNotMatch(extras, /modalSystem/);
+    assert.match(extras, /modalSystem/);
     const loadHandler = index.match(/window\.addEventListener\('load',[\s\S]*?\}, \{ once: true \}\);/)?.[0] ?? '';
     assert.doesNotMatch(loadHandler, /loadJETLExtras/);
     assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);

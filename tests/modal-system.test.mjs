@@ -89,6 +89,7 @@ test('un modal visible converge tras una sola mutación de clase', () => {
 
 test('los módulos auxiliares tienen versión nueva y sólo carga explícita', () => {
     assert.match(index, /const JETL_EXTRAS_VERSION = '20260814-13'/);
+    assert.match(index, /const JETL_EXTRA_SCRIPTS = \[\s*'js\/modalSystem\.js',\s*'js\/schemaUI\.js'/);
     assert.match(index, /script\.src = src \+ '\?v=' \+ JETL_EXTRAS_VERSION/);
     assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);
 });
@@ -100,6 +101,7 @@ test('String Formatter usa el contrato modal de Desktop y persiste JSON', () => 
     assert.match(attributes, /textarea df-config/);
     assert.match(attributes, /JSON\.parse\(configRaw\)/);
     assert.match(schema, /function openFormatterEditor\(nodeId\)/);
+    assert.match(schema, /openCalcEditor,/);
     assert.match(schema, /_commitNodeControl\(configControl, JSON\.stringify\(config\)\)/);
     assert.match(schema, /new Event\('input', \{ bubbles: true \}\)/);
     assert.match(schema, /else if \(nodeEl\?\.classList\.contains\('attr_string_formatter'\)\)/);
