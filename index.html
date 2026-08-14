@@ -3080,6 +3080,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/packages.js',
             'js/modalSystem.js'
         ];
+        const JETL_POST_BOOT_VERSION = '20260814-10';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',
@@ -3139,7 +3140,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             const loadNext = () => {
                 if (index >= JETL_POST_BOOT_SCRIPTS.length) return;
                 const script = document.createElement('script');
-                script.src = JETL_POST_BOOT_SCRIPTS[index++];
+                script.src = JETL_POST_BOOT_SCRIPTS[index++] + '?v=' + JETL_POST_BOOT_VERSION;
                 script.onload = loadNext;
                 script.onerror = loadNext;
                 document.body.appendChild(script);

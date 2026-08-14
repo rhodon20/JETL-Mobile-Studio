@@ -16,25 +16,32 @@
 
     function syncModal(modal) {
         if (!visible(modal)) {
-            modal.classList.remove('is-open');
-            modal.setAttribute('aria-hidden', 'true');
+            if (modal.classList.contains('is-open')) modal.classList.remove('is-open');
+            if (modal.getAttribute('aria-hidden') !== 'true') modal.setAttribute('aria-hidden', 'true');
             if (activeModal === modal) {
                 activeModal = null;
-                document.body.classList.remove('modal-open');
+                if (document.body.classList.contains('modal-open')) document.body.classList.remove('modal-open');
                 if (returnFocus && document.contains(returnFocus)) returnFocus.focus({ preventScroll: true });
                 returnFocus = null;
             }
             return;
         }
 
-        if (activeModal !== modal) {
+        const becameActive = activeModal !== modal;
+        if (becameActive) {
             returnFocus = document.activeElement;
             activeModal = modal;
         }
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('modal-open');
-        window.requestAnimationFrame(() => modal.classList.add('is-open'));
-        window.setTimeout(() => focusable(modal)[0]?.focus({ preventScroll: true }), 40);
+        if (modal.getAttribute('aria-hidden') !== 'false') modal.setAttribute('aria-hidden', 'false');
+        if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open');
+        if (!modal.classList.contains('is-open')) {
+            window.requestAnimationFrame(() => {
+                if (visible(modal) && !modal.classList.contains('is-open')) modal.classList.add('is-open');
+            });
+        }
+        if (becameActive) {
+            window.setTimeout(() => focusable(modal)[0]?.focus({ preventScroll: true }), 40);
+        }
     }
 
     function closeModal(modal) {
