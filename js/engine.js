@@ -240,8 +240,6 @@ function initializeJETLApp() {
         }
     });
 
-    setJETLStartupStatus('ready', 'Sistema listo');
-    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
     createGeoWorker();
     initQuickSearch();
 
@@ -259,12 +257,26 @@ function initializeJETLApp() {
     if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
         setTimeout(() => JETLSchemaUI.refreshAll(), 0);
     }
+    setJETLStartupStatus('ready', 'Sistema listo');
+    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
+    const bootDiagnostic = document.getElementById('boot-diagnostic');
+    if (bootDiagnostic) bootDiagnostic.remove();
     } catch (error) {
         jetlAppInitialized = false;
-        setJETLStartupStatus('error', `Error de inicio: ${error.message || error}`);
+        const errorMessage = error && error.message ? error.message : String(error || 'Error desconocido');
+        setJETLStartupStatus('error', `Error de inicio: ${errorMessage}`);
+        if (window.__JETL_BOOT) {
+            window.__JETL_BOOT.stage = 'error';
+            window.__JETL_BOOT.error = errorMessage;
+        }
+        const bootDiagnostic = document.getElementById('boot-diagnostic');
+        if (bootDiagnostic) {
+            bootDiagnostic.textContent = `No se pudo iniciar JETL Studio: ${errorMessage}`;
+            bootDiagnostic.style.color = '#ff8a80';
+        }
         console.error('[JETL] Error durante la inicialización', error);
         if (typeof window.showToast === 'function') {
-            window.showToast(`No se pudo iniciar JETL Studio: ${error.message || error}`, 'error');
+            window.showToast(`No se pudo iniciar JETL Studio: ${errorMessage}`, 'error');
         }
     }
 }
