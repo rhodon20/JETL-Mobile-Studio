@@ -76,7 +76,11 @@
     }
 
     function _refreshToolsUi() {
-        if (typeof renderSidebar === 'function') {
+        // Durante el arranque el motor pinta el catálogo una sola vez, después
+        // de registrar también los paquetes comunitarios. Evita un render DOM
+        // completo duplicado antes de que el editor esté montado.
+        const editorReady = !!(window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready');
+        if (editorReady && typeof renderSidebar === 'function') {
             const f = document.getElementById('sidebar-filter-input');
             renderSidebar(f ? String(f.value || '') : '');
         }
@@ -399,7 +403,6 @@
 
     reloadInstalledPackages();
 })();
-
 
 
 /* ---- js/smoke.js ---- */

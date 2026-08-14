@@ -240,27 +240,33 @@ function initializeJETLApp() {
         }
     });
 
-    createGeoWorker();
-    initQuickSearch();
-
-    // --- CORRECCIÓN: Inicialización de Módulos Faltantes ---
-    initHistory();
-    initContextMenu();
-    initEngineDelegation();
-
-    const filterInput = document.getElementById('table-filter');
-    if (filterInput) {
-        filterInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') applyTableFilter();
-        });
-    }
-    if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
-        setTimeout(() => JETLSchemaUI.refreshAll(), 0);
-    }
     setJETLStartupStatus('ready', 'Sistema listo');
     if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
     const bootDiagnostic = document.getElementById('boot-diagnostic');
     if (bootDiagnostic) bootDiagnostic.remove();
+
+    // El editor ya es utilizable. Los listeners auxiliares se conectan en el
+    // siguiente fotograma para garantizar que Safari pueda pintar la interfaz.
+    requestAnimationFrame(() => setTimeout(() => {
+        try {
+            initQuickSearch();
+            initHistory();
+            initContextMenu();
+            initEngineDelegation();
+
+            const filterInput = document.getElementById('table-filter');
+            if (filterInput) {
+                filterInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') applyTableFilter();
+                });
+            }
+            if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
+                JETLSchemaUI.refreshAll();
+            }
+        } catch (optionalError) {
+            console.error('[JETL] Error inicializando controles auxiliares', optionalError);
+        }
+    }, 0));
     } catch (error) {
         jetlAppInitialized = false;
         const errorMessage = error && error.message ? error.message : String(error || 'Error desconocido');

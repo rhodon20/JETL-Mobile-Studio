@@ -217,11 +217,5 @@ function prewarmGeoWorker(timeoutMs = 15000) {
 }
 
 window.prewarmGeoWorker = prewarmGeoWorker;
-
-if (typeof window !== 'undefined') {
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            try { prewarmGeoWorker(12000); } catch (e) {}
-        }, 250);
-    });
-}
+// El pool se crea bajo demanda al ejecutar una operación espacial. Arrancar
+// varios Workers durante la primera pintura penaliza especialmente a Safari.
