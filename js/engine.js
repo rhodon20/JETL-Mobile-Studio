@@ -5,6 +5,68 @@ let editor, map, mapLayers = {}, executionData = {};
 window.executionData = executionData;
 window.lastRunReport = null;
 let dirtyNodeMap = {};
+const LOCAL_DRAFT_KEY = 'jetl_flow_optimized';
+
+function hasLocalDraft() {
+    return !!SafeStorage.load(LOCAL_DRAFT_KEY);
+}
+
+function updateLocalDraftUI() {
+    const button = document.querySelector('[data-ui-action="restore-draft"]');
+    const available = hasLocalDraft();
+    if (button) {
+        button.disabled = !available;
+        button.setAttribute('aria-disabled', String(!available));
+        button.title = available ? 'Restaurar el borrador guardado en este navegador' : 'No hay borrador local';
+    }
+    window.__JETL_HAS_LOCAL_DRAFT = available;
+}
+
+function resetEditorState() {
+    editor.clear();
+    clearAllRuntimeCaches();
+    executionData = {};
+    window.executionData = executionData;
+    clearAllDirty();
+    if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
+    currentRunTimestamp = 0;
+    window.JETLMobile?.fitFlowToViewport();
+}
+
+function startNewProject() {
+    const graph = _getGraphDataSafe();
+    if (Object.keys(graph).length > 0 && !window.confirm('¿Crear un proyecto nuevo y borrar el flujo actual?')) return;
+    resetEditorState();
+    SafeStorage.clear(LOCAL_DRAFT_KEY);
+    updateLocalDraftUI();
+    if (typeof window.showToast === 'function') window.showToast('Proyecto nuevo', 'success');
+}
+
+function restoreLocalDraft() {
+    const saved = SafeStorage.load(LOCAL_DRAFT_KEY);
+    if (!saved) {
+        updateLocalDraftUI();
+        if (typeof window.showToast === 'function') window.showToast('No hay borrador local', 'warning');
+        return false;
+    }
+    try {
+        const flow = JSON.parse(saved);
+        resetEditorState();
+        editor.import(flow);
+        invalidateAllNodes('draft_restored');
+        window.JETLMobile?.fitFlowToViewport();
+        if (typeof window.showToast === 'function') window.showToast('Borrador restaurado', 'success');
+        return true;
+    } catch (error) {
+        console.error('[JETL] Borrador local inválido', error);
+        SafeStorage.clear(LOCAL_DRAFT_KEY);
+        updateLocalDraftUI();
+        if (typeof window.showToast === 'function') window.showToast('El borrador local estaba dañado', 'error');
+        return false;
+    }
+}
+
+window.JETLProjects = { startNew: startNewProject, restoreDraft: restoreLocalDraft, hasDraft: hasLocalDraft };
 
 function _getGraphDataSafe() {
     try {
@@ -187,16 +249,18 @@ function initializeJETLApp() {
 
     editor = new Drawflow(drawflowElement);
     window.JETLEditor = editor;
+    // En pantallas táctiles, los controles del nodo deben editarse y no iniciar
+    // el arrastre del nodo. Drawflow excluye input/textarea/select con este modo.
+    editor.draggable_inputs = false;
     editor.reroute = true;
     editor.reroute_fix_curvature = true;
     editor.start();
 
-    const saved = SafeStorage.load('jetl_flow_optimized');
-    if (saved) {
-        try { editor.import(JSON.parse(saved)); } catch (e) { console.error("Error importando flujo guardado:", e); }
-    }
+    // El borrador local no se restaura silenciosamente. El usuario puede
+    // recuperarlo desde Proyecto > Restaurar.
+    updateLocalDraftUI();
 
-    ['nodeCreated', 'nodeRemoved', 'connectionCreated', 'connectionRemoved'].forEach(ev => {
+    ['nodeCreated', 'nodeRemoved', 'nodeMoved', 'connectionCreated', 'connectionRemoved'].forEach(ev => {
         editor.on(ev, (payload) => {
             if (ev === 'nodeRemoved') {
                 const removedId = String(payload);
@@ -214,7 +278,8 @@ function initializeJETLApp() {
                 if (dstId) invalidateNodeAndDownstream(dstId, ev);
                 if (!srcId && !dstId) invalidateAllNodes(ev);
             }
-            SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
+            SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+            updateLocalDraftUI();
             if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
                 setTimeout(() => JETLSchemaUI.refreshAll(), 0);
             }
@@ -222,6 +287,8 @@ function initializeJETLApp() {
     });
     editor.on('nodeDataChanged', (nodeId) => {
         invalidateNodeAndDownstream(String(nodeId), 'node_data_changed');
+        SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+        updateLocalDraftUI();
     });
 
     editor.on('click', (e) => {
@@ -249,12 +316,21 @@ function initializeJETLApp() {
     // El editor ya es utilizable. Los listeners auxiliares se conectan en el
     // siguiente fotograma para garantizar que Safari pueda pintar la interfaz.
     requestAnimationFrame(() => setTimeout(() => {
-        try {
-            initQuickSearch();
-            initHistory();
-            initContextMenu();
-            initEngineDelegation();
+        const initializers = [
+            ['controles principales', initEngineDelegation],
+            ['historial', initHistory],
+            ['menú contextual', initContextMenu],
+            ['búsqueda rápida', initQuickSearch]
+        ];
+        initializers.forEach(([label, initializer]) => {
+            try {
+                initializer();
+            } catch (optionalError) {
+                console.error(`[JETL] Error inicializando ${label}`, optionalError);
+            }
+        });
 
+        try {
             const filterInput = document.getElementById('table-filter');
             if (filterInput) {
                 filterInput.addEventListener('keydown', (e) => {
@@ -265,7 +341,7 @@ function initializeJETLApp() {
                 JETLSchemaUI.refreshAll();
             }
         } catch (optionalError) {
-            console.error('[JETL] Error inicializando controles auxiliares', optionalError);
+            console.error('[JETL] Error inicializando tabla o esquema', optionalError);
         }
     }, 0));
     } catch (error) {
@@ -331,8 +407,9 @@ function renderSidebar(filter) {
             title.classList.add('active');
         }
 
+        const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
-            itemsDiv.innerHTML += `<div class="node-item" draggable="true" data-k="${t.k}">
+            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}">
                 <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
             </div>`;
         });
@@ -547,7 +624,13 @@ function allowDrop(e) { e.preventDefault(); }
 function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
     addNode(k, rect.width / 2 + rect.left, rect.height / 2 + rect.top);
-    if (window.innerWidth < 768) toggleSidebar();
+    if (window.innerWidth < 768) {
+        window.JETLMobile?.closeTransientViews();
+        document.querySelectorAll('[data-mobile-view]').forEach((button) => {
+            button.classList.toggle('active', button.dataset.mobileView === 'flow');
+        });
+        window.JETLMobile?.fitFlowToViewport();
+    }
 }
 
 function addNode(k, x, y) {
@@ -582,9 +665,7 @@ function addNode(k, x, y) {
 
     // 1. ACTUALIZACIÓN VISUAL (DOM)
     const el = document.getElementById('node-' + id);
-    if (el) {
-        anim_NodeEnter(el);
-    }
+    if (el && typeof anim_NodeEnter === 'function') anim_NodeEnter(el);
     if (window.JETLSchemaUI && typeof JETLSchemaUI.updateNode === 'function') {
         setTimeout(() => JETLSchemaUI.updateNode(id), 0);
     }
@@ -602,6 +683,8 @@ function initEngineDelegation() {
         else if (action === 'undo' && typeof undo === 'function') undo();
         else if (action === 'redo' && typeof redo === 'function') redo();
         else if (action === 'clear-canvas') clearCanvas();
+        else if (action === 'new-project') startNewProject();
+        else if (action === 'restore-draft') restoreLocalDraft();
         else if (action === 'save-project') saveProject();
         else if (action === 'open-project') {
             const upload = document.getElementById('upload-jetl');
@@ -639,7 +722,8 @@ function initEngineDelegation() {
 
     const sidebar = document.getElementById('sidebar-content');
     if (sidebar) {
-        sidebar.addEventListener('click', (e) => {
+        let lastTouchSelection = 0;
+        const activateSidebarItem = (e) => {
             const catTitle = e.target.closest('.cat-title[data-cat-toggle]');
             if (catTitle) {
                 const itemsDiv = catTitle.nextElementSibling;
@@ -647,13 +731,25 @@ function initEngineDelegation() {
                     itemsDiv.classList.toggle('open');
                     catTitle.classList.toggle('active');
                 }
-                return;
+                return true;
             }
 
             const item = e.target.closest('.node-item');
-            if (!item) return;
+            if (!item) return false;
             const k = item.dataset.k;
             if (k) addNodeClick(k);
+            return true;
+        };
+
+        sidebar.addEventListener('touchend', (e) => {
+            if (!activateSidebarItem(e)) return;
+            lastTouchSelection = Date.now();
+            e.preventDefault();
+        }, { passive: false });
+
+        sidebar.addEventListener('click', (e) => {
+            if (Date.now() - lastTouchSelection < 700) return;
+            activateSidebarItem(e);
         });
 
         sidebar.addEventListener('dragstart', (e) => {

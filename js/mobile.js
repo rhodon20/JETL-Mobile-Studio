@@ -138,27 +138,29 @@
         }
     }
 
-    document.addEventListener('click', (event) => {
+    let lastHandledTouch = 0;
+
+    function handleMobileAction(event) {
         const viewButton = event.target.closest('[data-mobile-view]');
         if (viewButton) {
             openView(viewButton.dataset.mobileView);
-            return;
+            return true;
         }
 
         if (event.target.closest('#mobile-run')) {
             runFlow();
-            return;
+            return true;
         }
 
         if (event.target.closest('#mobile-scrim, [data-mobile-close]')) {
             closeTransientViews();
             setActive('flow');
-            return;
+            return true;
         }
 
         if (isMobile() && event.target.closest('#sidebar-overlay')) {
             setActive('flow');
-            return;
+            return true;
         }
 
         if (isMobile() && event.target.closest('#mobile-project-sheet [data-ui-action]')) {
@@ -166,7 +168,33 @@
                 closeTransientViews();
                 setActive('flow');
             }, 0);
+            return true;
         }
+        return false;
+    }
+
+    // iOS puede cancelar el `click` tras interpretar el gesto como arrastre.
+    // `touchend` garantiza una activación y el filtro temporal evita duplicarla.
+    document.addEventListener('touchend', (event) => {
+        const projectAction = event.target.closest('#mobile-project-sheet [data-ui-action]');
+        if (isMobile() && projectAction) {
+            lastHandledTouch = Date.now();
+            event.preventDefault();
+            projectAction.click();
+            window.setTimeout(() => {
+                closeTransientViews();
+                setActive('flow');
+            }, 0);
+            return;
+        }
+        if (!isMobile() || !handleMobileAction(event)) return;
+        lastHandledTouch = Date.now();
+        event.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('click', (event) => {
+        if (Date.now() - lastHandledTouch < 700) return;
+        handleMobileAction(event);
     });
 
     mobileQuery.addEventListener?.('change', () => {

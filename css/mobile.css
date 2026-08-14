@@ -108,6 +108,24 @@
         min-height: 48px;
     }
 
+    input,
+    textarea,
+    select,
+    .node-control {
+        -webkit-user-select: text;
+        user-select: text;
+        touch-action: manipulation;
+    }
+
+    .node-item,
+    .cat-title,
+    [data-mobile-view],
+    [data-ui-action],
+    [data-mobile-close] {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
     #sidebar-overlay {
         position: fixed !important;
         z-index: 1100 !important;
@@ -349,6 +367,11 @@
         gap: 9px;
         font: inherit;
         font-size: .75rem;
+    }
+
+    .mobile-project-grid button:disabled {
+        opacity: .38;
+        filter: grayscale(1);
     }
 
     .mobile-project-grid i {

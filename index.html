@@ -1462,6 +1462,24 @@ body.modal-open {
         min-height: 48px;
     }
 
+    input,
+    textarea,
+    select,
+    .node-control {
+        -webkit-user-select: text;
+        user-select: text;
+        touch-action: manipulation;
+    }
+
+    .node-item,
+    .cat-title,
+    [data-mobile-view],
+    [data-ui-action],
+    [data-mobile-close] {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
     #sidebar-overlay {
         position: fixed !important;
         z-index: 1100 !important;
@@ -1705,6 +1723,11 @@ body.modal-open {
         font-size: .75rem;
     }
 
+    .mobile-project-grid button:disabled {
+        opacity: .38;
+        filter: grayscale(1);
+    }
+
     .mobile-project-grid i {
         color: #69b4f2;
         font-size: 1.25rem;
@@ -1907,10 +1930,10 @@ body.modal-open {
         <div class="mobile-project-grid">
             <button type="button" data-ui-action="save-project"><i class="fas fa-save"></i><span>Guardar</span></button>
             <button type="button" data-ui-action="open-project"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
+            <button type="button" data-ui-action="new-project"><i class="fas fa-file-circle-plus"></i><span>Nuevo</span></button>
+            <button type="button" data-ui-action="restore-draft"><i class="fas fa-clock-rotate-left"></i><span>Restaurar</span></button>
             <button type="button" data-ui-action="open-templates"><i class="fas fa-layer-group"></i><span>Plantillas</span></button>
             <button type="button" data-ui-action="open-params"><i class="fas fa-sliders-h"></i><span>Parámetros</span></button>
-            <button type="button" data-ui-action="undo"><i class="fas fa-undo"></i><span>Deshacer</span></button>
-            <button type="button" data-ui-action="redo"><i class="fas fa-redo"></i><span>Rehacer</span></button>
         </div>
     </section>
     <div id="ctx-menu"
@@ -2872,11 +2895,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-6"
+    <script defer src="js/engine.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
-    <script defer src="js/mobile.js?v=20260814-6"
+    <script defer src="js/mobile.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(14, 14, &quot;listo&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
 
