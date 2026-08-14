@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v8';
+const CACHE_NAME = 'jetl-mobile-cache-v9';
 const coreAssets = [
     './',
     './index.html',
@@ -78,14 +78,32 @@ self.addEventListener('fetch', event => {
 
     if (event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    if (response && response.ok) {
-                        caches.open(CACHE_NAME).then(cache => cache.put('./index.html', response.clone()));
-                    }
-                    return response;
-                })
-                .catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
+            caches.match('./index.html').then(cached => {
+                const networkUpdate = fetch(event.request)
+                    .then(response => {
+                        if (response && response.ok) {
+                            caches.open(CACHE_NAME).then(cache => cache.put('./index.html', response.clone()));
+                        }
+                        return response;
+                    })
+                    .catch(() => null);
+
+                // Una navegación nunca debe quedar bloqueada esperando la red.
+                if (cached) {
+                    networkUpdate.then(() => undefined);
+                    return cached;
+                }
+                return Promise.race([
+                    networkUpdate,
+                    new Promise(resolve => setTimeout(() => resolve(null), 8000))
+                ]).then(response => {
+                    if (response) return response;
+                    return caches.match('./').then(rootCached => rootCached || new Response(
+                        '<!doctype html><meta name="viewport" content="width=device-width"><body style="background:#121212;color:#fff;font-family:sans-serif;padding:24px"><h1>JETL Studio</h1><p>Sin conexión. Vuelve a intentarlo cuando dispongas de red.</p></body>',
+                        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                    ));
+                });
+            })
         );
         return;
     }
@@ -98,14 +116,16 @@ self.addEventListener('fetch', event => {
     // una versión antigua del SW deje JS/CSS obsoleto tras un despliegue.
     if (isVersionedAppAsset) {
         event.respondWith(
-            fetch(event.request)
-                .then(networkResponse => {
-                    if (networkResponse && networkResponse.ok) {
-                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
-                    }
+            Promise.race([
+                fetch(event.request).catch(() => null),
+                new Promise(resolve => setTimeout(() => resolve(null), 5000))
+            ]).then(networkResponse => {
+                if (networkResponse && networkResponse.ok) {
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
                     return networkResponse;
-                })
-                .catch(() => caches.match(event.request))
+                }
+                return caches.match(event.request);
+            })
         );
         return;
     }
