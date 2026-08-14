@@ -247,39 +247,47 @@
         _renderKeeperFieldList(dom, fields);
     }
 
-    function _renderFormatterFieldList(dom, fields) {
-        const box = dom.querySelector('[df-formatter-fields]');
-        const input = dom.querySelector('[df-field]');
-        if (!box || !input) return;
-        const selected = new Set(
-            (input.value || '')
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean)
-        );
-        box.innerHTML = '';
-        if (!fields.length) {
-            box.innerHTML = '<div style="font-size:0.7em;color:#777">Sin campos disponibles</div>';
-            return;
+    const FORMATTER_OPERATION_LABELS = {
+        upper: 'Mayúsculas', lower: 'Minúsculas', capitalize: 'Capitalizar', trim: 'Limpiar espacios',
+        replace: 'Reemplazar', concat: 'Concatenar', pad: 'Rellenar', template: 'Plantilla'
+    };
+
+    function _readFormatterConfig(dom) {
+        const raw = dom?.querySelector('[df-config]')?.value;
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                return {
+                    fields: Array.isArray(parsed.fields) ? parsed.fields : String(parsed.fields || '').split(','),
+                    operation: parsed.operation || 'upper',
+                    arguments: parsed.arguments || '',
+                    onError: parsed.onError || 'null'
+                };
+            } catch (e) { /* Compatibilidad con nodos previos al editor modal. */ }
         }
-        fields.forEach((f) => {
-            const row = document.createElement('label');
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '6px';
-            row.style.fontSize = '0.78em';
-            row.style.color = '#ddd';
-            row.style.marginBottom = '4px';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.setAttribute('data-formatter-field', f);
-            cb.checked = selected.has(f);
-            const txt = document.createElement('span');
-            txt.textContent = f;
-            row.appendChild(cb);
-            row.appendChild(txt);
-            box.appendChild(row);
-        });
+        return {
+            fields: String(dom?.querySelector('[df-field]')?.value || '').split(','),
+            operation: dom?.querySelector('[df-op]')?.value || 'upper',
+            arguments: dom?.querySelector('[df-args]')?.value || '',
+            onError: dom?.querySelector('[df-on-error]')?.value || 'null'
+        };
+    }
+
+    function _normaliseFormatterConfig(config) {
+        return {
+            fields: Array.from(new Set((config.fields || []).map(value => String(value).trim()).filter(Boolean))),
+            operation: FORMATTER_OPERATION_LABELS[config.operation] ? config.operation : 'upper',
+            arguments: String(config.arguments || ''),
+            onError: config.onError === 'reject' ? 'reject' : 'null'
+        };
+    }
+
+    function _syncFormatterSummary(dom, config) {
+        const safeConfig = _normaliseFormatterConfig(config);
+        const summary = dom?.querySelector('[data-formatter-summary]');
+        const operation = dom?.querySelector('[data-formatter-operation]');
+        if (summary) summary.textContent = safeConfig.fields.length ? safeConfig.fields.join(', ') : 'Sin campos';
+        if (operation) operation.textContent = FORMATTER_OPERATION_LABELS[safeConfig.operation];
     }
 
     function updateStringFormatterNode(nodeId) {
@@ -290,9 +298,7 @@
         if (!node || node.name !== 'attr_string_formatter') return;
         const dom = document.getElementById('node-' + nodeId);
         if (!dom) return;
-        const p1 = _getParentNodeId(node, 'input_1');
-        const fields = _schemaFromNodeData(p1);
-        _renderFormatterFieldList(dom, fields);
+        _syncFormatterSummary(dom, _readFormatterConfig(dom));
     }
 
     function _renderMatcherFieldList(dom, fields) {
@@ -531,6 +537,13 @@
 
     let currentCalcNodeId = null;
 
+    function _commitNodeControl(control, value) {
+        if (!control) return;
+        control.value = value;
+        control.dispatchEvent(new Event('input', { bubbles: true }));
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     function openCalcEditor(nodeId) {
         const nodeEl = document.getElementById('node-' + nodeId);
         const modal = document.getElementById('calc-editor-modal');
@@ -554,9 +567,9 @@
             const nodeEl = document.getElementById('node-' + currentCalcNodeId);
             if (nodeEl) {
                 const name = document.getElementById('calc-editor-name').value.trim();
-                nodeEl.querySelector('[df-name]').value = name || 'new_field';
-                nodeEl.querySelector('[df-expr]').value = document.getElementById('calc-editor-expression').value;
-                nodeEl.querySelector('[df-on-error]').value = document.getElementById('calc-editor-error').value;
+                _commitNodeControl(nodeEl.querySelector('[df-name]'), name || 'new_field');
+                _commitNodeControl(nodeEl.querySelector('[df-expr]'), document.getElementById('calc-editor-expression').value);
+                _commitNodeControl(nodeEl.querySelector('[df-on-error]'), document.getElementById('calc-editor-error').value);
                 const summary = nodeEl.querySelector('[data-calc-summary]');
                 if (summary) summary.textContent = name || 'new_field';
             }
@@ -574,6 +587,89 @@
         const end = typeof expression.selectionEnd === 'number' ? expression.selectionEnd : expression.value.length;
         expression.setRangeText(token, start, end, 'end');
         expression.focus();
+    }
+
+    let currentFormatterNodeId = null;
+
+    function _renderFormatterModalFields(fields, selectedFields) {
+        const box = document.getElementById('formatter-editor-available-fields');
+        if (!box) return;
+        const selected = new Set(selectedFields);
+        box.innerHTML = '';
+        if (!fields.length) {
+            box.innerHTML = '<div class="node-editor-empty">Ejecuta el nodo anterior para detectar sus campos, o escríbelos manualmente.</div>';
+            return;
+        }
+        fields.forEach((field) => {
+            const row = document.createElement('label');
+            row.className = 'node-editor-field-option';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.setAttribute('data-formatter-modal-field', field);
+            checkbox.checked = selected.has(field);
+            const label = document.createElement('span');
+            label.textContent = field;
+            row.append(checkbox, label);
+            box.appendChild(row);
+        });
+    }
+
+    function _formatterAvailableFields(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        const parentId = _getParentNodeId(node, 'input_1');
+        return _schemaFromNodeData(parentId);
+    }
+
+    function _syncFormatterModalChecks() {
+        const input = document.getElementById('formatter-editor-fields');
+        if (!input) return;
+        const selected = new Set(input.value.split(',').map(value => value.trim()).filter(Boolean));
+        document.querySelectorAll('[data-formatter-modal-field]').forEach((checkbox) => {
+            checkbox.checked = selected.has(checkbox.getAttribute('data-formatter-modal-field'));
+        });
+    }
+
+    function openFormatterEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('formatter-editor-modal');
+        if (!nodeEl || !modal) return false;
+        const config = _normaliseFormatterConfig(_readFormatterConfig(nodeEl));
+        currentFormatterNodeId = String(nodeId);
+        document.getElementById('formatter-editor-fields').value = config.fields.join(', ');
+        document.getElementById('formatter-editor-operation').value = config.operation;
+        document.getElementById('formatter-editor-arguments').value = config.arguments;
+        document.getElementById('formatter-editor-error').value = config.onError;
+        _renderFormatterModalFields(_formatterAvailableFields(nodeId), config.fields);
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeFormatterEditor(save) {
+        const modal = document.getElementById('formatter-editor-modal');
+        if (!modal) return;
+        if (save && currentFormatterNodeId) {
+            const nodeEl = document.getElementById('node-' + currentFormatterNodeId);
+            if (nodeEl) {
+                const config = _normaliseFormatterConfig({
+                    fields: document.getElementById('formatter-editor-fields').value.split(','),
+                    operation: document.getElementById('formatter-editor-operation').value,
+                    arguments: document.getElementById('formatter-editor-arguments').value,
+                    onError: document.getElementById('formatter-editor-error').value
+                });
+                const configControl = nodeEl.querySelector('[df-config]');
+                if (configControl) {
+                    _commitNodeControl(configControl, JSON.stringify(config));
+                } else {
+                    _commitNodeControl(nodeEl.querySelector('[df-field]'), config.fields.join(', '));
+                    _commitNodeControl(nodeEl.querySelector('[df-op]'), config.operation);
+                    _commitNodeControl(nodeEl.querySelector('[df-args]'), config.arguments);
+                    _commitNodeControl(nodeEl.querySelector('[df-on-error]'), config.onError);
+                }
+                _syncFormatterSummary(nodeEl, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentFormatterNodeId = null;
     }
 
     function updateNode(nodeId) {
@@ -611,6 +707,9 @@
             if (action === 'calc-open-editor') {
                 evt.stopPropagation();
                 openCalcEditor(nodeId);
+            } else if (action === 'formatter-open-editor') {
+                evt.stopPropagation();
+                openFormatterEditor(nodeId);
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -652,13 +751,31 @@
             if (action === 'close-calc-editor') closeCalcEditor(false);
             else if (action === 'save-calc-editor') closeCalcEditor(true);
             else if (action === 'calc-editor-insert') insertCalcFieldInModal();
+            else if (action === 'close-formatter-editor') closeFormatterEditor(false);
+            else if (action === 'save-formatter-editor') closeFormatterEditor(true);
         });
 
         document.addEventListener('dblclick', (evt) => {
             const nodeEl = evt.target.closest('.drawflow-node');
-            if (!nodeEl?.classList.contains('attr_calc_pro')) return;
-            openCalcEditor(nodeEl.id.replace('node-', ''));
+            if (nodeEl?.classList.contains('attr_calc_pro')) openCalcEditor(nodeEl.id.replace('node-', ''));
+            else if (nodeEl?.classList.contains('attr_string_formatter')) openFormatterEditor(nodeEl.id.replace('node-', ''));
         });
+
+        document.addEventListener('change', (evt) => {
+            const checkbox = evt.target.closest('[data-formatter-modal-field]');
+            if (!checkbox) return;
+            const input = document.getElementById('formatter-editor-fields');
+            if (!input) return;
+            const available = new Set(Array.from(document.querySelectorAll('[data-formatter-modal-field]'))
+                .map(element => element.getAttribute('data-formatter-modal-field')));
+            const manual = input.value.split(',').map(value => value.trim())
+                .filter(value => value && !available.has(value));
+            const selected = Array.from(document.querySelectorAll('[data-formatter-modal-field]:checked'))
+                .map(element => element.getAttribute('data-formatter-modal-field'));
+            input.value = Array.from(new Set([...manual, ...selected])).join(', ');
+        });
+
+        document.getElementById('formatter-editor-fields')?.addEventListener('input', _syncFormatterModalChecks);
 
         document.addEventListener('change', (evt) => {
             const cb = evt.target.closest('input[type="checkbox"][data-matcher-field]');
@@ -790,6 +907,7 @@
         refreshAll,
         appendJoinPair,
         appendRenamerPair,
-        insertCalcField
+        insertCalcField,
+        openFormatterEditor
     };
 })();

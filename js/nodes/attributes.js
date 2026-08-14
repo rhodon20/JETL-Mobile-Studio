@@ -591,44 +591,29 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     attr_string_formatter: {
         cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Formatter', icon: 'fa-text-width', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campo(s) Objetivo</span>
-                <input type="text" df-field class="node-control" placeholder="Ej: name, type">
+            <div class="node-editor-summary">
+                <i class="fas fa-text-width"></i>
+                <div><strong data-formatter-summary>Sin campos</strong><small data-formatter-operation>Mayúsculas</small></div>
             </div>
-            <div df-formatter-fields style="max-height:110px; overflow:auto; border:1px solid #333; border-radius:4px; padding:6px; background:#151515; margin-bottom:6px"></div>
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">OperaciÃ³n</span>
-                <select df-op class="node-control">
-                    <option value="upper">MayÃºsculas (UPPER)</option>
-                    <option value="lower">MinÃºsculas (lower)</option>
-                    <option value="capitalize">Capitalizar (Titulo)</option>
-                    <option value="trim">Trim (Limpiar espacios)</option>
-                    <option value="replace">Reemplazar (A -> B)</option>
-                    <option value="concat">Concatenar (Suffix)</option>
-                    <option value="pad">Rellenar (PadStart 001)</option>
-                    <option value="template">Plantilla ({campo})</option>
-                </select>
-            </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Argumentos (Sep: | )</span>
-                <input type="text" df-args class="node-control" placeholder="old|new Ã³ 000">
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Compat (asignar vacio)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>
-            <div style="font-size:0.6em;color:#666;margin-top:2px">
-                Para Replace: "buscar|reemplazo"<br>
-                Para Template: "ID_{id}_zona"
+            <button type="button" class="btn node-editor-open" data-schema-action="formatter-open-editor">
+                <i class="fas fa-pen"></i> Abrir editor
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-config class="node-control" tabindex="-1">{"fields":[],"operation":"upper","arguments":"","onError":"null"}</textarea>
             </div>`,
         run: async (id, inputs, dom) => {
-            const fieldRaw = resolveParamText(dom.querySelector('[df-field]').value);
-            const op = resolveParamText(dom.querySelector('[df-op]').value) || 'upper';
-            const argsRaw = resolveParamText(dom.querySelector('[df-args]').value || '');
-            const onError = dom.querySelector('[df-on-error]')?.value || 'null';
+            let config = null;
+            const configRaw = dom.querySelector('[df-config]')?.value;
+            if (configRaw) {
+                try { config = JSON.parse(configRaw); } catch (e) { config = null; }
+            }
+            const legacyField = dom.querySelector('[df-field]')?.value || '';
+            const fieldRaw = resolveParamText(config
+                ? (Array.isArray(config.fields) ? config.fields.join(',') : config.fields || '')
+                : legacyField);
+            const op = resolveParamText(config?.operation || dom.querySelector('[df-op]')?.value || 'upper');
+            const argsRaw = resolveParamText(config?.arguments || dom.querySelector('[df-args]')?.value || '');
+            const onError = config?.onError || dom.querySelector('[df-on-error]')?.value || 'null';
             const fields = fieldRaw.split(',').map((s) => s.trim()).filter(Boolean);
             if (!fields.length) throw new Error("Campo objetivo vacio");
 

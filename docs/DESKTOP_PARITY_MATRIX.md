@@ -17,7 +17,7 @@ sistema de archivos.
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Pendiente priorizado | Resumen y JSON oculto en canvas; editor modal responsive con Guardar/Cancelar |
+| Nodo compacto + editor modal estilo Desktop | Parcial — Calculator y String Formatter | Extender el patrón probado de resumen + JSON + Guardar/Cancelar a los nodos complejos restantes |
 
 ## Ejecución y diagnóstico
 

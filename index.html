@@ -1729,6 +1729,44 @@ body.modal-open {
     display: none;
 }
 
+.node-editor-field-list {
+    max-height: 180px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    overflow: auto;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, .16);
+}
+
+.node-editor-field-option {
+    min-width: 0;
+    padding: 8px 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    color: #d7d7da;
+    background: rgba(255, 255, 255, .035);
+    cursor: pointer;
+}
+
+.node-editor-field-option span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-editor-empty {
+    grid-column: 1 / -1;
+    padding: 8px;
+    color: #8e8e94;
+    font-size: .78rem;
+    line-height: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .modal,
     .modal-content,
@@ -2286,16 +2324,18 @@ body.modal-open {
     .run-monitor-card { width:100%; }
 
     .modal {
-        align-items: flex-end;
-        padding: 8px 8px var(--mobile-safe-bottom);
+        align-items: center;
+        padding: max(10px, var(--mobile-safe-top)) 8px max(10px, var(--mobile-safe-bottom));
     }
 
     .modal-content {
         width: 100% !important;
         max-width: none !important;
-        max-height: 78dvh;
-        border-radius: 22px 22px 0 0 !important;
+        max-height: calc(100dvh - max(20px, var(--mobile-safe-top)) - max(20px, var(--mobile-safe-bottom)));
+        border-radius: 16px !important;
     }
+
+    .node-editor-field-list { grid-template-columns: 1fr; max-height: 160px; }
 
     .run-history-content { max-height: 84dvh; }
     .run-history-layout { height:min(70dvh,690px); grid-template-columns:1fr; grid-template-rows:minmax(118px,30%) minmax(0,1fr); }
@@ -2612,6 +2652,31 @@ body.modal-open {
             <div class="modal-footer">
                 <button class="btn" data-ui-action="close-calc-editor">Cancelar</button>
                 <button class="btn btn-primary" data-ui-action="save-calc-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="formatter-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formatter-editor-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-text-width"></i><div><strong id="formatter-editor-title">String Formatter</strong><small>Transforma uno o varios campos de texto</small></div></div>
+                <button class="modal-close" data-ui-action="close-formatter-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span>Campos objetivo</span><input id="formatter-editor-fields" class="node-control" autocomplete="off" placeholder="name, type"></label>
+                <div class="form-field"><span>Campos detectados</span><div id="formatter-editor-available-fields" class="node-editor-field-list"></div></div>
+                <label class="form-field"><span>Operación</span><select id="formatter-editor-operation" class="node-control">
+                    <option value="upper">Mayúsculas</option><option value="lower">Minúsculas</option>
+                    <option value="capitalize">Capitalizar</option><option value="trim">Limpiar espacios</option>
+                    <option value="replace">Reemplazar</option><option value="concat">Concatenar</option>
+                    <option value="pad">Rellenar</option><option value="template">Plantilla</option>
+                </select></label>
+                <label class="form-field"><span>Argumentos</span><input id="formatter-editor-arguments" class="node-control" autocomplete="off" placeholder="buscar|reemplazo, sufijo o plantilla"></label>
+                <label class="form-field"><span>Si se produce un error</span><select id="formatter-editor-error" class="node-control"><option value="null">Asignar vacío y continuar</option><option value="reject">Enviar a la salida 2</option></select></label>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Para reemplazar usa <code>buscar|reemplazo</code>. En plantillas puedes insertar campos como <code>ID_{id}_zona</code>.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-formatter-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-formatter-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
             </div>
         </div>
     </div>
@@ -3485,7 +3550,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(5, 14, &quot;attributes.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/spatial.js&quot;)"></script>
 
-    <script defer src="js/nodes/attributes.js?v=20260814-6"
+    <script defer src="js/nodes/attributes.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(6, 14, &quot;raster.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
 
@@ -3540,7 +3605,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260814-12';
+        const JETL_EXTRAS_VERSION = '20260814-13';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

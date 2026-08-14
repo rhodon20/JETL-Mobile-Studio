@@ -62,6 +62,11 @@ La referencia funcional es `JETL-Desktop/docs/guides/MODAL_EDITOR_GUIDE.md`:
   casi toda la superficie disponible, sin convertirse en inspector lateral ni
   en hoja inferior.
 
+Implementado como patrón inicial en **Field Calculator Pro** y **String
+Formatter**. El segundo conserva la configuración en JSON y admite la apertura
+mediante botón o doble clic, con compatibilidad de lectura y guardado para los
+flujos creados antes de esta migración.
+
 ### Fase 3 — Navegación del flujo
 
 - Buscador global de nodos y atributos. Implementado v1.
