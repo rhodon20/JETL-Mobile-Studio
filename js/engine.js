@@ -135,7 +135,11 @@ function resolvePort(parentRes, parentPort) {
 // WORKER SETUP (POOL) is now handled via js/core/workerPool.js
 
 
-window.onload = function () {
+let jetlAppInitialized = false;
+
+function initializeJETLApp() {
+    if (jetlAppInitialized) return;
+    jetlAppInitialized = true;
     try {
         const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
         Object.defineProperty(HTMLInputElement.prototype, 'value', {
@@ -224,7 +228,13 @@ window.onload = function () {
     if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
         setTimeout(() => JETLSchemaUI.refreshAll(), 0);
     }
-};
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeJETLApp, { once: true });
+} else {
+    queueMicrotask(initializeJETLApp);
+}
 
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');

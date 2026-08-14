@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v2';
+const CACHE_NAME = 'jetl-mobile-cache-v3';
 const coreAssets = [
     './',
     './index.html',
@@ -22,9 +22,15 @@ const coreAssets = [
     './js/vendor/proj4.js',
     './js/vendor/wellknown.js',
     './js/vendor/anime.min.js',
+    './js/vendor/geopackage.min.js',
+    './js/vendor/parquet.min.js',
+    './js/vendor/parquet_bundled.js',
+    './js/vendor/jsts.min.js',
+    './js/vendor/rbush.min.js',
 
     // Core JS
     './js/core.js',
+    './js/params.js',
     './js/formats.js',
     './js/core/workerPool.js',
     './js/state/history.js',
@@ -32,6 +38,10 @@ const coreAssets = [
     './js/visualization.js',
     './js/processNode.js',
     './js/engine.js',
+    './js/templates.js',
+    './js/packages.js',
+    './js/tools.js',
+    './js/schemaUI.js',
     './js/smoke.js',
 
     // Node Definitions
@@ -41,9 +51,7 @@ const coreAssets = [
     './js/nodes/attributes.js',
     './js/nodes/raster.js',
     './js/nodes/writers.js',
-    './js/schemaUI.js',
-    './js/nodes/utils.js',
-    './js/tools.js'
+    './js/nodes/utils.js'
 ];
 
 self.addEventListener('install', event => {
@@ -79,6 +87,20 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     // Evitar interceptar requests pesadas que son problemáticas de cachear nativamente
     if (event.request.method !== 'GET' || event.request.url.includes('.wasm')) return;
+
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    if (response && response.ok) {
+                        caches.open(CACHE_NAME).then(cache => cache.put('./index.html', response.clone()));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
+        );
+        return;
+    }
 
     event.respondWith(
         caches.match(event.request)
