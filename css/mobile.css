@@ -105,7 +105,15 @@
         transform: translateX(0) !important;
     }
 
+    body.mobile-nodes-open #sidebar {
+        transform: translateX(0) !important;
+    }
+
     #mobile-state-nodes:checked ~ #layout #sidebar-overlay {
+        display: block !important;
+    }
+
+    body.mobile-nodes-open #sidebar-overlay {
         display: block !important;
     }
 
@@ -300,10 +308,10 @@
         background: rgba(52, 152, 219, .13);
     }
 
-    #mobile-state-nodes:checked ~ #mobile-dock [for="mobile-state-nodes"],
-    #mobile-state-flow:checked ~ #mobile-dock [for="mobile-state-flow"],
-    #mobile-state-results:checked ~ #mobile-dock [for="mobile-state-results"],
-    #mobile-state-project:checked ~ #mobile-dock [for="mobile-state-project"] {
+    #mobile-state-nodes:checked ~ #mobile-dock [data-mobile-view="nodes"],
+    #mobile-state-flow:checked ~ #mobile-dock [data-mobile-view="flow"],
+    #mobile-state-results:checked ~ #mobile-dock [data-mobile-view="results"],
+    #mobile-state-project:checked ~ #mobile-dock [data-mobile-view="project"] {
         color: #71b9ff;
         background: rgba(52, 152, 219, .13);
     }

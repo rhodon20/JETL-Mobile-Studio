@@ -73,12 +73,13 @@
             var sidebar = document.getElementById('sidebar');
             var overlay = document.getElementById('sidebar-overlay');
             var project = document.getElementById('mobile-project-sheet');
-            document.body.classList.remove('mobile-results-open', 'mobile-sheet-open');
+            document.body.classList.remove('mobile-nodes-open', 'mobile-results-open', 'mobile-sheet-open');
             if (sidebar) sidebar.classList.remove('open');
             if (overlay) overlay.style.display = 'none';
             if (project) project.setAttribute('aria-hidden', 'true');
 
             if (view === 'nodes') {
+                document.body.classList.add('mobile-nodes-open');
                 if (sidebar) sidebar.classList.add('open');
                 if (overlay) overlay.style.display = 'block';
             } else if (view === 'results') {
@@ -95,7 +96,9 @@
             }
 
             document.querySelectorAll('[data-mobile-view]').forEach(function (button) {
-                button.classList.toggle('active', button.getAttribute('data-mobile-view') === view);
+                var active = button.getAttribute('data-mobile-view') === view;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
             });
         };
         window.JETLNativeAddNode = function (key) {
@@ -1545,7 +1548,15 @@ body.modal-open {
         transform: translateX(0) !important;
     }
 
+    body.mobile-nodes-open #sidebar {
+        transform: translateX(0) !important;
+    }
+
     #mobile-state-nodes:checked ~ #layout #sidebar-overlay {
+        display: block !important;
+    }
+
+    body.mobile-nodes-open #sidebar-overlay {
         display: block !important;
     }
 
@@ -1740,10 +1751,10 @@ body.modal-open {
         background: rgba(52, 152, 219, .13);
     }
 
-    #mobile-state-nodes:checked ~ #mobile-dock [for="mobile-state-nodes"],
-    #mobile-state-flow:checked ~ #mobile-dock [for="mobile-state-flow"],
-    #mobile-state-results:checked ~ #mobile-dock [for="mobile-state-results"],
-    #mobile-state-project:checked ~ #mobile-dock [for="mobile-state-project"] {
+    #mobile-state-nodes:checked ~ #mobile-dock [data-mobile-view="nodes"],
+    #mobile-state-flow:checked ~ #mobile-dock [data-mobile-view="flow"],
+    #mobile-state-results:checked ~ #mobile-dock [data-mobile-view="results"],
+    #mobile-state-project:checked ~ #mobile-dock [data-mobile-view="project"] {
         color: #71b9ff;
         background: rgba(52, 152, 219, .13);
     }
@@ -2059,21 +2070,21 @@ body.modal-open {
     </div>
 
     <nav id="mobile-dock" aria-label="Navegación principal">
-        <label class="mobile-dock-btn" for="mobile-state-nodes" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos" aria-pressed="false" onclick="JETLNativeNav('nodes')">
             <i class="fas fa-shapes"></i><span>Nodos</span>
-        </label>
-        <label class="mobile-dock-btn" for="mobile-state-flow" data-mobile-view="flow" aria-label="Ver flujo">
+        </button>
+        <button type="button" class="mobile-dock-btn active" data-mobile-view="flow" aria-label="Ver flujo" aria-pressed="true" onclick="JETLNativeNav('flow')">
             <i class="fas fa-diagram-project"></i><span>Flujo</span>
-        </label>
+        </button>
         <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="JETLNativeRun()">
             <i class="fas fa-play"></i><span>Ejecutar</span>
         </button>
-        <label class="mobile-dock-btn" for="mobile-state-results" data-mobile-view="results" aria-label="Abrir resultados">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados" aria-pressed="false" onclick="JETLNativeNav('results')">
             <i class="fas fa-chart-area"></i><span>Resultados</span>
-        </label>
-        <label class="mobile-dock-btn" for="mobile-state-project" data-mobile-view="project" aria-label="Abrir acciones del proyecto">
+        </button>
+        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto" aria-pressed="false" onclick="JETLNativeNav('project')">
             <i class="fas fa-folder-open"></i><span>Proyecto</span>
-        </label>
+        </button>
     </nav>
 
     <label id="mobile-scrim" for="mobile-state-flow" aria-hidden="true"></label>
@@ -3052,7 +3063,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-9"
+    <script defer src="js/engine.js?v=20260814-11"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3077,10 +3088,9 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         const JETL_POST_BOOT_SCRIPTS = [
             'js/schemaUI.js',
             'js/templates.js',
-            'js/packages.js',
-            'js/modalSystem.js'
+            'js/packages.js'
         ];
-        const JETL_POST_BOOT_VERSION = '20260814-10';
+        const JETL_POST_BOOT_VERSION = '20260814-11';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

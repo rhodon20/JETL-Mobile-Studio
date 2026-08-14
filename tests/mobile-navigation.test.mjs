@@ -46,7 +46,8 @@ function bootNavigation() {
     const buttons = ['nodes', 'flow', 'results', 'project'].map((view) => {
         const button = createElement(`button-${view}`);
         button.dataset.mobileView = view;
-        button.getAttribute = (name) => name === 'data-mobile-view' ? view : null;
+        const getAttribute = button.getAttribute.bind(button);
+        button.getAttribute = (name) => name === 'data-mobile-view' ? view : getAttribute(name);
         return button;
     });
     const listeners = new Map();
@@ -94,21 +95,24 @@ function expectView(env, view) {
         assert.equal(elements.get(`mobile-state-${other}`).checked, false, `${view}: radio ${other} inactivo`);
     }
     assert.equal(elements.get('sidebar').classList.contains('open'), view === 'nodes', `${view}: sidebar`);
+    assert.equal(document.body.classList.contains('mobile-nodes-open'), view === 'nodes', `${view}: estado nodos`);
     assert.equal(elements.get('sidebar-overlay').style.display, view === 'nodes' ? 'block' : 'none', `${view}: overlay`);
     assert.equal(document.body.classList.contains('mobile-results-open'), view === 'results', `${view}: resultados`);
     assert.equal(document.body.classList.contains('mobile-sheet-open'), view === 'project', `${view}: proyecto`);
     assert.equal(elements.get('mobile-project-sheet').getAttribute('aria-hidden'), view === 'project' ? 'false' : 'true');
     buttons.forEach((button) => {
         assert.equal(button.classList.contains('active'), button.dataset.mobileView === view, `${view}: botón ${button.dataset.mobileView}`);
+        assert.equal(button.getAttribute('aria-pressed'), String(button.dataset.mobileView === view), `${view}: aria ${button.dataset.mobileView}`);
     });
 }
 
-test('cada destino móvil tiene un control nativo y una regla CSS de estado', () => {
+test('cada destino móvil tiene un botón directo y una regla CSS de respaldo', () => {
     for (const view of ['nodes', 'flow', 'results', 'project']) {
         assert.match(index, new RegExp(`<input[^>]+id="mobile-state-${view}"`));
-        assert.match(index, new RegExp(`for="mobile-state-${view}"`));
+        assert.match(index, new RegExp(`<button[^>]+data-mobile-view="${view}"[^>]+onclick="JETLNativeNav\\('${view}'\\)"`));
     }
     assert.match(index, /#mobile-state-nodes:checked ~ #layout #sidebar/);
+    assert.match(index, /body\.mobile-nodes-open #sidebar/);
     assert.match(index, /#mobile-state-results:checked ~ #bottom-panel/);
     assert.match(index, /#mobile-state-project:checked ~ #mobile-project-sheet/);
 });
@@ -144,4 +148,10 @@ test('las librerías GIS no se cargan automáticamente al terminar la página', 
     assert.ok(loadBlock, 'No se encontró el bloque de carga diferida');
     assert.doesNotMatch(loadBlock, /\n\s*loadJETLRuntime\(\);/);
     assert.match(index, /window\.JETLEnsureRuntime = loadJETLRuntime/);
+});
+
+test('el observador de modales no forma parte del arranque automático', () => {
+    const postBoot = index.match(/const JETL_POST_BOOT_SCRIPTS = \[([\s\S]*?)\];/)?.[1] ?? '';
+    assert.ok(postBoot, 'No se encontró la lista post-arranque');
+    assert.doesNotMatch(postBoot, /modalSystem/);
 });

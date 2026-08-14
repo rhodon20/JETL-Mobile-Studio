@@ -86,6 +86,6 @@ test('un modal visible converge tras una sola mutación de clase', () => {
 });
 
 test('la página fuerza una versión nueva de los módulos post-arranque', () => {
-    assert.match(index, /const JETL_POST_BOOT_VERSION = '20260814-10'/);
+    assert.match(index, /const JETL_POST_BOOT_VERSION = '20260814-11'/);
     assert.match(index, /script\.src = JETL_POST_BOOT_SCRIPTS\[index\+\+\] \+ '\?v=' \+ JETL_POST_BOOT_VERSION/);
 });

@@ -16,7 +16,7 @@
     }
 
     function closeTransientViews() {
-        document.body.classList.remove('mobile-results-open', 'mobile-sheet-open');
+        document.body.classList.remove('mobile-nodes-open', 'mobile-results-open', 'mobile-sheet-open');
         document.getElementById('mobile-project-sheet')?.setAttribute('aria-hidden', 'true');
 
         const sidebar = document.getElementById('sidebar');

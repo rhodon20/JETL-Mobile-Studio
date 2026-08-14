@@ -256,6 +256,24 @@ function initializeJETLApp() {
     editor.reroute_fix_curvature = true;
     editor.start();
 
+    // Drawflow mueve y escala su lienzo interno, pero la cuadrícula pertenece
+    // al contenedor. Sin sincronizarla, un flujo vacío parece inmóvil aunque
+    // los gestos funcionen. Mantener ambos en el mismo sistema de coordenadas
+    // da feedback visible inmediato para paneo y pinch-to-zoom.
+    const syncCanvasViewport = () => {
+        const zoom = Number.isFinite(editor.zoom) ? editor.zoom : 1;
+        const x = Number.isFinite(editor.canvas_x) ? editor.canvas_x : 0;
+        const y = Number.isFinite(editor.canvas_y) ? editor.canvas_y : 0;
+        drawflowElement.style.backgroundPosition = x + 'px ' + y + 'px';
+        drawflowElement.style.backgroundSize = (25 * zoom) + 'px ' + (25 * zoom) + 'px';
+        drawflowElement.dataset.viewport = Math.round(x) + ',' + Math.round(y) + ',' + zoom.toFixed(2);
+    };
+    const scheduleCanvasViewportSync = () => window.requestAnimationFrame(syncCanvasViewport);
+    editor.on('translate', scheduleCanvasViewportSync);
+    editor.on('zoom', scheduleCanvasViewportSync);
+    syncCanvasViewport();
+    window.JETLSyncCanvasViewport = syncCanvasViewport;
+
     // El borrador local no se restaura silenciosamente. El usuario puede
     // recuperarlo desde Proyecto > Restaurar.
     updateLocalDraftUI();
