@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v4';
+const CACHE_NAME = 'jetl-mobile-cache-v5';
 const coreAssets = [
     './',
     './index.html',
