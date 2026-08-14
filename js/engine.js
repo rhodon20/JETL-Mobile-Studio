@@ -338,6 +338,7 @@ function initializeJETLApp() {
             ['controles principales', initEngineDelegation],
             ['historial', initHistory],
             ['menú contextual', initContextMenu],
+            ['navegador de flujo', initFlowNavigator],
             ['búsqueda rápida', initQuickSearch]
         ];
         initializers.forEach(([label, initializer]) => {
@@ -440,6 +441,176 @@ function renderSidebar(filter) {
     });
 }
 function filterTools(val) { renderSidebar(val); }
+
+function buildFlowNavigatorEntries(flowData, registry, query = '') {
+    const data = flowData && flowData.drawflow && flowData.drawflow.Home
+        ? flowData.drawflow.Home.data || {}
+        : {};
+    const needle = String(query || '').trim().toLocaleLowerCase('es');
+    return Object.entries(data).map(([id, node]) => {
+        const tool = registry[node.name] || {};
+        const label = tool.label || node.name || `Nodo ${id}`;
+        const category = tool.cat || 'Sin categoría';
+        const searchable = [id, node.name, label, category, JSON.stringify(node.data || {})]
+            .join(' ')
+            .toLocaleLowerCase('es');
+        const inputs = Object.values(node.inputs || {}).reduce((total, input) => total + (input.connections || []).length, 0);
+        const outputs = Object.values(node.outputs || {}).reduce((total, output) => total + (output.connections || []).length, 0);
+        return {
+            id: String(id), name: node.name || '', label, category,
+            icon: tool.icon || 'fa-cube', color: tool.color || '#888',
+            inputs, outputs, searchable
+        };
+    }).filter((entry) => !needle || entry.searchable.includes(needle))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+}
+window.buildFlowNavigatorEntries = buildFlowNavigatorEntries;
+
+function escapeFlowNavigatorHTML(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function getFlowNavigatorSummary(flowData) {
+    const data = flowData && flowData.drawflow && flowData.drawflow.Home
+        ? flowData.drawflow.Home.data || {}
+        : {};
+    const nodes = Object.values(data);
+    const connections = nodes.reduce((total, node) => total + Object.values(node.outputs || {})
+        .reduce((sum, output) => sum + (output.connections || []).length, 0), 0);
+    const categories = new Set(nodes.map((node) => TOOL_REGISTRY[node.name]?.cat).filter(Boolean)).size;
+    return { nodes: nodes.length, connections, categories };
+}
+
+function renderFlowNavigator(query = '') {
+    const list = document.getElementById('flow-navigator-list');
+    const summary = document.getElementById('flow-navigator-summary');
+    if (!list || !summary || !editor) return;
+    const flowData = editor.export();
+    const entries = buildFlowNavigatorEntries(flowData, TOOL_REGISTRY, query);
+    const totals = getFlowNavigatorSummary(flowData);
+    summary.innerHTML = `
+        <span><strong>${totals.nodes}</strong> nodos</span>
+        <span><strong>${totals.connections}</strong> conexiones</span>
+        <span><strong>${totals.categories}</strong> categorías</span>`;
+
+    if (!entries.length) {
+        list.innerHTML = `<div class="flow-navigator-empty">
+            <i class="fas fa-search"></i>
+            <strong>${totals.nodes ? 'No hay coincidencias' : 'El flujo está vacío'}</strong>
+            <span>${totals.nodes ? 'Prueba con otro nombre, atributo o ID.' : 'Añade nodos desde el catálogo para empezar.'}</span>
+        </div>`;
+        return;
+    }
+
+    list.innerHTML = entries.map((entry) => {
+        const id = escapeFlowNavigatorHTML(entry.id);
+        const label = escapeFlowNavigatorHTML(entry.label);
+        const category = escapeFlowNavigatorHTML(entry.category);
+        const color = /^#[0-9a-f]{3,8}$/i.test(entry.color) ? entry.color : '#888';
+        const icon = String(entry.icon).split(/\s+/).filter((token) => /^fa[\w-]*$/.test(token)).join(' ');
+        return `
+        <button type="button" class="flow-navigator-item" data-flow-node-id="${id}">
+            <span class="flow-navigator-icon" style="--node-accent:${color}"><i class="fas ${icon}"></i></span>
+            <span class="flow-navigator-copy">
+                <strong>${label}</strong>
+                <small>#${id} · ${category}</small>
+            </span>
+            <span class="flow-navigator-ports" aria-label="${entry.inputs} entradas y ${entry.outputs} salidas">
+                <span><i class="fas fa-arrow-right-to-bracket"></i>${entry.inputs}</span>
+                <span><i class="fas fa-arrow-right-from-bracket"></i>${entry.outputs}</span>
+            </span>
+            <i class="fas fa-crosshairs flow-navigator-target" aria-hidden="true"></i>
+        </button>`;
+    }).join('');
+}
+
+function closeFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal.is-open')) document.body.classList.remove('modal-open');
+}
+window.JETLCloseFlowNavigator = closeFlowNavigator;
+
+function openFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    const input = document.getElementById('flow-navigator-filter');
+    if (!modal) return false;
+    initFlowNavigator();
+    window.JETLNativeNav?.('flow');
+    if (input) input.value = '';
+    renderFlowNavigator('');
+    modal.style.display = 'flex';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    setTimeout(() => input?.focus(), 0);
+    return true;
+}
+window.JETLOpenFlowNavigator = openFlowNavigator;
+
+function focusFlowNode(nodeId) {
+    const id = String(nodeId || '');
+    const node = document.getElementById('node-' + id);
+    const viewport = document.getElementById('drawflow');
+    if (!node || !viewport || !editor?.precanvas) return false;
+
+    const zoom = Math.min(1, Math.max(editor.zoom_min || 0.5, window.innerWidth <= 768 ? 0.88 : (editor.zoom || 1)));
+    const centerX = node.offsetLeft + node.offsetWidth / 2;
+    const centerY = node.offsetTop + node.offsetHeight / 2;
+    const x = viewport.clientWidth / 2 - centerX * zoom;
+    const y = viewport.clientHeight / 2 - centerY * zoom;
+
+    editor.canvas_x = x;
+    editor.canvas_y = y;
+    editor.zoom = zoom;
+    editor.zoom_last_value = zoom;
+    editor.precanvas.style.transformOrigin = '0 0';
+    editor.precanvas.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    document.querySelectorAll('.drawflow-node').forEach((element) => element.classList.remove('selected'));
+    node.classList.add('selected');
+    editor.node_selected = node;
+    currentNodeId = id;
+    editor.dispatch?.('nodeSelected', id);
+    if (executionData[id]?.data && typeof buildTable === 'function') buildTable(executionData[id].data);
+    window.JETLSyncCanvasViewport?.();
+    node.animate?.([
+        { boxShadow: '0 0 0 3px rgba(52,152,219,.5)' },
+        { boxShadow: '0 0 0 3px rgba(52,152,219,.24)' }
+    ], { duration: 420, easing: 'ease-out' });
+    return true;
+}
+window.JETLFocusFlowNode = focusFlowNode;
+
+function initFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    const input = document.getElementById('flow-navigator-filter');
+    const list = document.getElementById('flow-navigator-list');
+    if (!modal || !input || !list || modal.dataset.ready === 'true') return;
+    modal.dataset.ready = 'true';
+    input.addEventListener('input', () => renderFlowNavigator(input.value));
+    list.addEventListener('click', (event) => {
+        const item = event.target.closest('[data-flow-node-id]');
+        if (!item) return;
+        const id = item.getAttribute('data-flow-node-id');
+        closeFlowNavigator();
+        window.JETLNativeNav?.('flow');
+        requestAnimationFrame(() => focusFlowNode(id));
+    });
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeFlowNavigator();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) closeFlowNavigator();
+    });
+}
 
 let qsMousePos = { x: 0, y: 0 };
 
@@ -702,6 +873,8 @@ function initEngineDelegation() {
         else if (action === 'clear-canvas') clearCanvas();
         else if (action === 'new-project') startNewProject();
         else if (action === 'restore-draft') restoreLocalDraft();
+        else if (action === 'open-flow-navigator') openFlowNavigator();
+        else if (action === 'close-flow-navigator') closeFlowNavigator();
         else if (action === 'save-project') saveProject();
         else if (action === 'open-project') {
             const upload = document.getElementById('upload-jetl');

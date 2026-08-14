@@ -474,6 +474,33 @@
         font-size: .75rem;
     }
 
+    .flow-navigator-content {
+        max-height: 82dvh;
+    }
+
+    .flow-navigator-search {
+        margin: 12px 12px 8px;
+    }
+
+    .flow-navigator-summary {
+        padding: 0 12px 8px;
+        overflow-x: auto;
+    }
+
+    .flow-navigator-summary span {
+        flex: 0 0 auto;
+    }
+
+    .flow-navigator-list {
+        max-height: none;
+        flex: 1 1 auto;
+        padding: 4px 8px 12px;
+    }
+
+    .flow-navigator-item {
+        min-height: 66px;
+    }
+
     .mobile-project-grid button:disabled {
         opacity: .38;
         filter: grayscale(1);

@@ -26,7 +26,7 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 | Superficies y movimiento coherentes | Tokens y transiciones compartidas | En curso |
 | Diálogos de configuración | Sistema modal accesible y adaptable | Base implementada |
 | Historial de ejecución | Historial local PWA | Pendiente |
-| Navegador de flujo | Búsqueda de nodos y atributos | Pendiente |
+| Navegador de flujo | Búsqueda de nodos y atributos | Implementado v1 |
 | Apariencia classic/material | Preferencia visual local | Pendiente |
 | Backend, lotes y filesystem | Alternativas Web API cuando existan | Fuera de paridad directa |
 
@@ -49,9 +49,9 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 
 ### Fase 3 — Navegación del flujo
 
-- Buscador global de nodos y atributos.
-- Centrado y selección desde resultados.
-- Miniresumen del flujo en proyectos grandes.
+- Buscador global de nodos y atributos. Implementado v1.
+- Centrado y selección desde resultados. Implementado v1.
+- Miniresumen del flujo en proyectos grandes. Implementado v1 con recuento de nodos, conexiones y categorías.
 
 ### Fase 4 — Ejecución y diagnóstico
 
