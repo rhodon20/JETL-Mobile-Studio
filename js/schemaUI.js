@@ -529,6 +529,53 @@
         expr.setSelectionRange(nextPos, nextPos);
     }
 
+    let currentCalcNodeId = null;
+
+    function openCalcEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('calc-editor-modal');
+        if (!nodeEl || !modal) return;
+        currentCalcNodeId = String(nodeId);
+        updateCalcNode(nodeId);
+
+        const source = nodeEl.querySelector('[df-source-field]');
+        const modalSource = document.getElementById('calc-editor-source');
+        document.getElementById('calc-editor-name').value = nodeEl.querySelector('[df-name]')?.value || 'new_field';
+        document.getElementById('calc-editor-expression').value = nodeEl.querySelector('[df-expr]')?.value || '';
+        document.getElementById('calc-editor-error').value = nodeEl.querySelector('[df-on-error]')?.value || 'null';
+        if (source && modalSource) modalSource.innerHTML = source.innerHTML;
+        modal.style.display = 'flex';
+    }
+
+    function closeCalcEditor(save) {
+        const modal = document.getElementById('calc-editor-modal');
+        if (!modal) return;
+        if (save && currentCalcNodeId) {
+            const nodeEl = document.getElementById('node-' + currentCalcNodeId);
+            if (nodeEl) {
+                const name = document.getElementById('calc-editor-name').value.trim();
+                nodeEl.querySelector('[df-name]').value = name || 'new_field';
+                nodeEl.querySelector('[df-expr]').value = document.getElementById('calc-editor-expression').value;
+                nodeEl.querySelector('[df-on-error]').value = document.getElementById('calc-editor-error').value;
+                const summary = nodeEl.querySelector('[data-calc-summary]');
+                if (summary) summary.textContent = name || 'new_field';
+            }
+        }
+        modal.style.display = 'none';
+        currentCalcNodeId = null;
+    }
+
+    function insertCalcFieldInModal() {
+        const source = document.getElementById('calc-editor-source');
+        const expression = document.getElementById('calc-editor-expression');
+        if (!source?.value || !expression) return;
+        const token = `props["${source.value}"]`;
+        const start = typeof expression.selectionStart === 'number' ? expression.selectionStart : expression.value.length;
+        const end = typeof expression.selectionEnd === 'number' ? expression.selectionEnd : expression.value.length;
+        expression.setRangeText(token, start, end, 'end');
+        expression.focus();
+    }
+
     function updateNode(nodeId) {
         updateJoinNode(nodeId);
         updateCalcNode(nodeId);
@@ -561,7 +608,10 @@
             const nodeId = nodeEl.id.replace('node-', '');
 
             const action = btn.getAttribute('data-schema-action');
-            if (action === 'join-add') {
+            if (action === 'calc-open-editor') {
+                evt.stopPropagation();
+                openCalcEditor(nodeId);
+            } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
             } else if (action === 'renamer-add') {
@@ -595,6 +645,19 @@
                 const fields = _schemaFromNodeData(p1);
                 _renderTestRows(dom, fields, rows);
             }
+        });
+
+        document.addEventListener('click', (evt) => {
+            const action = evt.target.closest('[data-ui-action]')?.getAttribute('data-ui-action');
+            if (action === 'close-calc-editor') closeCalcEditor(false);
+            else if (action === 'save-calc-editor') closeCalcEditor(true);
+            else if (action === 'calc-editor-insert') insertCalcFieldInModal();
+        });
+
+        document.addEventListener('dblclick', (evt) => {
+            const nodeEl = evt.target.closest('.drawflow-node');
+            if (!nodeEl?.classList.contains('attr_calc_pro')) return;
+            openCalcEditor(nodeEl.id.replace('node-', ''));
         });
 
         document.addEventListener('change', (evt) => {

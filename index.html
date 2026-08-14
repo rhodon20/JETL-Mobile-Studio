@@ -981,6 +981,7 @@
             color: #aaa;
         }
     </style>
+    <link rel="stylesheet" href="css/ui-system.css">
     <link rel="stylesheet" href="css/mobile.css">
 </head>
 
@@ -1051,7 +1052,7 @@
 
     <div id="bottom-panel">
         <div id="panel-tabs">
-            <div style="display:flex; height:100%">
+            <div class="panel-tabs-main">
                 <button class="btn" data-ui-action="zoom-all"><i class="fas fa-expand"></i></button>
                 <button class="btn" id="btn-map-expand" data-ui-action="toggle-map-expand" title="Ampliar mapa"><i
                         class="fas fa-up-right-and-down-left-from-center"></i></button>
@@ -1061,8 +1062,11 @@
                 <button class="tab-btn" data-ui-action="tab-logs"><i class="fas fa-terminal"></i>
                     Consola</button>
             </div>
-            <button class="tab-btn" style="padding:0 15px" data-ui-action="toggle-panel"><i
-                    class="fas fa-compress-alt"></i></button>
+            <div class="panel-tabs-actions">
+                <button class="tab-btn panel-collapse-btn" id="btn-panel-collapse" data-ui-action="toggle-panel"
+                    title="Ocultar visor" aria-label="Ocultar visor" aria-expanded="true"><i
+                        class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span></button>
+            </div>
         </div>
         <div id="panel-content">
             <div id="logs" style="display:block">Sistema listo.</div>
@@ -1150,38 +1154,59 @@
         <div class="ctx-item" data-ui-action="ctx-delete" style="color:#e74c3c"><i class="fas fa-trash"></i> Eliminar
         </div>
     </div>
-    <div id="templates-modal" class="modal">
-        <div class="modal-content">
+    <div id="templates-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="templates-modal-title">
+        <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div>Plantillas de flujo</div>
-                <button class="btn" data-ui-action="close-templates"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-layer-group"></i><div><strong id="templates-modal-title">Plantillas de flujo</strong><small>Inicia un flujo a partir de una estructura preparada</small></div></div>
+                <button class="modal-close" data-ui-action="close-templates" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div id="templates-list"></div>
+            <div class="modal-body"><div id="templates-list"></div></div>
         </div>
     </div>
-    <div id="params-modal" class="modal">
+    <div id="params-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="params-modal-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div>Parametros del Workspace</div>
-                <button class="btn" data-ui-action="close-params"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-sliders-h"></i><div><strong id="params-modal-title">Parámetros del espacio de trabajo</strong><small>Variables reutilizables en los nodos compatibles</small></div></div>
+                <button class="modal-close" data-ui-action="close-params" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div style="padding:12px; border-bottom:1px solid #333; color:#aaa; font-size:0.8rem">
-                Usa <code>${param_key}</code> en campos de texto de nodos compatibles.
+            <div class="modal-body">
+                <div class="modal-help">
+                    Usa <code>${param_key}</code> en campos de texto de nodos compatibles.
+                </div>
+                <div id="params-rows" class="modal-scroll"></div>
             </div>
-            <div id="params-rows" style="padding:12px; max-height:50vh; overflow:auto"></div>
-            <div style="padding:10px 12px; border-top:1px solid #333; display:flex; gap:8px; justify-content:flex-end">
-                <button class="btn" data-ui-action="add-param-row"><i class="fas fa-plus"></i></button>
-                <button class="btn" data-ui-action="save-params"><i class="fas fa-save"></i> Guardar</button>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="add-param-row"><i class="fas fa-plus"></i> Añadir</button>
+                <button class="btn btn-primary" data-ui-action="save-params"><i class="fas fa-save"></i> Guardar y cerrar</button>
             </div>
         </div>
     </div>
-    <div id="packages-modal" class="modal">
+    <div id="packages-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="packages-modal-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-box-open"></i><div><strong id="packages-modal-title">Paquetes comunitarios</strong><small>Amplía el catálogo de transformadores disponibles</small></div></div>
+                <button class="modal-close" data-ui-action="close-packages" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body"><div id="packages-list"></div></div>
+        </div>
+    </div>
+    <div id="calc-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="calc-editor-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div>Paquetes Comunitarios</div>
-                <button class="btn" data-ui-action="close-packages"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-keyboard"></i><div><strong id="calc-editor-title">Calculadora de campos</strong><small>Define el campo de salida y su expresión</small></div></div>
+                <button class="modal-close" data-ui-action="close-calc-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div id="packages-list"></div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span>Campo de destino</span><input id="calc-editor-name" class="node-control" autocomplete="off"></label>
+                <label class="form-field"><span>Expresión</span><textarea id="calc-editor-expression" class="node-control" rows="6" placeholder='props["poblacion"] / props["area"]'></textarea></label>
+                <div class="form-field"><span>Insertar campo disponible</span><div class="form-inline"><select id="calc-editor-source" class="node-control"></select><button class="btn" data-ui-action="calc-editor-insert" title="Insertar en la expresión"><i class="fas fa-arrow-down"></i> Insertar</button></div></div>
+                <label class="form-field"><span>Si la expresión produce un error</span><select id="calc-editor-error" class="node-control"><option value="null">Asignar null y continuar</option><option value="reject">Enviar el elemento a la salida 2</option></select></label>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Puedes usar <code>props</code>, <code>feat</code>, <code>Math</code> y <code>turf</code>. La expresión se ejecuta localmente.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-calc-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-calc-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
         </div>
     </div>
     <style>
@@ -1220,6 +1245,7 @@
     <script src="js/templates.js"></script>
     <script src="js/packages.js"></script>
     <script src="js/smoke.js"></script>
+    <script src="js/modalSystem.js"></script>
     <script src="js/mobile.js"></script>
 
     <script>

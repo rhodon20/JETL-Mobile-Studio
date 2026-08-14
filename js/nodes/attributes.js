@@ -922,29 +922,21 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         cat: '2.3 VECTOR - ATTRIBUTES', label: 'Field Calculator Pro', icon: 'fa-keyboard', color: '#27ae60', in: 1, out: 2,
         help: 'Expresiones JS con helpers: props, feat, Math, turf.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campo destino</span>
-                <input type="text" df-name class="node-control" value="new_field">
+            <div class="node-editor-summary">
+                <i class="fas fa-keyboard"></i>
+                <div><strong data-calc-summary>new_field</strong><small>Configura una expresión por elemento</small></div>
             </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Expresion</span>
-                <textarea df-expr class="node-control" style="height:60px" placeholder="props.a + props.b"></textarea>
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
+            <button type="button" class="btn node-editor-open" data-schema-action="calc-open-editor">
+                <i class="fas fa-pen"></i> Abrir editor
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <input type="text" df-name class="node-control" value="new_field" tabindex="-1">
+                <textarea df-expr class="node-control" tabindex="-1"></textarea>
+                <select df-on-error class="node-control" tabindex="-1">
                     <option value="null">Asignar null (compat)</option>
                     <option value="reject">Enviar a output_2</option>
                 </select>
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">Campos disponibles</span>
-                <div style="display:flex; gap:4px; margin-top:2px">
-                    <select class="node-control" df-source-field style="flex:1"></select>
-                    <button class="btn" style="padding:4px 8px" data-schema-action="calc-insert" title="Insertar campo en expresion">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                </div>
+                <select df-source-field class="node-control" tabindex="-1"></select>
             </div>`,
         run: async (id, inputs, dom) => {
             const field = resolveParamText(dom.querySelector('[df-name]').value);

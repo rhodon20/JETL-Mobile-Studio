@@ -1,0 +1,323 @@
+/* Shared Studio surfaces, aligned with JETL Desktop's UI contract. */
+:root {
+    --surface-1: #1e1e20;
+    --surface-2: #252528;
+    --surface-3: #2d2d31;
+    --surface-border: rgba(255, 255, 255, .11);
+    --surface-shadow: 0 22px 70px rgba(0, 0, 0, .55);
+    --focus-ring: 0 0 0 3px rgba(52, 152, 219, .3);
+}
+
+#bottom-panel {
+    --panel-collapsed-height: 44px;
+    min-height: 0;
+}
+
+body.panel-collapsed #bottom-panel {
+    height: var(--panel-collapsed-height) !important;
+}
+
+body.panel-collapsed #panel-content {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#panel-tabs {
+    min-height: 42px;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+.panel-tabs-main,
+.panel-tabs-actions {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    height: 100%;
+}
+
+.panel-tabs-main {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+.panel-tabs-main::-webkit-scrollbar {
+    display: none;
+}
+
+.panel-tabs-actions {
+    flex: 0 0 auto;
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    padding-left: 4px;
+    background: linear-gradient(90deg, rgba(37, 37, 38, 0), #252526 12px);
+}
+
+.panel-collapse-btn {
+    min-width: 88px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #c9c9cc;
+    border-left: 1px solid #3b3b3d;
+}
+
+.panel-collapse-btn:hover,
+.panel-collapse-btn:focus-visible {
+    color: #fff;
+    background: rgba(255, 255, 255, .07);
+}
+
+.panel-collapse-btn:focus-visible,
+.modal-close:focus-visible,
+.modal button:focus-visible,
+.modal input:focus-visible,
+.modal select:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.modal {
+    z-index: 10000;
+    padding: 24px;
+    background: rgba(5, 7, 10, .68);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+.modal.is-open {
+    opacity: 1;
+}
+
+.modal-content {
+    width: min(620px, calc(100vw - 32px));
+    max-width: none;
+    max-height: min(82dvh, 760px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    box-shadow: var(--surface-shadow);
+    transform: translateY(8px) scale(.985);
+    transition: transform .2s cubic-bezier(.2, .8, .2, 1);
+}
+
+.modal.is-open .modal-content {
+    transform: translateY(0) scale(1);
+}
+
+.modal-content-wide {
+    width: min(820px, calc(100vw - 32px));
+}
+
+.modal-header {
+    flex: 0 0 auto;
+    min-height: 68px;
+    padding: 13px 16px;
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.modal-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-title > i {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #74bef5;
+    background: rgba(52, 152, 219, .14);
+}
+
+.modal-title > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.modal-title strong {
+    color: #f5f5f6;
+    font-size: 1rem;
+}
+
+.modal-title small {
+    color: #9b9ba0;
+    font-size: .73rem;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-close {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #d4d4d7;
+    background: rgba(255, 255, 255, .06);
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, .12);
+}
+
+.modal-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+}
+
+.modal-scroll {
+    padding: 14px 16px;
+    max-height: 50dvh;
+    overflow: auto;
+}
+
+.modal-help {
+    padding: 12px 16px;
+    color: #aaa;
+    font-size: .8rem;
+    line-height: 1.45;
+    background: rgba(52, 152, 219, .06);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.modal-help code {
+    color: #8ecbf5;
+}
+
+.modal-footer {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    border-top: 1px solid var(--surface-border);
+    background: var(--surface-2);
+}
+
+.btn-primary {
+    color: #fff;
+    background: #237fbe;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background: #298fce;
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
+.modal-form {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #bcbcc0;
+    font-size: .78rem;
+    font-weight: 650;
+}
+
+.form-field .node-control {
+    min-height: 42px;
+    margin: 0;
+    font-size: .9rem;
+}
+
+.form-field textarea.node-control {
+    min-height: 132px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    line-height: 1.45;
+}
+
+.form-inline {
+    display: flex;
+    gap: 8px;
+}
+
+.form-inline > .node-control {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.node-editor-summary {
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .035);
+}
+
+.node-editor-summary > i {
+    color: #55b982;
+}
+
+.node-editor-summary > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.node-editor-summary strong,
+.node-editor-summary small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-editor-summary small {
+    color: #85858a;
+    font-size: .65rem;
+}
+
+.node-editor-open {
+    width: 100%;
+    margin-top: 7px;
+    gap: 6px;
+}
+
+.node-editor-storage {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal,
+    .modal-content,
+    #bottom-panel {
+        transition: none !important;
+    }
+}

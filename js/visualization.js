@@ -987,9 +987,28 @@ function toggleSidebar() {
 
 function togglePanelHeight() {
     if (mapPanelExpanded) return;
-    const p = document.getElementById('bottom-panel');
-    const isMin = p.offsetHeight < 100;
-    p.style.height = isMin ? '45vh' : '36px';
+    const body = document.body;
+    const button = document.getElementById('btn-panel-collapse');
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+    if (isMobile) {
+        body.classList.remove('mobile-results-open');
+        if (window.JETLMobile) window.JETLMobile.closeTransientViews();
+        document.querySelectorAll('[data-mobile-view]').forEach((item) => {
+            item.classList.toggle('active', item.dataset.mobileView === 'flow');
+        });
+        return;
+    }
+
+    const collapsed = body.classList.toggle('panel-collapsed');
+    if (button) {
+        button.setAttribute('aria-expanded', String(!collapsed));
+        button.setAttribute('aria-label', collapsed ? 'Mostrar visor' : 'Ocultar visor');
+        button.title = collapsed ? 'Mostrar visor' : 'Ocultar visor';
+        button.innerHTML = collapsed
+            ? '<i class="fas fa-chevron-up"></i><span class="panel-action-label">Mostrar</span>'
+            : '<i class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span>';
+    }
     setTimeout(() => map.invalidateSize(), 350);
 }
 
@@ -1043,8 +1062,7 @@ function switchTab(t) {
     const toShow = document.getElementById(showId);
     if (toShow) toShow.style.display = 'block';
 
-    const p = document.getElementById('bottom-panel');
-    if (p.offsetHeight < 100) togglePanelHeight();
+    if (document.body.classList.contains('panel-collapsed')) togglePanelHeight();
 
     if (t === 'map') {
         setTimeout(() => {

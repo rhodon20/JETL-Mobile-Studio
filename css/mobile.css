@@ -335,7 +335,7 @@
 
     .modal {
         align-items: flex-end;
-        padding-bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        padding: 8px 8px var(--mobile-safe-bottom);
     }
 
     .modal-content {
@@ -343,6 +343,11 @@
         max-width: none !important;
         max-height: 78dvh;
         border-radius: 22px 22px 0 0 !important;
+    }
+
+    body.modal-open #mobile-dock {
+        visibility: hidden;
+        pointer-events: none;
     }
 }
 
