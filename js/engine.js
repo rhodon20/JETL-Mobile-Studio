@@ -627,10 +627,7 @@ function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
     addNode(k, rect.width / 2 + rect.left, rect.height / 2 + rect.top);
     if (window.innerWidth < 768) {
-        window.JETLMobile?.closeTransientViews();
-        document.querySelectorAll('[data-mobile-view]').forEach((button) => {
-            button.classList.toggle('active', button.dataset.mobileView === 'flow');
-        });
+        window.JETLNativeNav?.('flow');
         window.JETLMobile?.fitFlowToViewport();
     }
 }
@@ -805,7 +802,10 @@ async function runEngine() {
     if (cancelBtn) cancelBtn.style.display = 'block';
     log("--- INICIANDO EJECUCIÓN TOTAL ---");
 
-    if (window.JETLRuntimeReady && !(await window.JETLRuntimeReady)) {
+    const runtime = typeof window.JETLEnsureRuntime === 'function'
+        ? window.JETLEnsureRuntime()
+        : window.JETLRuntimeReady;
+    if (runtime && !(await runtime)) {
         const runtimeError = window.__JETL_RUNTIME_ERROR;
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");
@@ -871,7 +871,10 @@ async function runEnginePartial(targetId) {
     loader.style.display = 'flex';
     if (cancelBtn) cancelBtn.style.display = 'block';
 
-    if (window.JETLRuntimeReady && !(await window.JETLRuntimeReady)) {
+    const runtime = typeof window.JETLEnsureRuntime === 'function'
+        ? window.JETLEnsureRuntime()
+        : window.JETLRuntimeReady;
+    if (runtime && !(await runtime)) {
         const runtimeError = window.__JETL_RUNTIME_ERROR;
         log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
         showToast("No se pudo preparar el motor", "error");

@@ -64,10 +64,12 @@
             window.setTimeout(function () { dot.style.boxShadow = ''; }, 220);
         };
         window.JETLNativeNav = function (view) {
-            if (!document.body) return;
+            if (!document.body || !['flow', 'nodes', 'results', 'project'].includes(view)) return;
             window.JETLMarkInteraction('nav:' + view);
             var nativeState = document.getElementById('mobile-state-' + view);
-            if (nativeState) nativeState.checked = true;
+            document.querySelectorAll('.mobile-view-state').forEach(function (state) {
+                state.checked = state === nativeState;
+            });
             var sidebar = document.getElementById('sidebar');
             var overlay = document.getElementById('sidebar-overlay');
             var project = document.getElementById('mobile-project-sheet');
@@ -81,7 +83,10 @@
                 if (overlay) overlay.style.display = 'block';
             } else if (view === 'results') {
                 document.body.classList.add('mobile-results-open');
-                Promise.resolve(window.JETLRuntimeReady).then(function (ready) {
+                var runtime = typeof window.JETLEnsureRuntime === 'function'
+                    ? window.JETLEnsureRuntime()
+                    : window.JETLRuntimeReady;
+                Promise.resolve(runtime).then(function (ready) {
                     if (ready !== false && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
                 }).catch(function (error) { console.error('[JETL] Visor no disponible', error); });
             } else if (view === 'project') {
@@ -103,71 +108,22 @@
         };
         window.JETLNativeRun = async function () {
             window.JETLMarkInteraction('run');
-            var ready = window.JETLRuntimeReady ? await window.JETLRuntimeReady : true;
+            var runtime = typeof window.JETLEnsureRuntime === 'function'
+                ? window.JETLEnsureRuntime()
+                : window.JETLRuntimeReady;
+            var ready = runtime ? await runtime : true;
             if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
             reportJETLBootError('El motor no está disponible');
         };
-        (function installDockCapture() {
-            var lastCaptureAt = 0;
-            var dockActions = ['nodes', 'flow', 'run', 'results', 'project'];
-            var diagnosticBuild = 'TOUCH-11';
-
-            function getPoint(event) {
-                var touch = (event.touches && event.touches[0]) || (event.changedTouches && event.changedTouches[0]);
-                return touch
-                    ? { x: touch.clientX, y: touch.clientY }
-                    : { x: event.clientX, y: event.clientY };
-            }
-
-            function showDiagnostic(message) {
-                var diagnostic = document.getElementById('interaction-diagnostic');
-                if (diagnostic) diagnostic.textContent = diagnosticBuild + ' · ' + message;
-            }
-
-            function captureDockAction(event) {
-                var dock = document.getElementById('mobile-dock');
-                if (!dock || window.innerWidth > 768) return;
-                var point = getPoint(event);
-                var target = event.target && typeof event.target.closest === 'function'
-                    ? event.target.closest('#mobile-dock .mobile-dock-btn')
-                    : null;
-                var action = target && target.id === 'mobile-run'
-                    ? 'run'
-                    : target && target.getAttribute('data-mobile-view');
-
-                // En algunos navegadores iOS la barra fija se pinta fuera del
-                // rectángulo que informa getBoundingClientRect(). Si el target
-                // no identifica el botón, usamos la franja inferior real del
-                // viewport como respaldo y no la caja CSS del dock.
-                if (!action) {
-                    var bottomBand = Math.max(112, dock.offsetHeight || 0);
-                    if (point.y < window.innerHeight - bottomBand) return;
-                    var viewportWidth = Math.max(1, window.innerWidth);
-                    var fallbackIndex = Math.min(4, Math.floor(Math.max(0, point.x) / (viewportWidth / 5)));
-                    action = dockActions[fallbackIndex];
-                }
-
-                event.preventDefault();
-                event.stopPropagation();
-                if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-
-                var now = Date.now();
-                if (now - lastCaptureAt < 550) return;
-                lastCaptureAt = now;
-
-                showDiagnostic(event.type + ' → ' + action);
-                window.JETLMarkInteraction('capture:' + action);
-                if (action === 'run') window.JETLNativeRun();
-                else window.JETLNativeNav(action);
-            }
-
-            window.addEventListener('pointerdown', captureDockAction, true);
-            window.addEventListener('touchstart', captureDockAction, { capture: true, passive: false });
-            window.addEventListener('mousedown', captureDockAction, true);
-            window.addEventListener('touchend', captureDockAction, { capture: true, passive: false });
-            window.addEventListener('click', captureDockAction, true);
-            window.JETLCaptureDockAction = captureDockAction;
-        })();
+        // La navegación usa un único estado nativo: los <label> cambian el
+        // radio asociado y este listener sincroniza las clases auxiliares. No
+        // se interceptan pointer/touch/click, por lo que un mismo gesto nunca
+        // puede abrir y cerrar la vista en fases distintas.
+        document.addEventListener('change', function (event) {
+            var state = event.target;
+            if (!state || !state.classList || !state.classList.contains('mobile-view-state') || !state.checked) return;
+            window.JETLNativeNav(state.id.replace('mobile-state-', ''));
+        });
         window.addEventListener('error', (event) => {
             reportJETLBootError(event.message || 'Error de JavaScript');
         });
@@ -2030,7 +1986,7 @@ body.modal-open {
             </div>
             <div id="sidebar-content"></div>
         </div>
-        <label id="sidebar-overlay" for="mobile-state-flow" data-ui-action="toggle-sidebar"
+        <label id="sidebar-overlay" for="mobile-state-flow"
             style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:40;">
         </label>
 
@@ -2109,7 +2065,7 @@ body.modal-open {
         <label class="mobile-dock-btn" for="mobile-state-flow" data-mobile-view="flow" aria-label="Ver flujo">
             <i class="fas fa-diagram-project"></i><span>Flujo</span>
         </label>
-        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="event.stopPropagation(); JETLNativeRun()" ontouchend="event.preventDefault(); event.stopPropagation(); JETLNativeRun()">
+        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar flujo" onclick="JETLNativeRun()">
             <i class="fas fa-play"></i><span>Ejecutar</span>
         </button>
         <label class="mobile-dock-btn" for="mobile-state-results" data-mobile-view="results" aria-label="Abrir resultados">
@@ -3096,11 +3052,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-8"
+    <script defer src="js/engine.js?v=20260814-9"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
-    <script defer src="js/mobile.js?v=20260814-8"
+    <script defer src="js/mobile.js?v=20260814-9"
         onload="window.JETLBootModuleLoaded(14, 14, &quot;listo&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
 
@@ -3109,10 +3065,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         const bootDiagnostic = document.getElementById('boot-diagnostic');
         if (bootDiagnostic) bootDiagnostic.textContent = "Cargando readers.js (1/14)…";
 
-        window.__JETL_RUNTIME_STATE = 'loading';
+        window.__JETL_RUNTIME_STATE = 'idle';
         window.JETLRuntimeReady = new Promise((resolve) => {
             window.__JETL_RESOLVE_RUNTIME = resolve;
         });
+        let jetlRuntimeLoadStarted = false;
 
         // Sólo se cargan módulos de interfaz después del primer render. Los
         // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
@@ -3159,6 +3116,9 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         }
 
         async function loadJETLRuntime() {
+            if (jetlRuntimeLoadStarted) return window.JETLRuntimeReady;
+            jetlRuntimeLoadStarted = true;
+            window.__JETL_RUNTIME_STATE = 'loading';
             try {
                 await Promise.all(JETL_RUNTIME_SCRIPTS.map(loadJETLScript));
                 await loadJETLScript('js/visualization.js');
@@ -3170,7 +3130,9 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
                 window.__JETL_RUNTIME_ERROR = error;
                 window.__JETL_RESOLVE_RUNTIME(false);
             }
+            return window.JETLRuntimeReady;
         }
+        window.JETLEnsureRuntime = loadJETLRuntime;
 
         function loadJETLPostBootScripts() {
             let index = 0;
@@ -3188,7 +3150,6 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         window.addEventListener('load', () => {
             requestAnimationFrame(() => setTimeout(() => {
                 loadJETLDeferredStyles();
-                loadJETLRuntime();
                 loadJETLPostBootScripts();
             }, 0));
         }, { once: true });

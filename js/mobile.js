@@ -30,9 +30,12 @@
     }
 
     async function waitForRuntime(message) {
-        if (!window.JETLRuntimeReady) return;
+        const runtime = typeof window.JETLEnsureRuntime === 'function'
+            ? window.JETLEnsureRuntime()
+            : window.JETLRuntimeReady;
+        if (!runtime) return;
         if (window.__JETL_RUNTIME_STATE !== 'ready' && message) notify(message, 'info');
-        const ready = await window.JETLRuntimeReady;
+        const ready = await runtime;
         if (!ready) throw window.__JETL_RUNTIME_ERROR || new Error('El motor no pudo cargarse');
     }
 
@@ -79,42 +82,10 @@
         window.requestAnimationFrame(() => window.requestAnimationFrame(fitFlowToViewport));
     }
 
-    async function openView(view) {
+    function openView(view) {
         if (!isMobile()) return;
-
-        const sameViewIsOpen =
-            (view === 'nodes' && document.getElementById('sidebar')?.classList.contains('open')) ||
-            (view === 'results' && document.body.classList.contains('mobile-results-open')) ||
-            (view === 'project' && document.body.classList.contains('mobile-sheet-open'));
-
-        closeTransientViews();
-        if (sameViewIsOpen || view === 'flow') {
-            setActive('flow');
-            scheduleFlowFit();
-            return;
-        }
-
-        if (view === 'nodes') {
-            document.getElementById('sidebar')?.classList.add('open');
-            const overlay = document.getElementById('sidebar-overlay');
-            if (overlay) overlay.style.display = 'block';
-        } else if (view === 'results') {
-            try {
-                await waitForRuntime('Preparando el visor…');
-                window.ensureJETLMap?.();
-                document.body.classList.add('mobile-results-open');
-            } catch (error) {
-                console.warn('[JETL] No se pudo iniciar el mapa', error);
-                notify('No se pudo preparar el visor', 'error');
-                setActive('flow');
-                return;
-            }
-        } else if (view === 'project') {
-            document.body.classList.add('mobile-sheet-open');
-            document.getElementById('mobile-project-sheet')?.setAttribute('aria-hidden', 'false');
-        }
-
-        setActive(view);
+        window.JETLNativeNav?.(view);
+        if (view === 'flow') scheduleFlowFit();
     }
 
     async function runFlow() {
@@ -140,63 +111,9 @@
         }
     }
 
-    let lastHandledTouch = 0;
-
-    function handleMobileAction(event) {
-        const viewButton = event.target.closest('[data-mobile-view]');
-        if (viewButton) {
-            openView(viewButton.dataset.mobileView);
-            return true;
-        }
-
-        if (event.target.closest('#mobile-run')) {
-            runFlow();
-            return true;
-        }
-
-        if (event.target.closest('#mobile-scrim, [data-mobile-close]')) {
-            closeTransientViews();
-            setActive('flow');
-            return true;
-        }
-
-        if (isMobile() && event.target.closest('#sidebar-overlay')) {
-            setActive('flow');
-            return true;
-        }
-
-        if (isMobile() && event.target.closest('#mobile-project-sheet [data-ui-action]')) {
-            window.setTimeout(() => {
-                closeTransientViews();
-                setActive('flow');
-            }, 0);
-            return true;
-        }
-        return false;
-    }
-
-    // iOS puede cancelar el `click` tras interpretar el gesto como arrastre.
-    // `touchend` garantiza una activación y el filtro temporal evita duplicarla.
-    document.addEventListener('touchend', (event) => {
-        const projectAction = event.target.closest('#mobile-project-sheet [data-ui-action]');
-        if (isMobile() && projectAction) {
-            lastHandledTouch = Date.now();
-            event.preventDefault();
-            projectAction.click();
-            window.setTimeout(() => {
-                closeTransientViews();
-                setActive('flow');
-            }, 0);
-            return;
-        }
-        if (!isMobile() || !handleMobileAction(event)) return;
-        lastHandledTouch = Date.now();
-        event.preventDefault();
-    }, { passive: false });
-
     document.addEventListener('click', (event) => {
-        if (Date.now() - lastHandledTouch < 700) return;
-        handleMobileAction(event);
+        if (!isMobile() || !event.target.closest('#mobile-project-sheet [data-ui-action]')) return;
+        window.setTimeout(() => openView('flow'), 0);
     });
 
     mobileQuery.addEventListener?.('change', () => {
@@ -217,5 +134,5 @@
         scheduleFlowFit();
     }
 
-    window.JETLMobile = { openView, closeTransientViews, fitFlowToViewport };
+    window.JETLMobile = { openView, closeTransientViews, fitFlowToViewport, runFlow };
 })();
