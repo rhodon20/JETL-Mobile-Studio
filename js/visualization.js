@@ -1336,15 +1336,11 @@ function anim_NodeSuccess(id) { const el = document.getElementById('node-' + id)
 function anim_CableFlow(nodeId) {
     const selector = `.drawflow .connection.node_in_node-${nodeId} .main-path`;
     const cables = document.querySelectorAll(selector);
-    if (cables.length === 0) return;
-    cables.forEach(c => { c.style.strokeDasharray = ''; c.style.strokeDashoffset = ''; });
-    anime({
-        targets: cables,
-        stroke: [{ value: '#00ffcc', duration: 200, easing: 'linear' }, { value: '#777', duration: 500, delay: 1000, easing: 'easeInQuad' }],
-        strokeWidth: [{ value: 5, duration: 200 }, { value: 3, duration: 500, delay: 1000 }],
-        strokeDasharray: [{ value: '20 10', duration: 100 }],
-        strokeDashoffset: [{ value: [200, 0], duration: 1200, easing: 'linear' }],
-        complete: function (anim) { cables.forEach(c => { c.style.stroke = ''; c.style.strokeWidth = ''; c.style.strokeDasharray = ''; c.style.strokeDashoffset = ''; }); }
+    cables.forEach((c) => {
+        c.style.stroke = '';
+        c.style.strokeWidth = '';
+        c.style.strokeDasharray = '';
+        c.style.strokeDashoffset = '';
     });
 }
 

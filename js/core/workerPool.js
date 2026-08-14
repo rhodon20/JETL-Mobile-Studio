@@ -158,7 +158,8 @@ function postWorkerTask(payload, timeoutMs = 30000, transfer = null) {
         geoWorkerPool.post(payload, timeoutMs, transfer).then(resolve).catch(reject);
         const load = geoWorkerPool.getLoad();
         const loaderMsg = document.getElementById('loader-msg');
-        if (loaderMsg) loaderMsg.innerText = `Procesando (${load.pending} en curso / ${load.queued} en cola)...`;
+        const liveMonitor = document.getElementById('loader')?.dataset.status === 'running';
+        if (loaderMsg && !liveMonitor) loaderMsg.innerText = `Procesando (${load.pending} en curso / ${load.queued} en cola)...`;
     });
 }
 

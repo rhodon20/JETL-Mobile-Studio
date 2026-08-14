@@ -103,9 +103,6 @@ async function processNode(id, allNodes) {
         result = await tool.run(id, safeInputs, dom);
         result = normalizeResult(result);
 
-        if (typeof anim_NodeSuccess === 'function') anim_NodeSuccess(id);
-        if (typeof anim_CableFlow === 'function') anim_CableFlow(id);
-
     } catch (e) {
         const cancelled = !!window.isEngineCancelled || e?.cancelled || e?.name === 'CancelledError';
         window.JETLRunTrace?.node(id, {

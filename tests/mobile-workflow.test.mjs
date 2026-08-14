@@ -242,3 +242,16 @@ test('la cancelación se registra sin convertirla en un error de nodo', () => {
     assert.match(engine, /cancelled_nodes:/);
     assert.match(engine, /<span>Cancelados<\/span>/);
 });
+
+test('la ejecución no dispara la animación legacy de cables ni oculta el nodo activo', () => {
+    const processNodeSource = readFileSync(new URL('../js/processNode.js', import.meta.url), 'utf8');
+    const visualization = readFileSync(new URL('../js/visualization.js', import.meta.url), 'utf8');
+    const workerPool = readFileSync(new URL('../js/core/workerPool.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(processNodeSource, /anim_CableFlow\(/);
+    assert.doesNotMatch(processNodeSource, /anim_NodeSuccess\(/);
+    const cableFunction = visualization.match(/function anim_CableFlow[\s\S]*?\n}/)?.[0] ?? '';
+    assert.doesNotMatch(cableFunction, /anime\s*\(/);
+    assert.match(cableFunction, /strokeDasharray = ''/);
+    assert.match(workerPool, /loader'\)\?\.dataset\.status === 'running'/);
+    assert.match(workerPool, /loaderMsg && !liveMonitor/);
+});
