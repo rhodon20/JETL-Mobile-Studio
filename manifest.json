@@ -1,0 +1,22 @@
+{
+  "name": "JETL Studio",
+  "short_name": "JETL",
+  "description": "Herramienta Open Source para construccion de flujos ETL geoespaciales offline",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#202020",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "utilities",
+    "productivity",
+    "map"
+  ]
+}

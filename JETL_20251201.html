@@ -1,0 +1,872 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JETL v2025.12.01 - Sunrise</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
+    <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
+    <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script> <style>
+        /* --- CORE VARS --- */
+        :root { --bg: #121212; --panel: #1e1e1e; --node: #252526; --text: #e0e0e0; --accent: #3498db; --border: #333; --success: #27ae60; --danger: #c0392b; }
+        * { box-sizing: border-box; user-select: none; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+        
+        /* HEADER */
+        #header { height: 45px; background: #202020; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 10px; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .brand { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; letter-spacing: 0.5px; }
+        .brand span { font-weight: 300; opacity: 0.6; font-size: 0.8em; }
+        .status-dot { width: 8px; height: 8px; background: #7f8c8d; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: background 0.3s; }
+        
+        .toolbar { display: flex; gap: 6px; }
+        .btn { background: #333; color: #ddd; border: 1px solid #444; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.85rem; }
+        .btn:hover { background: #444; border-color: #555; color: #fff; }
+        .btn:active { transform: translateY(1px); }
+        .btn-run { background: #1e7e34; border-color: #19692c; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-run:hover { background: #218838; }
+
+        /* LAYOUT */
+        #layout { flex: 1; display: flex; overflow: hidden; position: relative; }
+        
+        #sidebar { width: 260px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        #sidebar-search { padding: 10px; border-bottom: 1px solid var(--border); background: #252526; }
+        #sidebar-search input { width: 100%; background: #111; border: 1px solid #444; color: white; padding: 6px 10px; border-radius: 4px; font-size: 0.85rem; outline: none; }
+        #sidebar-search input:focus { border-color: var(--accent); }
+        #sidebar-content { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        #workspace { flex: 1; position: relative; overflow: hidden; background: #181818; }
+        #drawflow { width: 100%; height: 100%; background-image: radial-gradient(#333 1px, transparent 1px); background-size: 25px 25px; outline: none; }
+
+        /* --- NODES --- */
+        .drawflow .drawflow-node { 
+            width: 240px; border-radius: 6px; border: 1px solid #444; background: var(--node); 
+            z-index: 10; padding: 0; display: flex; flex-direction: column; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .drawflow .drawflow-node:hover { border-color: #666; }
+        .drawflow .drawflow-node.selected { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3) !important; }
+        
+        .node-head { 
+            padding: 8px 10px; background: linear-gradient(to bottom, rgba(255,255,255,0.05), rgba(0,0,0,0.1)); 
+            border-bottom: 1px solid #333; font-weight: 600; font-size: 0.8rem; 
+            display: flex; justify-content: space-between; align-items: center; color: #f0f0f0; 
+            cursor: grab; border-top-left-radius: 5px; border-top-right-radius: 5px;
+        }
+        .node-head:active { cursor: grabbing; }
+        .node-body { padding: 10px; font-size: 0.75rem; color: #bbb; background: var(--node); border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; }
+        
+        .count-badge { background: var(--success); color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 0.65em; display: none; margin-right: 6px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+
+        .node-control { width: 100%; background: #111; border: 1px solid #444; color: #eee; padding: 5px 8px; border-radius: 3px; margin-bottom: 6px; box-sizing: border-box; font-family: 'Consolas', monospace; font-size: 0.85em; }
+        .node-control:focus { border-color: var(--accent); outline: none; }
+        select.node-control { cursor: pointer; }
+
+        /* Connections */
+        .drawflow .drawflow-node .inputs, .drawflow .drawflow-node .outputs {
+            position: absolute; top: 50% !important; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 14px; width: 0;
+        }
+        .drawflow .drawflow-node .inputs { left: -14px; }
+        .drawflow .drawflow-node .outputs { right: -14px; }
+
+        .drawflow .drawflow-node .input, .drawflow .drawflow-node .output {
+            width: 12px; height: 12px; border-radius: 50%; border: 2px solid #000;
+            background: #777; cursor: crosshair; transition: transform 0.1s;
+        }
+        .drawflow .drawflow-node .input:hover, .drawflow .drawflow-node .output:hover { transform: scale(1.3); background: #fff; }
+        .drawflow .drawflow-node .output { background: #555; }
+        .drawflow .connection .main-path { stroke-width: 3px; stroke: #666; }
+        .drawflow .connection.selected .main-path { stroke: var(--accent); }
+
+        /* Junction */
+        .drawflow .drawflow-node.junction { width: 16px; height: 16px; border-radius: 50%; background: #aaa; border: 2px solid #fff; min-height: unset; overflow: visible; padding: 0; box-shadow: none; }
+        .drawflow .drawflow-node.junction .inputs, .drawflow .drawflow-node.junction .outputs { top: 50% !important; left: 50% !important; transform: translate(-50%, -50%); }
+        .drawflow .drawflow-node.junction .node-head, .drawflow .drawflow-node.junction .node-body { display: none; }
+
+        /* Sidebar Items */
+        .cat-title { padding: 12px 10px 6px 10px; font-size: 0.7rem; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+        .node-item { 
+            padding: 8px 12px; margin: 2px 8px; background: #2a2a2a; border-radius: 4px; cursor: pointer; 
+            font-size: 0.8rem; display: flex; align-items: center; gap: 10px; border: 1px solid transparent; 
+            transition: all 0.2s; color: #ccc;
+        }
+        .node-item:hover { background: #333; border-color: #555; transform: translateX(3px); color: #fff; }
+        .node-item i { width: 18px; text-align: center; }
+
+        /* Bottom Panel */
+        #bottom-panel { height: 40vh; background: #1a1a1a; border-top: 1px solid var(--border); display: flex; flex-direction: column; z-index: 60; transition: height 0.3s ease; position: relative; }
+        #panel-tabs { height: 36px; background: #252526; display: flex; padding: 0 5px; border-bottom: 1px solid #333; justify-content: space-between; align-items: center; }
+        .tab-btn { background: transparent; border: none; color: #888; padding: 0 16px; height: 100%; cursor: pointer; font-size: 0.8rem; font-weight: 600; border-bottom: 2px solid transparent; transition: color 0.2s; }
+        .tab-btn:hover { color: #ddd; }
+        .tab-btn.active { color: white; border-bottom-color: var(--accent); background: rgba(255,255,255,0.03); }
+        
+        #panel-content { flex: 1; display: flex; overflow: hidden; position: relative; }
+        #logs { width: 100%; background: #111; overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace; font-size: 0.8rem; color: #ddd; display:none; white-space: pre-wrap; }
+        #map { flex: 1; background: #111; z-index: 1; width: 100%; }
+        #table-container { flex: 1; background: #181818; overflow: auto; display: none; z-index: 2; width: 100%; }
+
+        table.attr-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; color: #ccc; }
+        table.attr-table th { background: #2d2d2d; position: sticky; top: 0; padding: 8px; text-align: left; border-bottom: 1px solid #555; color: #fff; z-index: 10; font-weight: 600; box-shadow: 0 2px 2px rgba(0,0,0,0.1); }
+        table.attr-table td { padding: 6px 8px; border-bottom: 1px solid #333; white-space: nowrap; max-width: 250px; overflow: hidden; text-overflow: ellipsis; }
+        table.attr-table tr:hover td { background: #333; color: #fff; }
+        table.attr-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+		
+		/* Botón flotante para cargar capas */
+        #btn-load-layer {
+            position: absolute; top: 10px; left: 50px; /* Al lado del zoom */
+            z-index: 1000; background: var(--accent); color: white;
+            padding: 8px 15px; border-radius: 20px; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #fff;
+            display: none; font-weight: bold; font-size: 0.85rem;
+            animation: popin 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        #btn-load-layer:hover { background: #2980b9; transform: scale(1.05); }
+        @keyframes popin { from {transform: scale(0); opacity:0;} to {transform: scale(1); opacity:1;} }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; height: 100%; transform: translateX(-105%); box-shadow: 5px 0 20px rgba(0,0,0,0.5); width: 80%; max-width: 300px; }
+            #sidebar.open { transform: translateX(0); }
+            .brand span { display: none; }
+            #header { padding: 0 5px; }
+            .node-control { font-size: 16px; } /* Evita zoom en iOS inputs */
+        }
+        
+        #toast { 
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); 
+            background: #252526; color: white; padding: 10px 20px; border-radius: 30px; 
+            font-size: 0.9rem; opacity: 0; transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); 
+            z-index: 2000; border: 1px solid var(--border); box-shadow: 0 5px 15px rgba(0,0,0,0.5); pointer-events: none; 
+            display: flex; align-items: center; gap: 10px;
+        }
+        #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        /* Loading Overlay */
+        #loader { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; display:none; justify-content:center; align-items:center; flex-direction:column; color:white; backdrop-filter: blur(2px); }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="loader"><div class="spinner"></div><div id="loader-msg">Procesando...</div></div>
+    <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
+
+    <div id="header">
+        <button class="btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <div class="brand" style="margin-left:10px"><div class="status-dot" id="sys-status" title="Sistema Listo"></div>&nbsp;JETL Sunrise <span>v2025.12.01</span></div>
+        <div class="toolbar">
+            <button class="btn" onclick="clearCanvas()" title="Borrar todo"><i class="fas fa-trash-alt"></i></button>
+            <button class="btn btn-run" onclick="runEngine()">RUN <i class="fas fa-play" style="margin-left:6px; font-size:0.8em"></i></button>
+        </div>
+    </div>
+
+    <div id="layout">
+        <div id="sidebar">
+            <div id="sidebar-search">
+                <input type="text" placeholder="Buscar transformador..." onkeyup="filterTools(this.value)">
+            </div>
+            <div id="sidebar-content"></div>
+        </div>
+        <div id="sidebar-overlay" onclick="toggleSidebar()" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:40;"></div>
+        
+        <div id="workspace">
+            <div id="drawflow" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+        </div>
+    </div>
+
+    <div id="bottom-panel">
+        <div id="panel-tabs">
+            <div style="display:flex; height:100%">
+                <button class="tab-btn active" onclick="switchTab('map')"><i class="fas fa-map-marked-alt"></i> Mapa</button>
+                <button class="tab-btn" onclick="switchTab('table')"><i class="fas fa-table"></i> Datos</button>
+                <button class="tab-btn" onclick="switchTab('logs')"><i class="fas fa-terminal"></i> Consola</button>
+            </div>
+            <button class="tab-btn" style="padding:0 15px" onclick="togglePanelHeight()"><i class="fas fa-compress-alt"></i></button>
+        </div>
+		<div id="panel-content">
+					<div id="logs" style="display:block">Sistema listo.</div>
+					
+					<div id="table-container">
+						<div style="padding:40px; color:#666; text-align:center; font-style:italic">
+							<i class="fas fa-table" style="font-size:2em; margin-bottom:10px"></i><br>
+							Ejecuta el flujo y selecciona un nodo para ver sus datos aquí.
+						</div>
+					</div>
+
+					<button id="btn-load-layer" onclick="loadActiveLayerToMap()">
+						<i class="fas fa-eye"></i> Ver en Mapa
+					</button>
+					<div id="map"></div>
+				</div>
+			</div>
+    </div>
+
+    <script>
+        // =============================================
+        // 1. SISTEMA CORE Y STORAGE
+        // =============================================
+        const SafeStorage={isAvailable:!1,init:function(){try{let e="__test__";localStorage.setItem(e,e),localStorage.removeItem(e),this.isAvailable=!0}catch(e){console.warn("Storage disabled")}},save:function(e,t){this.isAvailable&&localStorage.setItem(e,t)},load:function(e){return this.isAvailable?localStorage.getItem(e):null},clear:function(e){this.isAvailable&&localStorage.removeItem(e)}};SafeStorage.init();
+
+        const CITIES = [{n:"Madrid",c:[40.416,-3.703]},{n:"Barcelona",c:[41.385,2.173]},{n:"Valencia",c:[39.469,-0.376]},{n:"Sevilla",c:[37.389,-5.984]}];
+        let layerControl; 
+		let currentNodeId = null; // Para saber qué nodo está seleccionado pero no cargado
+
+        // Helper para asegurar FeatureCollection
+        const ensureFC = (geo) => {
+            if (!geo) return turf.featureCollection([]);
+            if (geo.type === 'FeatureCollection') return geo;
+            if (geo.type === 'Feature') return turf.featureCollection([geo]);
+            if (geo.type === 'GeometryCollection') return turf.featureCollection(geo.geometries.map(g => turf.feature(g)));
+            return turf.featureCollection([turf.feature(geo)]);
+        };
+
+        // =============================================
+        // 2. REGISTRO DE HERRAMIENTAS (TOTAL: 80+)
+        // =============================================
+        const TOOL_REGISTRY = {
+            
+            // --- 1. INPUTS / READERS (GENERATORS) ---
+            reader_osm: { cat:'1. Inputs', label:'OSM Reader', icon:'fa-globe', color:'#e67e22', in:0, out:1, 
+                tpl:()=>`<select class="node-control" df-t><option value="building">Edificios</option><option value="highway">Carreteras</option><option value="leisure=park">Parques</option><option value="amenity">Servicios</option><option value="waterway">Agua</option><option value="landuse">Usos suelo</option></select><div style="font-size:0.7em;color:#aaa">Ciudad Aleatoria (ES)</div>`, 
+                run: async(id,i,d)=>{ 
+                    const t=d.querySelector('[df-t]').value; const c=CITIES[Math.floor(Math.random()*CITIES.length)];
+                    const o=0.02; 
+                    const [k,v] = t.includes('=') ? t.split('=') : [t, null];
+                    const q=`[out:json];(way["${k}"${v?`="${v}"`:''}](${c.c[0]-o},${c.c[1]-o},${c.c[0]+o},${c.c[1]+o}););out geom;`;
+                    log(`Descargando ${t} de ${c.n}...`);
+                    const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:q}); return osmtogeojson(await r.json());
+                } 
+            },
+            reader_file: { cat:'1. Inputs', label:'File Reader', icon:'fa-folder-open', color:'#e67e22', in:0, out:1, 
+                tpl:(id)=>`<input type="file" onchange="loadFile(this,'${id}')" class="node-control"><input type="hidden" id="d-${id}"><div style="font-size:0.7em;color:#aaa" id="lbl-${id}">Sin archivo</div>`, 
+                run: async(id)=>{ const v = document.getElementById('d-'+id).value; if(!v) throw new Error("Sin archivo"); return JSON.parse(v); } 
+            },
+            reader_http: { cat:'1. Inputs', label:'HTTP JSON', icon:'fa-cloud-download-alt', color:'#e67e22', in:0, out:1, tpl:()=>`<input class="node-control" df-u placeholder="URL (GeoJSON)">`, run: async(id,i,d)=>{const r=await fetch(d.querySelector('[df-u]').value); return await r.json();} },
+            reader_wkt: { cat:'1. Inputs', label:'WKT/Text', icon:'fa-font', color:'#e67e22', in:0, out:1, tpl:()=>`<textarea class="node-control" df-w placeholder="POINT(30 10)"></textarea>`, run: async(id,i,d)=>{const t=d.querySelector('[df-w]').value; const w=wellknown(t); return turf.featureCollection([turf.feature(w)])} },
+            reader_bbox_gen: { cat:'1. Inputs', label:'BBox Creator', icon:'fa-vector-square', color:'#e67e22', in:0, out:1, tpl:()=>`<input class="node-control" df-b placeholder="minX,minY,maxX,maxY" value="-3.75,40.4,-3.65,40.5">`, run:(id,i,d)=>{const b=d.querySelector('[df-b]').value.split(',').map(Number); return turf.featureCollection([turf.bboxPolygon(b)])} },
+            gen_point: { cat:'1. Inputs', label:'Point Creator', icon:'fa-map-pin', color:'#e67e22', in:0, out:1, tpl:()=>`<input class="node-control" df-c placeholder="Lon,Lat" value="-3.703,40.416">`, run:(id,i,d)=>{const c=d.querySelector('[df-c]').value.split(',').map(Number); return turf.featureCollection([turf.point(c)])} },
+            gen_grid: { cat:'1. Inputs', label:'Grid Generator', icon:'fa-th', color:'#e67e22', in:0, out:1, tpl:()=>`<select class="node-control" df-t><option value="hex">Hex</option><option value="sq">Square</option></select><input class="node-control" type="number" df-s value="1" placeholder="Size km">`, run:(id,i,d)=>{const t=d.querySelector('[df-t]').value,s=parseFloat(d.querySelector('[df-s]').value),b=[-3.8,40.3,-3.6,40.5]; return t==='hex'?turf.hexGrid(b,s):turf.squareGrid(b,s)} },
+            gen_random: { cat:'1. Inputs', label:'Random Points', icon:'fa-dice', color:'#e67e22', in:0, out:1, tpl:()=>`<input type="number" df-n value="50" class="node-control">`, run:(id,i,d)=>turf.randomPoint(parseInt(d.querySelector('[df-n]').value), {bbox:[-3.8,40.3,-3.6,40.5]}) },
+
+            // --- 2. GEOMETRY (MANIPULATION) ---
+            geo_buffer: { cat:'2. Geometry', label:'Bufferer', icon:'fa-bullseye', color:'#2980b9', in:1, out:1, tpl:()=>`<input type="number" df-v value="0.1" class="node-control" placeholder="km">`, run: (id,i,d)=>turf.buffer(i[0], parseFloat(d.querySelector('[df-v]').value), {units:'kilometers'}) },
+            geo_centroid: { cat:'2. Geometry', label:'CenterPoint', icon:'fa-dot-circle', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Centroide</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.centroid(f,{properties:f.properties}))) },
+            geo_center_mass: { cat:'2. Geometry', label:'Centro de Masa', icon:'fa-crosshairs', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Masa Ponderada</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.centerOfMass(f,{properties:f.properties}))) },
+            geo_midpoint: { cat:'2. Geometry', label:'Midpoint', icon:'fa-grip-lines', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Punto Medio (2 pts)</div>`, run: (id,i)=>{if(i[0].features.length<2)return i[0]; return turf.featureCollection([turf.midpoint(i[0].features[0], i[0].features[1])])} },
+            geo_bbox: { cat:'2. Geometry', label:'Envelope', icon:'fa-square-full', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Caja Límite</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.bboxPolygon(turf.bbox(f)))) },
+            geo_convex: { cat:'2. Geometry', label:'Convex Hull', icon:'fa-draw-polygon', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Envolvente</div>`, run: (id,i)=>turf.convex(i[0]) },
+            geo_concave: { cat:'2. Geometry', label:'Concave Hull', icon:'fa-star-of-life', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Envolvente Ajust.</div>`, run: (id,i)=>turf.concave(i[0], {units:'kilometers', maxEdge:1}) },
+			geo_voronoi: { 
+							cat:'2. Geometry', label:'Voronoi', icon:'fa-th-large', color:'#2980b9', in:1, out:1, 
+							tpl:()=>`<div>Polígonos</div>`, 
+							run: (id,i)=>{
+								if (!i[0] || !i[0].features) throw new Error("Sin datos");
+								
+								// 1. Limpieza de duplicados y Z (altitud)
+								const seen = new Set();
+								const cleanPoints = [];
+								i[0].features.forEach(f => {
+									if(turf.getType(f) === 'Point') {
+										// Usamos solo X,Y para la firma, ignorando Z si existe
+										const c = f.geometry.coordinates;
+										const key = c[0].toFixed(6) + ',' + c[1].toFixed(6);
+										if(!seen.has(key)) {
+											seen.add(key);
+											// Asegurar que es 2D puro
+											cleanPoints.push(turf.point([c[0], c[1]], f.properties));
+										}
+									}
+								});
+
+								if(cleanPoints.length === 0) throw new Error("No hay puntos válidos");
+								const fc = turf.featureCollection(cleanPoints);
+
+								// 2. Calcular BBox expandido (Evita errores de borde)
+								const bbox = turf.bbox(fc); 
+								const w = bbox[2] - bbox[0];
+								const h = bbox[3] - bbox[1];
+								const pad = Math.max(w, h) * 0.5 || 0.01; // 50% margen para seguridad
+								const expandedBbox = [bbox[0]-pad, bbox[1]-pad, bbox[2]+pad, bbox[3]+pad];
+
+								// 3. Generar
+								const result = turf.voronoi(fc, {bbox: expandedBbox});
+								
+								// 4. LIMPIEZA FINAL (CRÍTICO: Eliminar geometrías nulas)
+								if(result && result.features) {
+									result.features = result.features.filter(f => f && f.geometry && f.geometry.coordinates.length > 0);
+									
+									// Recuperar atributos (Turf voronoi pierde atributos, intentamos pegarlos por índice)
+									// Nota: Turf mantiene el orden, así que polygon[i] corresponde a point[i]
+									result.features.forEach((poly, idx) => {
+										if(poly && cleanPoints[idx]) {
+											poly.properties = cleanPoints[idx].properties;
+										}
+									});
+								}
+
+								return result;
+							} 
+						},
+			geo_union: { cat:'2. Geometry', label:'Dissolver', icon:'fa-object-group', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Fusionar Todo</div>`, run: (id,i)=>turf.dissolve(i[0]) },
+            geo_explode: { cat:'2. Geometry', label:'Explode', icon:'fa-braille', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Extraer Vértices</div>`, run: (id,i)=>turf.explode(i[0]) },
+            geo_simplify: { cat:'2. Geometry', label:'Simplify', icon:'fa-compress-arrows-alt', color:'#2980b9', in:1, out:1, tpl:()=>`<input class="node-control" df-t value="0.01" placeholder="Tol">`, run: (id,i,d)=>turf.simplify(i[0], {tolerance:parseFloat(d.querySelector('[df-t]').value)}) },
+            geo_bezier: { cat:'2. Geometry', label:'Bezier Smooth', icon:'fa-bezier-curve', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Curvar Líneas</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>f.geometry.type.includes('Line')?turf.bezierSpline(f):f)) },
+            geo_circle: { cat:'2. Geometry', label:'Circle', icon:'fa-circle-notch', color:'#2980b9', in:1, out:1, tpl:()=>`<input class="node-control" df-r value="0.5" placeholder="Rad km">`, run: (id,i,d)=>turf.featureCollection(i[0].features.map(f=>turf.circle(turf.centroid(f), parseFloat(d.querySelector('[df-r]').value)))) },
+            geo_ellipse: { cat:'2. Geometry', label:'Ellipse', icon:'fa-egg', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Elipse genérica</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.ellipse(turf.centroid(f), 1, 0.5))) },
+            geo_line2poly: { cat:'2. Geometry', label:'Line2Poly', icon:'fa-square', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Cerrar Líneas</div>`, run: (id,i)=>turf.lineToPolygon(i[0]) },
+            geo_poly2line: { cat:'2. Geometry', label:'Poly2Line', icon:'fa-expand', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Contorno</div>`, run: (id,i)=>turf.polygonToLine(i[0]) },
+            geo_point_surf: { cat:'2. Geometry', label:'PointOnSurface', icon:'fa-map-marker', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Interior garantizado</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.pointOnFeature(f))) },
+            geo_tesselate: { cat:'2. Geometry', label:'Tesselate', icon:'fa-shapes', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Subdividir Polys</div>`, run: (id,i)=>turf.tesselate(i[0]) },
+            geo_transform: { cat:'2. Geometry', label:'Affine', icon:'fa-arrows-alt', color:'#2980b9', in:1, out:1, tpl:()=>`<select class="node-control" df-o><option value="rot">Rotar</option><option value="scale">Escalar</option></select><input class="node-control" df-v value="10" type="number">`, run: (id,i,d)=>{const o=d.querySelector('[df-o]').value,v=parseFloat(d.querySelector('[df-v]').value); return o==='rot'?turf.transformRotate(i[0],v):turf.transformScale(i[0],v)} },
+            geo_translate: { cat:'2. Geometry', label:'Translate', icon:'fa-arrow-right', color:'#2980b9', in:1, out:1, tpl:()=>`<input class="node-control" df-d value="0.5" placeholder="Dist km">`, run: (id,i,d)=>turf.transformTranslate(i[0], parseFloat(d.querySelector('[df-d]').value), 90) },
+            geo_chunk: { cat:'2. Geometry', label:'Line Chunk', icon:'fa-cut', color:'#2980b9', in:1, out:1, tpl:()=>`<input class="node-control" df-l value="0.5" placeholder="km">`, run: (id,i,d)=>{const l=parseFloat(d.querySelector('[df-l]').value);let r=[];i[0].features.forEach(f=>{if(f.geometry.type.includes('Line'))r=r.concat(turf.lineChunk(f,l).features);else r.push(f)}); return turf.featureCollection(r)} },
+            geo_clean: { cat:'2. Geometry', label:'Clean Coords', icon:'fa-broom', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Fix Errores</div>`, run: (id,i)=>turf.cleanCoords(i[0]) },
+            geo_unkink: { cat:'2. Geometry', label:'Unkink Poly', icon:'fa-unlink', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Desatar nudos</div>`, run: (id,i)=>turf.unkinkPolygon(i[0]) },
+            geo_densify: { cat:'2. Geometry', label:'Densify', icon:'fa-plus-square', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Añadir vértices</div>`, run: (id,i)=>{i[0].features.forEach(f=>f.geometry=turf.truncate(f,{precision:6, coordinates:2}).geometry); return i[0]} }, // Mock: turf doesn't have direct densify, using truncate as placeholder for cleaning
+            geo_sector: { cat:'2. Geometry', label:'Sector', icon:'fa-pizza-slice', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Sector Circular</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.sector(turf.centroid(f), 1, 0, 90))) },
+            geo_destination: { cat:'2. Geometry', label:'Destination', icon:'fa-location-arrow', color:'#2980b9', in:1, out:1, tpl:()=>`<div>Proyectar Pto</div>`, run: (id,i)=>turf.featureCollection(i[0].features.map(f=>turf.destination(f, 1, 90))) },
+
+            // --- 3. SPATIAL ANALYSIS ---
+			sp_clip: { 
+							cat:'3. Spatial', label:'Clipper (Optimized)', icon:'fa-crop', color:'#8e44ad', in:2, out:1, 
+							tpl:()=>`<div>Data &#8745; Mask</div>`, 
+							run: (id,i)=>{ 
+								if(!i[0] || !i[1] || !i[1].features.length) throw new Error("Faltan datos");
+								
+								// 1. Preparación de Máscara
+								// NOTA: Con 400 polígonos, 'dissolve' siempre será lento la primera vez. 
+								// No hay forma fácil de evitarlo en JS puro sin congelar un poco la UI.
+								let maskCollection = turf.flatten(i[1]);
+								let dissolved = turf.dissolve(maskCollection);
+								let mask = dissolved.features[0];
+								
+								if (dissolved.features.length > 1) {
+									const coords = dissolved.features.map(f => f.geometry.coordinates);
+									mask = turf.multiPolygon(coords);
+								}
+
+								// 2. OPTIMIZACIÓN: Calcular BBox de la máscara una sola vez
+								const maskBbox = turf.bbox(mask); // [minX, minY, maxX, maxY]
+								const maskPolyBbox = turf.bboxPolygon(maskBbox);
+
+								const res = [];
+								i[0].features.forEach(f => {
+									try {
+										// --- PRE-CHECK RÁPIDO (La Optimización) ---
+										// Si el cuadrado que envuelve al dato NO toca el cuadrado de la máscara,
+										// ni siquiera intentamos la intersección matemática compleja.
+										const fBbox = turf.bbox(f);
+										if (!turf.booleanOverlap(turf.bboxPolygon(fBbox), maskPolyBbox) && 
+											!turf.booleanContains(maskPolyBbox, turf.bboxPolygon(fBbox)) &&
+											!turf.booleanContains(turf.bboxPolygon(fBbox), maskPolyBbox)) {
+											return; // Skip
+										}
+
+										// Cálculo pesado solo si pasan el filtro
+										const type = turf.getType(f);
+										if (type === 'Polygon' || type === 'MultiPolygon') {
+											const clipped = turf.intersect(f, mask);
+											if(clipped) { clipped.properties = f.properties; res.push(clipped); }
+										} else if (type.includes('Line')) {
+											// Lógica de líneas (igual que antes)
+											const maskLine = turf.polygonToLine(mask); 
+											const split = turf.lineSplit(f, maskLine);
+											const parts = (split && split.features.length) ? split.features : [f];
+											parts.forEach(part => {
+												if (turf.booleanPointInPolygon(turf.pointOnFeature(part), mask)) { 
+													part.properties = f.properties; res.push(part); 
+												}
+											});
+										} else if (type.includes('Point')) {
+											if(turf.booleanPointInPolygon(f, mask)) res.push(f);
+										}
+									} catch(e) {}
+								});
+								return turf.featureCollection(res);
+							} 
+						},
+            sp_erase: { cat:'3. Spatial', label:'Eraser', icon:'fa-eraser', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>In - Mask</div>`, run: (id,i)=>{ const m=i[1].features[0]; return turf.featureCollection(i[0].features.map(f=>turf.difference(f,m)).filter(f=>f)) } },
+            sp_intersect: { cat:'3. Spatial', label:'Intersect Check', icon:'fa-check-circle', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Filtra si toca</div>`, run: (id,i)=>{const m=i[1].features[0]; return turf.featureCollection(i[0].features.filter(f=>!turf.booleanDisjoint(f,m)))} },
+            sp_within: { cat:'3. Spatial', label:'Within', icon:'fa-bullseye', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Dentro de</div>`, run: (id,i)=>turf.pointsWithinPolygon(i[0], i[1]) },
+            sp_contains: { cat:'3. Spatial', label:'Contains', icon:'fa-expand', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Contiene a</div>`, run: (id,i)=>{const m=i[1].features[0]; return turf.featureCollection(i[0].features.filter(f=>turf.booleanContains(f,m)))} },
+            sp_disjoint: { cat:'3. Spatial', label:'Disjoint', icon:'fa-ban', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>No Toca</div>`, run: (id,i)=>{const m=i[1].features[0]; return turf.featureCollection(i[0].features.filter(f=>turf.booleanDisjoint(f,m)))} },
+            sp_distance: { cat:'3. Spatial', label:'Distance', icon:'fa-ruler', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Centroid Dist</div>`, run: (id,i)=>{const d=turf.distance(turf.centroid(i[0]), turf.centroid(i[1])); alert("Dist: "+d+" km"); return i[0]} },
+            sp_nearest: { cat:'3. Spatial', label:'Nearest', icon:'fa-magnet', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Vecino Cercano</div>`, run: (id,i)=>{const r=[]; i[0].features.forEach(f=>{const n=turf.nearestPoint(turf.centroid(f),i[1]); f.properties._near_idx=n.properties.featureIndex; r.push(f)}); return turf.featureCollection(r)} },
+            sp_tag: { cat:'3. Spatial', label:'Spatial Tag', icon:'fa-tags', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Point -> Poly Attr</div>`, run: (id,i)=>turf.tag(i[0], i[1], 'id', '_poly_id') },
+            sp_isolines: { cat:'3. Spatial', label:'Isolines', icon:'fa-mountain', color:'#8e44ad', in:1, out:1, tpl:()=>`<input class="node-control" df-z placeholder="Z Field"><input type="number" class="node-control" df-b value="10">`, run: (id,i,d)=>turf.isolines(i[0], [0,10,20,30,40,50,60,70,80,90,100], {zProperty:d.querySelector('[df-z]').value}) },
+            sp_tin_grid: { cat:'3. Spatial', label:'Interpolate', icon:'fa-chart-area', color:'#8e44ad', in:1, out:1, tpl:()=>`<input class="node-control" df-z placeholder="Z Field">`, run: (id,i,d)=>turf.interpolate(i[0], 1, {gridType: 'hex', property: d.querySelector('[df-z]').value}) },
+            sp_kinks: { cat:'3. Spatial', label:'Kinks', icon:'fa-bug', color:'#e74c3c', in:1, out:1, tpl:()=>`<div>Auto-Cruces</div>`, run: (id,i)=>turf.featureCollection(i[0].features.flatMap(f=>turf.kinks(f).features)) },
+            sp_clusters_km: { cat:'3. Spatial', label:'K-Means', icon:'fa-object-group', color:'#8e44ad', in:1, out:1, tpl:()=>`<div>Cluster Points</div>`, run: (id,i)=>turf.clustersKmeans(i[0]) },
+            sp_clusters_db: { cat:'3. Spatial', label:'DBScan', icon:'fa-object-group', color:'#8e44ad', in:1, out:1, tpl:()=>`<input class="node-control" df-d value="1" placeholder="Dist"><input type="number" class="node-control" df-m value="3">`, run: (id,i,d)=>turf.clustersDbscan(i[0], parseFloat(d.querySelector('[df-d]').value), {minPoints:parseInt(d.querySelector('[df-m]').value)}) },
+            sp_mask: { cat:'3. Spatial', label:'Mask', icon:'fa-mask', color:'#8e44ad', in:2, out:1, tpl:()=>`<div>Enmascarar</div>`, run: (id,i)=>turf.mask(i[0], i[1]) },
+
+            // --- 4. ATTRIBUTES (DATA) ---
+            attr_add: { cat:'4. Attributes', label:'Add Field', icon:'fa-plus', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-k placeholder="Key"><input class="node-control" df-v placeholder="Value">`, run: (id,i,d)=>{const k=d.querySelector('[df-k]').value,v=d.querySelector('[df-v]').value; i[0].features.forEach(f=>f.properties[k]=v); return i[0]} },
+            attr_calc: { cat:'4. Attributes', label:'Calculator', icon:'fa-calculator', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-k placeholder="New Field"><textarea class="node-control" df-f placeholder="props.ID * 2"></textarea>`, run: (id,i,d)=>{const k=d.querySelector('[df-k]').value, c=d.querySelector('[df-f]').value; i[0].features.forEach(f=>{try{f.properties[k]=eval('var props=f.properties;'+c)}catch{}}); return i[0]} },
+            attr_keep: { cat:'4. Attributes', label:'Keeper', icon:'fa-list-ul', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-k placeholder="f1,f2">`, run: (id,i,d)=>{const k=d.querySelector('[df-k]').value.split(','); i[0].features.forEach(f=>{const n={};k.forEach(key=>n[key]=f.properties[key]);f.properties=n}); return i[0]} },
+            attr_remove: { cat:'4. Attributes', label:'Remover', icon:'fa-eraser', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-k placeholder="f1,f2">`, run: (id,i,d)=>{const k=d.querySelector('[df-k]').value.split(','); i[0].features.forEach(f=>{k.forEach(key=>delete f.properties[key])}); return i[0]} },
+            attr_rename: { cat:'4. Attributes', label:'Renamer', icon:'fa-edit', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-o placeholder="Old"><input class="node-control" df-n placeholder="New">`, run: (id,i,d)=>{const o=d.querySelector('[df-o]').value, n=d.querySelector('[df-n]').value; i[0].features.forEach(f=>{f.properties[n]=f.properties[o]; delete f.properties[o]}); return i[0]} },
+            attr_mapper: { cat:'4. Attributes', label:'Value Map', icon:'fa-exchange-alt', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-f placeholder="Field"><input class="node-control" df-m placeholder="A=B, C=D">`, run:(id,i,d)=>{const fld=d.querySelector('[df-f]').value, m=d.querySelector('[df-m]').value.split(',').reduce((a,c)=>{const[k,v]=c.split('=');a[k.trim()]=v.trim();return a},{}); i[0].features.forEach(f=>{if(m[f.properties[fld]]) f.properties[fld]=m[f.properties[fld]]}); return i[0]} },
+            attr_case: { cat:'4. Attributes', label:'Str Case', icon:'fa-font', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-f placeholder="Field"><select class="node-control" df-c><option value="u">UPPER</option><option value="l">lower</option></select>`, run:(id,i,d)=>{const fld=d.querySelector('[df-f]').value, c=d.querySelector('[df-c]').value; i[0].features.forEach(f=>{const v=f.properties[fld]; if(v) f.properties[fld]=c==='u'?v.toUpperCase():v.toLowerCase()}); return i[0]} },
+            attr_concat: { cat:'4. Attributes', label:'Concat', icon:'fa-link', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-new placeholder="NewField"><input class="node-control" df-sep value="-" placeholder="Sep"><input class="node-control" df-f placeholder="f1,f2">`, run:(id,i,d)=>{const n=d.querySelector('[df-new]').value, s=d.querySelector('[df-sep]').value, fs=d.querySelector('[df-f]').value.split(','); i[0].features.forEach(f=>{f.properties[n]=fs.map(x=>f.properties[x]).join(s)}); return i[0]} },
+            attr_split: { cat:'4. Attributes', label:'Splitter', icon:'fa-cut', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-f placeholder="Field"><input class="node-control" df-s value="," placeholder="Sep">`, run:(id,i,d)=>{const fld=d.querySelector('[df-f]').value, s=d.querySelector('[df-s]').value; i[0].features.forEach(f=>{if(f.properties[fld]) f.properties[fld]=f.properties[fld].split(s)}); return i[0]} },
+            attr_json: { cat:'4. Attributes', label:'JSON Flat', icon:'fa-code', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Aplanar Obj</div>`, run:(id,i)=>{const fl=(o,p='',r={})=>{for(let k in o){let nk=p?p+'_'+k:k;if(typeof o[k]==='object'&&o[k])fl(o[k],nk,r);else r[nk]=o[k]}return r}; i[0].features.forEach(f=>{f.properties=fl(f.properties)}); return i[0]} },
+            attr_uuid: { cat:'4. Attributes', label:'UUID Gen', icon:'fa-fingerprint', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _UUID</div>`, run:(id,i)=>{i[0].features.forEach(f=>f.properties._uuid=crypto.randomUUID()); return i[0]} },
+            attr_id: { cat:'4. Attributes', label:'Counter ID', icon:'fa-sort-numeric-down', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _ID</div>`, run:(id,i)=>{i[0].features.forEach((f,x)=>f.properties._id=x+1); return i[0]} },
+            attr_area: { cat:'4. Attributes', label:'Calc Area', icon:'fa-chart-area', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _AREA</div>`, run:(id,i)=>{i[0].features.forEach(f=>f.properties._area=turf.area(f)); return i[0]} },
+            attr_len: { cat:'4. Attributes', label:'Calc Len', icon:'fa-ruler-horizontal', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _LEN</div>`, run:(id,i)=>{i[0].features.forEach(f=>f.properties._len=turf.length(f)); return i[0]} },
+            attr_coord: { cat:'4. Attributes', label:'Extract XY', icon:'fa-map-marker-alt', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _X, _Y</div>`, run:(id,i)=>{i[0].features.forEach(f=>{const c=turf.centroid(f).geometry.coordinates; f.properties._x=c[0]; f.properties._y=c[1]}); return i[0]} },
+            attr_date: { cat:'4. Attributes', label:'Date Stamper', icon:'fa-clock', color:'#27ae60', in:1, out:1, tpl:()=>`<div>Add _DATE</div>`, run:(id,i)=>{const d=new Date().toISOString(); i[0].features.forEach(f=>f.properties._date=d); return i[0]} },
+            attr_prefix: { cat:'4. Attributes', label:'Prefixer', icon:'fa-font', color:'#27ae60', in:1, out:1, tpl:()=>`<input class="node-control" df-p placeholder="Prefix">`, run:(id,i,d)=>{const p=d.querySelector('[df-p]').value; i[0].features.forEach(f=>{const n={}; Object.keys(f.properties).forEach(k=>n[p+k]=f.properties[k]); f.properties=n}); return i[0]} },
+            
+            attr_test: { cat:'4. Attributes', label:'Tester', icon:'fa-balance-scale', color:'#27ae60', in:1, out:2, 
+                tpl:()=>`<input class="node-control" df-l placeholder="Field"><select class="node-control" df-op><option value="==">=</option><option value=">">></option><option value="<"><</option><option value="like">Like</option></select><input class="node-control" df-r placeholder="Val">`, 
+                run: (id,i,d)=>{
+                    const l=d.querySelector('[df-l]').value, op=d.querySelector('[df-op]').value, r=d.querySelector('[df-r]').value, p=[], f=[];
+                    i[0].features.forEach(feat=>{const val=feat.properties[l]; let pass=false;
+                        if(op==='like') pass=String(val).includes(r); else if(op==='>') pass=val>Number(r); else if(op==='<') pass=val<Number(r); else pass=val==r;
+                        if(pass)p.push(feat);else f.push(feat);
+                    }); return {output_1:turf.featureCollection(p), output_2:turf.featureCollection(f)}
+                } 
+            },
+
+            // --- 5. UTILS / LOGIC ---
+            util_junction: { cat:'5. Utils', label:'Junction', icon:'fa-circle', color:'#7f8c8d', in:1, out:1, tpl:()=>``, run: (id,i)=>i[0] },
+            util_holder: { cat:'5. Utils', label:'Inspector', icon:'fa-eye', color:'#7f8c8d', in:1, out:1, tpl:()=>`<div style="font-size:0.7em; color:#aaa">Passthrough</div>`, run: (id,i)=>i[0] },
+			util_merge: { cat:'5. Utils', label:'Merger', icon:'fa-stream', color:'#7f8c8d', in:2, out:1, tpl:()=>`<div>Unir Sets</div>`, run: (id,i)=>turf.featureCollection([...i[0].features, ...i[1].features]) },
+            util_sample: { cat:'5. Utils', label:'Sampler', icon:'fa-vial', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input type="number" df-n value="10" class="node-control">`, run: (id,i,d)=>turf.sample(i[0], parseInt(d.querySelector('[df-n]').value)) },
+            util_head: { cat:'5. Utils', label:'Head (Top)', icon:'fa-arrow-up', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input type="number" df-n value="5" class="node-control">`, run: (id,i,d)=>turf.featureCollection(i[0].features.slice(0, parseInt(d.querySelector('[df-n]').value))) },
+            util_tail: { cat:'5. Utils', label:'Tail (Bot)', icon:'fa-arrow-down', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input type="number" df-n value="5" class="node-control">`, run: (id,i,d)=>turf.featureCollection(i[0].features.slice(-parseInt(d.querySelector('[df-n]').value))) },
+            util_slice: { cat:'5. Utils', label:'Slicer', icon:'fa-cut', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input class="node-control" df-s placeholder="start,end">`, run: (id,i,d)=>{const [s,e]=d.querySelector('[df-s]').value.split(',').map(Number); return turf.featureCollection(i[0].features.slice(s,e))} },
+            util_sort: { cat:'5. Utils', label:'Sorter', icon:'fa-sort', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input class="node-control" df-f placeholder="Field">`, run: (id,i,d)=>{const fld=d.querySelector('[df-f]').value; i[0].features.sort((a,b)=>a.properties[fld]>b.properties[fld]?1:-1); return i[0]} },
+			util_dedup: { 
+							cat:'5. Utils', label:'Deduplicator', icon:'fa-clone', color:'#7f8c8d', in:1, out:1, 
+							tpl:()=>`<div>Geometry Dedup</div>`, 
+							run: (id,i)=>{
+								const s = new Set(); 
+								return turf.featureCollection(i[0].features.filter(f=>{
+									// Redondeamos coordenadas para evitar flotantes locos (10.0000001 vs 10.0)
+									const coords = turf.getCoords(f).flat(Infinity).map(n => typeof n === 'number' ? n.toFixed(6) : n);
+									const h = coords.join('|'); 
+									if(s.has(h)) return false; 
+									s.add(h); 
+									return true;
+								}));
+							} 
+						},
+            util_flip: { cat:'5. Utils', label:'Invertir Coordenadas', icon:'fa-exchange-alt', color:'#7f8c8d', in:1, out:1, tpl:()=>`<div>XY -> YX</div>`, run: (id,i)=>turf.flip(i[0]) },
+            util_crs: { cat:'5. Utils', label:'Reproject', icon:'fa-globe-americas', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input class="node-control" df-f value="EPSG:4326" placeholder="From"><input class="node-control" df-t value="EPSG:3857" placeholder="To">`, run: (id,i,d)=>{const f=d.querySelector('[df-f]').value,t=d.querySelector('[df-t]').value; proj4.defs("EPSG:25830","+proj=utm +zone=30 +ellps=GRS80 +units=m +no_defs"); const r=JSON.parse(JSON.stringify(i[0])); turf.meta.coordEach(r,c=>{const o=proj4(f,t,c);c[0]=o[0];c[1]=o[1]}); return r} },
+            util_filter_geo: { cat:'5. Utils', label:'Geometry Filter', icon:'fa-shapes', color:'#7f8c8d', in:1, out:3, tpl:()=>`<div style="font-size:0.6em">1:Poly 2:Line 3:Pt</div>`, run: (id,i)=>{const p=[],l=[],pt=[]; i[0].features.forEach(f=>{const t=turf.getType(f).toLowerCase(); if(t.includes('poly'))p.push(f);else if(t.includes('line'))l.push(f);else pt.push(f)}); return {output_1:turf.featureCollection(p),output_2:turf.featureCollection(l),output_3:turf.featureCollection(pt)}} },
+            util_explode_coll: { cat:'5. Utils', label:'Deaggregator', icon:'fa-th', color:'#7f8c8d', in:1, out:1, tpl:()=>`<div>Flatten Coll.</div>`, run: (id,i)=>turf.flatten(i[0]) },
+            util_vertex_cr: { cat:'5. Utils', label:'VertexCreate', icon:'fa-drafting-compass', color:'#7f8c8d', in:1, out:1, tpl:()=>`<input class="node-control" df-x placeholder="Field X"><input class="node-control" df-y placeholder="Field Y">`, run: (id,i,d)=>{const x=d.querySelector('[df-x]').value,y=d.querySelector('[df-y]').value; return turf.featureCollection(i[0].features.map(f=>{const cx=Number(f.properties[x]),cy=Number(f.properties[y]); return !isNaN(cx)?turf.point([cx,cy],f.properties):null}).filter(f=>f))} },
+            util_logger: { cat:'5. Utils', label:'Logger', icon:'fa-terminal', color:'#7f8c8d', in:1, out:1, tpl:()=>`<div>Log Console</div>`, run: (id,i)=>{console.log('ID '+id, i[0]); log("Check browser console for ID "+id); return i[0]} },
+
+            // --- 6. OUTPUTS (WRITERS) ---
+            writer_geojson: { cat:'6. Writers', label:'GeoJSON DL', icon:'fa-file-code', color:'#c0392b', in:1, out:0, tpl:()=>`<div>Descargar</div>`, run: (id,i)=>{download(JSON.stringify(i[0]),'export.geojson','application/json'); return i[0]} },
+            writer_csv: { cat:'6. Writers', label:'CSV DL', icon:'fa-file-csv', color:'#c0392b', in:1, out:0, tpl:()=>`<div>Descargar</div>`, run: (id,i)=>{download(toCSV(i[0]),'export.csv','text/csv'); return i[0]} },
+            writer_kml: { cat:'6. Writers', label:'KML DL', icon:'fa-globe', color:'#c0392b', in:1, out:0, tpl:()=>`<div>Descargar</div>`, run: (id,i)=>{download(toKML(i[0]),'export.kml','application/vnd.google-earth.kml+xml'); return i[0]} },
+            writer_wkt: { cat:'6. Writers', label:'WKT Console', icon:'fa-font', color:'#c0392b', in:1, out:0, tpl:()=>`<div>Ver en Log</div>`, run: (id,i)=>{i[0].features.forEach(f=>log(wellknown.stringify(f))); return i[0]} }
+        };
+
+
+        // =============================================
+        // 3. ENGINE & EVENTS
+        // =============================================
+        let editor, map, mapLayers={}, executionData={};
+
+        window.onload = function() {
+            // MAPA (Usando Canvas Renderer para performance)
+            map = L.map('map', { renderer: L.canvas() }).setView([40.416, -3.703], 6);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM contributors' }).addTo(map);
+            layerControl = L.control.layers(null, {}, {position: 'topright', collapsed: true}).addTo(map);
+
+            // DRAWFLOW
+            editor = new Drawflow(document.getElementById("drawflow"));
+            editor.reroute = true;
+            editor.reroute_fix_curvature = true;
+            editor.start();
+
+            // Auto-Save / Restore
+            const saved = SafeStorage.load('jetl_flow_ultimate');
+            if(saved) try { editor.import(JSON.parse(saved)); } catch(e){ console.error(e); }
+
+            ['nodeCreated','nodeRemoved','connectionCreated','connectionRemoved'].forEach(ev => {
+                editor.on(ev, ()=>SafeStorage.save('jetl_flow_ultimate', JSON.stringify(editor.export())));
+            });
+            
+			// Evento Click en Nodo (LAZY LOAD)
+            editor.on('click', (e)=>{
+                const el = e.target.closest('.drawflow-node');
+                const btnLoad = document.getElementById('btn-load-layer');
+                
+                if(el) {
+                    const id = el.id.replace('node-','');
+                    currentNodeId = id; // Guardamos ID actual
+                    
+                    // Gestión visual de selección
+                    document.querySelectorAll('.drawflow-node').forEach(n=>n.classList.remove('selected'));
+                    el.classList.add('selected');
+
+                    if(executionData[id]) {
+                        // 1. Cargar Tabla (Rápido)
+                        buildTable(executionData[id]);
+                        
+                        // 2. NO cargar mapa automáticamente. Mostrar botón burbuja.
+                        // Comprobamos si ya está en el mapa para cambiar el texto del botón si quieres, 
+                        // pero por simplicidad, siempre mostramos "Ver en Mapa".
+                        btnLoad.style.display = 'block';
+                        btnLoad.innerHTML = `<i class="fas fa-eye"></i> Cargar Capa #${id}`;
+                    } else {
+                        btnLoad.style.display = 'none';
+                    }
+                } else {
+                    // Click fuera de nodo
+                    document.querySelectorAll('.drawflow-node').forEach(n=>n.classList.remove('selected'));
+                    btnLoad.style.display = 'none';
+                    currentNodeId = null;
+                }
+            });
+
+            renderSidebar('');
+            document.getElementById('sys-status').style.background = '#2ecc71';
+        };
+
+        // UI HELPERS
+        function renderSidebar(filter) {
+            const container = document.getElementById('sidebar-content');
+            container.innerHTML = '';
+            const cats = {};
+            Object.entries(TOOL_REGISTRY).forEach(([k,tool])=>{
+                if(filter && !tool.label.toLowerCase().includes(filter.toLowerCase())) return;
+                if(!cats[tool.cat]) cats[tool.cat] = [];
+                cats[tool.cat].push({k,...tool});
+            });
+            Object.keys(cats).sort().forEach(c => {
+                container.innerHTML += `<div class="cat-title">${c}</div>`;
+                cats[c].forEach(t => {
+                    // Soporte para Click (Mobile) y Drag (Desktop)
+                    container.innerHTML += `<div class="node-item" draggable="true" ondragstart="drag(event)" data-k="${t.k}" onclick="addNodeClick('${t.k}')">
+                        <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
+                    </div>`;
+                });
+            });
+        }
+        function filterTools(val) { renderSidebar(val); }
+
+        function drag(e){ e.dataTransfer.setData("node", e.target.dataset.k); }
+        function drop(e){ e.preventDefault(); const k=e.dataTransfer.getData("node"); if(k) addNode(k, e.clientX, e.clientY); }
+        function allowDrop(e){ e.preventDefault(); }
+        
+        // Función Click para móvil (añade al centro)
+        function addNodeClick(k) {
+            const rect = document.getElementById('drawflow').getBoundingClientRect();
+            addNode(k, rect.width/2 + rect.left, rect.height/2 + rect.top);
+            if(window.innerWidth < 768) toggleSidebar();
+        }
+
+        function addNode(k, x, y) {
+            const t = TOOL_REGISTRY[k];
+            let pos = {x:100, y:100};
+            if(x && y) { try { pos = editor.posFromWindow({x,y}); } catch(e){} }
+
+            const isJunc = k === 'util_junction';
+            const html = isJunc ? `<div class="junction-point"></div>` :
+                `<div class="node-head" style="border-bottom:3px solid ${t.color}">
+                    <div style="display:flex;align-items:center;">
+                        <span class="count-badge" id="b-NODEID">0</span>
+                        <span><i class="fas ${t.icon}"></i> ${t.label}</span>
+                    </div>
+                    <i class="fas fa-times" style="cursor:pointer;opacity:0.6" onclick="editor.removeNodeId('node-NODEID')"></i>
+                </div>
+                <div class="node-body">${t.tpl('NODEID')}</div>`;
+            
+            const id = editor.addNode(k, t.in, t.out, pos.x, pos.y, isJunc?'junction':'', {}, html);
+            const el = document.getElementById('node-'+id);
+            if(el) el.innerHTML = el.innerHTML.replace(/NODEID/g, id);
+        }
+
+        // =============================================
+        // ENGINE RECURSIVO
+        // =============================================
+        async function runEngine() {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'flex';
+            log("--- INICIANDO ---");
+            executionData = {};
+            document.querySelectorAll('.count-badge').forEach(b=>b.style.display='none');
+            
+            // Wait 50ms para renderizar UI
+            await new Promise(r=>setTimeout(r,50));
+
+            const exportData = editor.export().drawflow.Home.data;
+            const nodes = Object.values(exportData);
+            const roots = nodes.filter(n => TOOL_REGISTRY[n.name].in === 0);
+
+            if(roots.length === 0) { log("Error: Añade un Reader", "err"); loader.style.display='none'; return; }
+
+            try {
+                for(const r of roots) await processNode(r.id, exportData);
+                log("--- FIN EXITOSO ---");
+                showToast("Proceso completado", "success");
+            } catch(e) {
+                log("FATAL: " + e.message, "err");
+                showToast("Error en ejecución", "error");
+            }
+            loader.style.display = 'none';
+        }
+
+        async function processNode(id, allNodes) {
+            if(executionData[id]) return executionData[id];
+
+            const nodeData = allNodes[id];
+            const tool = TOOL_REGISTRY[nodeData.name];
+            const dom = document.getElementById('node-'+id);
+
+            // Recolectar Inputs
+            const inputs = [];
+            for(let i=1; i <= tool.in; i++) {
+                const conns = nodeData.inputs['input_'+i].connections;
+                if(conns.length > 0) {
+                    const parentId = conns[0].node;
+                    const parentPort = conns[0].input; 
+                    const parentRes = await processNode(parentId, allNodes);
+                    
+                    if(parentRes) {
+                        // Routing Inteligente de Puertos
+                        if(!parentRes.type && parentRes[parentPort]) inputs.push(parentRes[parentPort]);
+                        else if(parentRes.type) inputs.push(parentRes); // Es GeoJSON directo
+                        else if(parentRes['output_1']) inputs.push(parentRes['output_1']); // Fallback
+                        else inputs.push(null);
+                    } else inputs.push(null);
+                } else inputs.push(null);
+            }
+
+            // UI Feedback
+            if(dom) dom.style.opacity = '0.6';
+            document.getElementById('loader-msg').innerText = `Ejecutando ${tool.label}...`;
+            await new Promise(r=>setTimeout(r,10)); // Yield al main thread
+
+            let result = null;
+            try {
+                // Clonar inputs para evitar mutación por referencia entre ramas
+                const safeInputs = inputs.map(i => i ? JSON.parse(JSON.stringify(i)) : null);
+                if(tool.in>0 && (!safeInputs[0] || !safeInputs[0].features)) throw new Error("Input vacío/inválido");
+                
+                result = await tool.run(id, safeInputs, dom);
+                
+                // Normalizar salida unitaria a FeatureCollection si es necesario
+                if(result && result.type === 'Feature') result = turf.featureCollection([result]);
+            } catch(e) {
+                log(`[${tool.label}] ERROR: ${e.message}`, "err");
+                if(dom) { dom.style.boxShadow = "0 0 0 2px #c0392b"; dom.style.opacity = '1'; }
+                throw e; 
+            }
+
+            if(dom) dom.style.opacity = '1';
+            executionData[id] = result;
+
+            // Update Badge
+            let count = 0;
+            if (result) {
+                if(result.features) count = result.features.length;
+                else Object.values(result).forEach(v => { if(v && v.features) count += v.features.length; });
+                
+                const badge = document.getElementById('b-'+id);
+                if(badge) { badge.innerText = count; badge.style.display = 'inline-block'; }
+                
+                // Auto-show final results on map
+                if(tool.out === 0) { showOnMap(id); buildTable(result); }
+            }
+
+            // Propagar
+            for(let i=1; i <= tool.out; i++) {
+                if(nodeData.outputs['output_'+i]) {
+                    const outputs = nodeData.outputs['output_'+i].connections;
+                    for(const conn of outputs) await processNode(conn.node, allNodes);
+                }
+            }
+            return result;
+        }
+
+        // =============================================
+        // VISUALIZACIÓN
+        // =============================================
+        function showOnMap(id) {
+            let data = executionData[id];
+            if(!data) return;
+            if(!data.type) data = data.output_1 || data.output_2 || data.output_3;
+            if(!data || !data.features || data.features.length === 0) return;
+
+            // Limpieza inteligente: Eliminar capas anteriores de este nodo
+            if(mapLayers[id]) { map.removeLayer(mapLayers[id]); layerControl.removeLayer(mapLayers[id]); }
+
+            const nodeName = editor.getNodeFromId(id).name;
+            const tool = TOOL_REGISTRY[nodeName];
+            const layerName = `<span style="color:${tool.color}">■</span> ${tool.label} (#${id})`;
+            
+            const layer = L.geoJSON(data, {
+                style: { color: tool.color, weight: 2, opacity: 0.8, fillOpacity: 0.2 },
+                pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 6, color: '#fff', weight:1, fillColor: tool.color, fillOpacity: 0.9 })
+            }).addTo(map);
+
+            layerControl.addOverlay(layer, layerName);
+            mapLayers[id] = layer;
+            
+            // Zoom Fit
+            try { map.fitBounds(layer.getBounds(), {padding:[50,50], maxZoom: 16}); } catch(e){}
+        }
+
+        function buildTable(data) {
+            const container = document.getElementById('table-container');
+            container.innerHTML = '';
+            if(!data.type) data = data.output_1 || data.output_2 || data.output_3; // Unpack multipuerto
+            if(!data || !data.features || data.features.length === 0) { container.innerHTML = '<div style="padding:20px;text-align:center">Sin datos.</div>'; return; }
+
+            const props = data.features[0].properties || {};
+            const headers = Object.keys(props);
+            
+            let html = '<table class="attr-table"><thead><tr><th>#</th>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead><tbody>';
+            
+            const limit = Math.min(data.features.length, 200); // Max 200 filas para DOM performance
+            for(let i=0; i<limit; i++) {
+                html += `<tr><td>${i+1}</td>`;
+                headers.forEach(h => {
+                    let val = data.features[i].properties[h];
+                    if(typeof val === 'object') val = '[Obj]';
+                    html += `<td title="${val}">${val!==undefined?val:''}</td>`
+                });
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            if(data.features.length > 200) html += `<div style="padding:10px;text-align:center;font-size:0.8rem;color:#888;background:#222">... Visualizando 200 de ${data.features.length} registros. Descarga el CSV para ver todo.</div>`;
+            container.innerHTML = html;
+        }
+
+        // =============================================
+        // HELPERS GENÉRICOS
+        // =============================================
+        function toggleSidebar() { const s = document.getElementById('sidebar'); s.classList.toggle('open'); document.getElementById('sidebar-overlay').style.display = s.classList.contains('open')?'block':'none'; }
+        function togglePanelHeight() { 
+            const p = document.getElementById('bottom-panel'); 
+            const isMin = p.offsetHeight < 100;
+            p.style.height = isMin ? '45vh' : '36px'; 
+            setTimeout(()=>map.invalidateSize(), 350); 
+        }
+        function switchTab(t) {
+            document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+            event.target.closest('button').classList.add('active');
+            ['map','logs','table-container'].forEach(x=>document.getElementById(x).style.display='none');
+            document.getElementById(t==='table'?'table-container':t).style.display = 'block';
+            if(document.getElementById('bottom-panel').offsetHeight < 100) togglePanelHeight();
+            if(t==='map') setTimeout(()=>map.invalidateSize(), 300);
+        }
+
+        function log(m, t) { 
+            const l = document.getElementById('logs'); 
+            const ts = new Date().toLocaleTimeString();
+            l.innerHTML += `<div style="color:${t==='err'?'#e74c3c':(t==='success'?'#2ecc71':'#bbb')};margin-bottom:4px"><span style="opacity:0.5">[${ts}]</span> ${m}</div>`; 
+            l.scrollTop = l.scrollHeight; 
+        }
+        function showToast(m, type) { 
+            const t=document.getElementById('toast'); 
+            document.getElementById('toast-msg').innerText=m; 
+            t.className = 'visible'; 
+            t.style.borderLeft = `4px solid ${type==='error'?'#e74c3c':'#2ecc71'}`;
+            setTimeout(()=>t.className='', 3000); 
+        }
+        
+        async function loadFile(input, id) {
+            const file = input.files[0];
+            if (!file) return;
+            const lbl = document.getElementById('lbl-' + id);
+            lbl.innerText = "Leyendo...";
+            
+            try {
+                let geojson = null;
+                const buffer = await file.arrayBuffer();
+                
+                if (file.name.match(/\.zip$/i)) {
+                    const result = await shp(buffer);
+                    geojson = Array.isArray(result) ? turf.featureCollection(result.flatMap(r=>r.features)) : result;
+                } else if (file.name.match(/\.json$|\.geojson$/i)) {
+                    const text = new TextDecoder("utf-8").decode(buffer);
+                    geojson = JSON.parse(text);
+                } else if (file.name.match(/\.kml$/i)) {
+                    const text = new TextDecoder("utf-8").decode(buffer);
+                    geojson = toGeoJSON.kml(new DOMParser().parseFromString(text,'text/xml'));
+                } else {
+                    throw new Error("Formato no soportado (.zip shp, .kml, .geojson)");
+                }
+
+                geojson = ensureFC(geojson);
+                document.getElementById('d-' + id).value = JSON.stringify(geojson);
+                lbl.innerText = `${file.name} (${geojson.features.length} feats)`;
+                lbl.style.color = "#2ecc71";
+            } catch (e) {
+                console.error(e);
+                lbl.innerText = "Error lectura";
+                lbl.style.color = "#e74c3c";
+                alert("Error: " + e.message);
+            }
+        }
+
+        function download(c,n,t){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([c],{type:t})); a.download=n; a.click(); }
+        function toCSV(g){ 
+            if(!g.features.length)return""; 
+            const props = new Set();
+            g.features.forEach(f=>Object.keys(f.properties).forEach(k=>props.add(k)));
+            const h=Array.from(props);
+            return h.join(',')+'\n'+g.features.map(f=>h.map(k=>{
+                let v = f.properties[k]||'';
+                if(typeof v === 'string' && v.includes(',')) v = `"${v}"`;
+                return v;
+            }).join(',')).join('\n'); 
+        }
+        function toKML(g){ return '<?xml version="1.0" encoding="UTF-8"?><kml><Document>'+g.features.map(f=>`<Placemark><name>${f.properties.id||f.properties.name||''}</name><description>${JSON.stringify(f.properties)}</description>${tokmlgeo(f.geometry)}</Placemark>`).join('')+'</Document></kml>'; }
+        function tokmlgeo(g){ 
+            if(!g) return '';
+            const c = g.coordinates;
+            if(g.type==='Point') return `<Point><coordinates>${c.join(',')}</coordinates></Point>`;
+            if(g.type==='LineString') return `<LineString><coordinates>${c.map(p=>p.join(',')).join(' ')}</coordinates></LineString>`;
+            if(g.type==='Polygon') return `<Polygon><outerBoundaryIs><LinearRing><coordinates>${c[0].map(p=>p.join(',')).join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon>`;
+            return '';
+        }
+        function clearCanvas(){ 
+            if(!confirm("¿Borrar todo?")) return;
+            editor.clear(); 
+            SafeStorage.clear('jetl_flow_ultimate'); 
+            map.eachLayer(l => { if(!!l.toGeoJSON) { map.removeLayer(l); layerControl.removeLayer(l); } });
+            mapLayers = {}; executionData = {};
+            log("Canvas limpio.");
+        }
+		function loadActiveLayerToMap() {
+            if(currentNodeId && executionData[currentNodeId]) {
+                showOnMap(currentNodeId);
+                // Opcional: Ocultar botón tras cargar, o cambiar estilo para indicar "Cargado"
+                const btn = document.getElementById('btn-load-layer');
+                btn.innerHTML = `<i class="fas fa-check"></i> Capa Cargada`;
+                setTimeout(()=>btn.style.display='none', 1000); // Ocultar tras 1s
+            }
+        }
+    </script>
+</body>
+</html>

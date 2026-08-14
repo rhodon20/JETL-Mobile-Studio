@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "apache-arrow": "^21.1.0",
+    "parquet-wasm": "^0.7.1"
+  }
+}

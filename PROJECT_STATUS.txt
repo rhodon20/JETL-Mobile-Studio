@@ -1,0 +1,60 @@
+JETL Studio - Estado del Proyecto (2026-03-05)
+
+Resumen rapido
+- Webapp ETL geoespacial 100% client-side.
+- Motor visual con Drawflow + render Leaflet + analitica Turf.
+- Estado funcional validado en navegador (smoke extendido 38/38 OK).
+- Registry de herramientas estable y ampliable con paquetes comunitarios.
+
+Estado por bloques
+1) Estabilidad base
+- KML import/export: OK (integrado en smoke).
+- Carga directa de app: OK.
+- Sidebar, drag and drop, acciones de nodo: OK.
+- Tabla (filtro/seleccion/export): OK.
+
+2) UX de atributos (schema-driven)
+- Attribute Join:
+  - asistente con dos combos (campos Input 1 / Input 2),
+  - alta de pares al mapping via boton.
+- Field Calculator Pro:
+  - lista de campos disponibles desde schema upstream,
+  - insercion de campo en expresion via boton.
+- Fallback manual conservado si no hay schema disponible.
+
+3) Hardening tecnico reciente
+- Migracion de eventos inline a delegacion:
+  - header, tabs, paneles, context menu,
+  - sidebar, quick search, toolbar de tabla,
+  - acciones de nodos run/view/delete.
+- Safe evaluator para formulas de atributos:
+  - validacion de expresion,
+  - bloqueo de tokens peligrosos,
+  - fix aplicado por error de strict mode en Field Calculator Pro.
+- Cache runtime unificada:
+  - `_file_cache`, `_tiff_cache`, `_node_tiff_ref`,
+  - limpieza en node remove / clear canvas / load project / reset template.
+
+4) Pruebas manuales recientes (usuario)
+- Smoke: OK repetido.
+- Smoke extendido: OK (38/38).
+- Join y Calculator con UI dinamica: OK.
+- Tabla: filtros y export de seleccion: OK.
+- Clear canvas y plantillas: OK.
+- Reejecucion con GeoTIFF: OK.
+
+5) Calidad y release discipline
+- Matriz de compatibilidad inicial creada:
+  - `COMPATIBILITY_MATRIX.md` (GeoTIFF/GPKG/Parquet por navegador).
+- Checklist de release/regresion creado:
+  - `RELEASE_CHECKLIST.md`.
+
+Riesgos abiertos
+- Suite automatizada completa en progreso (base: `JETLSmoke.runExtended`).
+- GPKG y Parquet siguen marcados como experimentales.
+- Falta profundizar en performance para datasets grandes.
+
+Siguiente objetivo recomendado
+- Continuar Fase 3:
+  - aplicar checklist de release en cada iteracion,
+  - completar celdas `PEND/EXP` de compatibilidad con validacion real por navegador.

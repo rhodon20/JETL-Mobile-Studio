@@ -1,0 +1,1203 @@
+<meta name='viewport' content='width=device-width, initial-scale=1' />
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+    <meta name="theme-color" content="#202020">
+    <link rel="manifest" href="manifest.json">
+    <title>JETL Studio v2026.03.05 - Open Source PWA</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <script src="js/vendor/leaflet.js"></script>
+    <script src="js/vendor/turf.min.js"></script>
+    <script src="js/vendor/drawflow.min.js"></script>
+    <script src="js/vendor/shp.js"></script>
+    <script src="js/vendor/geoblaze.web.min.js"></script>
+    <script src="js/vendor/geotiff.js"></script>
+    <script src="js/vendor/osmtogeojson.js"></script>
+    <script src="js/vendor/proj4.js"></script>
+    <script src="js/vendor/wellknown.js"></script>
+    <script src="js/vendor/geopackage.min.js"></script>
+    <script src="js/vendor/parquet.min.js"></script>
+    <script src="js/vendor/anime.min.js"></script>
+
+    <style>
+        /* --- CORE VARS --- */
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --node: #252526;
+            --text: #e0e0e0;
+            --accent: #3498db;
+            --border: #333;
+            --success: #27ae60;
+            --warning: #d35400;
+            --danger: #c0392b;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        #header {
+            min-height: 45px;
+            background: #202020;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .brand {
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+
+        .brand span {
+            font-weight: 300;
+            opacity: 0.6;
+            font-size: 0.8em;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #7f8c8d;
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            transition: background 0.3s;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #333;
+            color: #ddd;
+            border: 1px solid #444;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover {
+            background: #444;
+            border-color: #555;
+            color: #fff;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-run {
+            background: #1e7e34;
+            border-color: #19692c;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-run:hover {
+            background: #218838;
+        }
+
+        /* LAYOUT */
+        #layout {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #sidebar {
+            width: 260px;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+            flex-shrink: 0;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        #sidebar-search {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            background: #252526;
+        }
+
+        #sidebar-search input {
+            width: 100%;
+            background: #111;
+            border: 1px solid #444;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        #sidebar-search input:focus {
+            border-color: var(--accent);
+        }
+
+        #sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 40px;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        #workspace {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #181818;
+        }
+
+        #drawflow {
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 25px 25px;
+            outline: none;
+        }
+
+        /* --- NODES --- */
+        .drawflow .drawflow-node {
+            width: 240px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: var(--node);
+            z-index: 10;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .drawflow .drawflow-node:hover {
+            border-color: #666;
+        }
+
+        .drawflow .drawflow-node.selected {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3) !important;
+        }
+
+        .node-head {
+            padding: 8px 10px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.1));
+            border-bottom: 1px solid #333;
+            font-weight: 600;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #f0f0f0;
+            cursor: grab;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+        }
+
+        .node-head:active {
+            cursor: grabbing;
+        }
+
+        .node-body {
+            padding: 10px;
+            font-size: 0.75rem;
+            color: #bbb;
+            background: var(--node);
+            border-bottom-left-radius: 5px;
+            border-bottom-right-radius: 5px;
+        }
+
+        /* Node Actions (Badge & Buttons) */
+        .node-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .node-help {
+            color: #777;
+            font-size: 0.85em;
+            cursor: help;
+            opacity: 0.7;
+        }
+
+        .node-help:hover {
+            color: #fff;
+            opacity: 1;
+        }
+
+        .time-badge {
+            font-size: 0.65em;
+            color: #aaa;
+            margin-left: 6px;
+        }
+
+        .count-badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.65em;
+            display: none;
+            font-weight: bold;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .badge-green {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .badge-orange {
+            background: var(--warning);
+            color: #fff;
+        }
+
+        .node-btn {
+            color: #777;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            padding: 2px;
+            border-radius: 3px;
+            pointer-events: auto;
+            opacity: 0.7;
+        }
+
+        .node-btn:hover {
+            color: #fff;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .node-btn.active {
+            color: var(--accent);
+            opacity: 1;
+            text-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+
+        .node-control {
+            width: 100%;
+            background: #111;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 5px 8px;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            box-sizing: border-box;
+            font-family: 'Consolas', monospace;
+            font-size: 0.85em;
+        }
+
+        .node-control:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        select.node-control {
+            cursor: pointer;
+        }
+
+        /* Connections */
+        .drawflow .drawflow-node .inputs,
+        .drawflow .drawflow-node .outputs {
+            position: absolute;
+            top: 50% !important;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 0;
+        }
+
+        .drawflow .drawflow-node .inputs {
+            left: -14px;
+        }
+
+        .drawflow .drawflow-node .outputs {
+            right: -14px;
+        }
+
+        .drawflow .drawflow-node .input,
+        .drawflow .drawflow-node .output {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #000;
+            background: #777;
+            cursor: crosshair;
+            transition: transform 0.1s;
+        }
+
+        .drawflow .drawflow-node .input:hover,
+        .drawflow .drawflow-node .output:hover {
+            transform: scale(1.3);
+            background: #fff;
+        }
+
+        .drawflow .drawflow-node .output {
+            background: #555;
+        }
+
+        .drawflow .connection .main-path {
+            stroke-width: 3px;
+            stroke: #666;
+        }
+
+        .drawflow .connection.selected .main-path {
+            stroke: var(--accent);
+        }
+
+        /* Junction */
+        .drawflow .drawflow-node.junction {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #aaa;
+            border: 2px solid #fff;
+            min-height: unset;
+            overflow: visible;
+            padding: 0;
+            box-shadow: none;
+        }
+
+        .drawflow .drawflow-node.junction .inputs,
+        .drawflow .drawflow-node.junction .outputs {
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%);
+        }
+
+        .drawflow .drawflow-node.junction .node-head,
+        .drawflow .drawflow-node.junction .node-body {
+            display: none;
+        }
+
+        /* Sidebar Items & Collapsible */
+        .cat-group {
+            border-bottom: 1px solid #333;
+        }
+
+        .cat-title {
+            padding: 12px 10px 8px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #222;
+            transition: color 0.2s;
+        }
+
+        .cat-title:hover {
+            color: #fff;
+            background: #2a2a2a;
+        }
+
+        .cat-title i {
+            font-size: 0.8em;
+            transition: transform 0.3s;
+        }
+
+        .cat-title.active i {
+            transform: rotate(180deg);
+        }
+
+        .cat-items {
+            display: none;
+            padding-bottom: 8px;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        .cat-items.open {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .node-item {
+            padding: 8px 12px;
+            margin: 2px 8px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            color: #ccc;
+        }
+
+        .node-item:hover {
+            background: #333;
+            border-color: #555;
+            transform: translateX(3px);
+            color: #fff;
+        }
+
+        .node-item i {
+            width: 18px;
+            text-align: center;
+        }
+
+        /* Quick Search Modal */
+        #quick-search {
+            position: absolute;
+            display: none;
+            background: #252526;
+            width: 250px;
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #qs-input {
+            width: 100%;
+            background: #1a1a1a;
+            border: none;
+            padding: 10px;
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+            border-bottom: 1px solid #333;
+        }
+
+        #qs-results {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .qs-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            color: #ccc;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .qs-item:hover,
+        .qs-item.selected {
+            background: var(--accent);
+            color: white;
+        }
+
+        .qs-item i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Bottom Panel */
+        #bottom-panel {
+            height: 40vh;
+            background: #1a1a1a;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 60;
+            transition: height 0.3s ease;
+            position: relative;
+        }
+
+        body.map-panel-maximized #layout {
+            display: none;
+        }
+
+        body.map-panel-maximized #bottom-panel {
+            flex: 1 1 auto;
+            height: auto !important;
+            border-top: 0;
+        }
+
+        #panel-tabs {
+            height: 36px;
+            background: #252526;
+            display: flex;
+            padding: 0 5px;
+            border-bottom: 1px solid #333;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            padding: 0 16px;
+            height: 100%;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: #ddd;
+        }
+
+        .tab-btn.active {
+            color: white;
+            border-bottom-color: var(--accent);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        #panel-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #logs {
+            width: 100%;
+            background: #111;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #ddd;
+            display: none;
+            white-space: pre-wrap;
+        }
+
+        #map {
+            flex: 1;
+            background: #111;
+            z-index: 1;
+            width: 100%;
+        }
+
+        #table-container {
+            flex: 1;
+            background: #181818;
+            overflow-x: auto;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: none;
+            z-index: 2;
+            width: 100%;
+        }
+
+        #table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #333;
+            background: #202020;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        #table-toolbar .table-tools {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        #table-filter {
+            background: #111;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            width: 200px;
+        }
+
+        #table-filter-field {
+            background: #111;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        table.attr-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            color: #ccc;
+        }
+
+        table.attr-table th {
+            background: #2d2d2d;
+            position: sticky;
+            top: 0;
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #555;
+            color: #fff;
+            z-index: 10;
+            font-weight: 600;
+            box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        table.attr-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #333;
+            white-space: nowrap;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        table.attr-table tr:hover td {
+            background: #333;
+            color: #fff;
+        }
+
+        table.attr-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: absolute;
+                height: 100%;
+                transform: translateX(-105%);
+                box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+                width: 80%;
+                max-width: 300px;
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+
+            .brand span {
+                display: none;
+            }
+
+            #header {
+                padding: 0 5px;
+            }
+
+            .node-control {
+                font-size: 16px;
+            }
+
+            .brand {
+                width: 100%;
+                justify-content: center;
+                font-size: 0.85rem;
+            }
+
+            .toolbar {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .btn {
+                padding: 6px 10px;
+                font-size: 0.75rem;
+            }
+
+            #symbology-panel {
+                right: 8px;
+                left: 8px;
+                bottom: 60px;
+                min-width: auto;
+            }
+
+            #symbology-toggle {
+                right: 8px;
+                bottom: 12px;
+                width: 32px;
+                height: 32px;
+            }
+
+            #panel-tabs {
+                flex-wrap: wrap;
+                height: auto;
+            }
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #252526;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 2000;
+            border: 1px solid var(--border);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Loading Overlay */
+        #loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            backdrop-filter: blur(2px);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Symbology Panel */
+        #symbology-panel {
+            position: absolute;
+            right: 12px;
+            bottom: 60px;
+            background: #252526;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 10px;
+            z-index: 800;
+            display: none;
+            min-width: 200px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        #symbology-panel select {
+            width: 100%;
+            margin-bottom: 6px;
+            background: #111;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .symbology-title {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        #symbology-toggle {
+            position: absolute;
+            right: 12px;
+            bottom: 16px;
+            z-index: 801;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #252526;
+            border: 1px solid #444;
+            color: #ddd;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        #symbology-toggle:hover {
+            color: #fff;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            z-index: 9000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #252526;
+            border: 1px solid #444;
+            border-radius: 8px;
+            width: 600px;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+            font-weight: 600;
+        }
+
+        #templates-list {
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .template-card {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .template-card:hover {
+            border-color: #555;
+            transform: translateY(-2px);
+        }
+
+        .template-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .template-desc {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loader-msg">Procesando...</div>
+        <button id="loader-cancel"
+            style="display:none; margin-top:15px; background:var(--danger); border:none; padding:8px 16px; color:white; cursor:pointer; border-radius:4px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"
+            data-ui-action="cancel-run">Cancelar Operación</button>
+    </div>
+    <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
+
+    <div id="quick-search">
+        <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
+        <div id="qs-results"></div>
+    </div>
+
+    <div id="header">
+        <button class="btn" data-ui-action="toggle-sidebar"><i class="fas fa-bars"></i></button>
+        <div class="brand" style="margin-left:10px">
+            <div class="status-dot" id="sys-status" title="Sistema Listo"></div>&nbsp;JETL Studio
+            <span>v2026.03.05</span>
+        </div>
+        <div class="toolbar">
+            <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+            <button class="btn" data-ui-action="redo" title="Rehacer (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            <button class="btn" data-ui-action="clear-canvas" title="Borrar todo"><i class="fas fa-trash-alt"></i></button>
+            <button class="btn" data-ui-action="save-project" title="Guardar Proyecto (.jetl)"><i
+                    class="fas fa-save"></i></button>
+            <button class="btn" data-ui-action="open-project" title="Abrir Proyecto"><i
+                    class="fas fa-folder-open"></i></button>
+            <button class="btn" data-ui-action="open-params" title="Parametros del Workspace"><i
+                    class="fas fa-sliders-h"></i></button>
+            <button class="btn" data-ui-action="export-run-report" title="Exportar Run Report"><i
+                    class="fas fa-file-alt"></i></button>
+            <button class="btn" data-ui-action="export-run-report-csv" title="Exportar Run Report CSV"><i
+                    class="fas fa-file-csv"></i></button>
+            <button class="btn" data-ui-action="open-templates" title="Plantillas de flujo"><i
+                    class="fas fa-layer-group"></i></button>
+            <button class="btn" data-ui-action="open-packages" title="Paquetes comunitarios"><i
+                    class="fas fa-box-open"></i></button>
+            <button class="btn" data-ui-action="apply-template-demo" title="Insertar pipeline demo"><i
+                    class="fas fa-bolt"></i></button>
+            <input type="file" id="upload-jetl" accept=".jetl,.json" style="display:none" >
+        </div>
+
+
+    </div>
+    <div class="toolbar-separator" style="width:1px; background:#444; margin:0 50px;"></div>
+
+    <div id="layout">
+        <div id="sidebar">
+            <div id="sidebar-search">
+                <input type="text" placeholder="Buscar transformador..." id="sidebar-filter-input">
+            </div>
+            <div id="sidebar-content"></div>
+        </div>
+        <div id="sidebar-overlay" data-ui-action="toggle-sidebar"
+            style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:40;">
+        </div>
+
+        <div id="workspace">
+            <div id="drawflow"  ></div>
+        </div>
+    </div>
+
+    <div id="bottom-panel">
+        <div id="panel-tabs">
+            <div style="display:flex; height:100%">
+                <button class="btn" data-ui-action="zoom-all"><i class="fas fa-expand"></i></button>
+                <button class="btn" id="btn-map-expand" data-ui-action="toggle-map-expand" title="Ampliar mapa"><i
+                        class="fas fa-up-right-and-down-left-from-center"></i></button>
+                <button class="tab-btn active" data-ui-action="tab-map"><i class="fas fa-map-marked-alt"></i>
+                    Mapa</button>
+                <button class="tab-btn" data-ui-action="tab-table"><i class="fas fa-table"></i> Datos</button>
+                <button class="tab-btn" data-ui-action="tab-logs"><i class="fas fa-terminal"></i>
+                    Consola</button>
+            </div>
+            <button class="tab-btn" style="padding:0 15px" data-ui-action="toggle-panel"><i
+                    class="fas fa-compress-alt"></i></button>
+        </div>
+        <div id="panel-content">
+            <div id="logs" style="display:block">Sistema listo.</div>
+
+            <div id="table-container">
+                <div id="table-toolbar">
+                    <div class="table-tools">
+                        <input id="table-filter" type="text" placeholder="Filtro rápido (texto)">
+                        <select id="table-filter-field"></select>
+                        <button class="btn" data-table-action="apply-filter" title="Aplicar filtro"><i
+                                class="fas fa-filter"></i></button>
+                        <button class="btn" data-table-action="clear-filter" title="Limpiar filtro"><i
+                                class="fas fa-times"></i></button>
+                    </div>
+                    <div class="table-tools">
+                        <button class="btn" data-table-action="export-geojson" title="Exportar selección GeoJSON"><i
+                                class="fas fa-file-code"></i></button>
+                        <button class="btn" data-table-action="export-csv" title="Exportar selección CSV"><i
+                                class="fas fa-file-csv"></i></button>
+                        <button class="btn" data-table-action="clear-selection" title="Limpiar selección"><i
+                                class="fas fa-eraser"></i></button>
+                    </div>
+                </div>
+                <div style="padding:40px; color:#666; text-align:center; font-style:italic">
+                    <i class="fas fa-table" style="font-size:2em; margin-bottom:10px"></i><br>
+                    Ejecuta el flujo y selecciona un nodo para ver sus datos aquí.
+                </div>
+            </div>
+
+            <div id="map"></div>
+            <div id="symbology-panel">
+                <div class="symbology-title">Simbología</div>
+                <select id="symbology-field"></select>
+                <select id="symbology-mode">
+                    <option value="categorical">Categorías</option>
+                    <option value="quantile">Cuantiles</option>
+                </select>
+                <button class="btn" data-ui-action="apply-symbology" title="Aplicar simbología"><i
+                        class="fas fa-palette"></i></button>
+            </div>
+            <div id="symbology-toggle" data-ui-action="toggle-symbology" title="Simbología">
+                <i class="fas fa-palette"></i>
+            </div>
+        </div>
+    </div>
+    <div id="ctx-menu"
+        style="display:none; position:absolute; z-index:9000; background:#252526; border:1px solid #444; box-shadow:0 5px 15px rgba(0,0,0,0.5); border-radius:4px; min-width:150px; overflow:hidden;">
+        <div class="ctx-item" data-ui-action="ctx-run"><i class="fas fa-play"></i> Ejecutar hasta aquí</div>
+        <div class="ctx-item" data-ui-action="ctx-view"><i class="fas fa-eye"></i> Ver en Mapa</div>
+        <div class="ctx-item" data-ui-action="ctx-delete" style="color:#e74c3c"><i class="fas fa-trash"></i> Eliminar
+        </div>
+    </div>
+    <div id="templates-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>Plantillas de flujo</div>
+                <button class="btn" data-ui-action="close-templates"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="templates-list"></div>
+        </div>
+    </div>
+    <div id="params-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>Parametros del Workspace</div>
+                <button class="btn" data-ui-action="close-params"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:12px; border-bottom:1px solid #333; color:#aaa; font-size:0.8rem">
+                Usa <code>${param_key}</code> en campos de texto de nodos compatibles.
+            </div>
+            <div id="params-rows" style="padding:12px; max-height:50vh; overflow:auto"></div>
+            <div style="padding:10px 12px; border-top:1px solid #333; display:flex; gap:8px; justify-content:flex-end">
+                <button class="btn" data-ui-action="add-param-row"><i class="fas fa-plus"></i></button>
+                <button class="btn" data-ui-action="save-params"><i class="fas fa-save"></i> Guardar</button>
+            </div>
+        </div>
+    </div>
+    <div id="packages-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>Paquetes Comunitarios</div>
+                <button class="btn" data-ui-action="close-packages"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="packages-list"></div>
+        </div>
+    </div>
+    <style>
+        .ctx-item {
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: #ddd;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .ctx-item:hover {
+            background: #3498db;
+            color: white;
+        }
+    </style>
+    <script src="js/core.js"></script>
+    <script src="js/params.js"></script>
+    <script src="js/formats.js"></script>
+    <script src="js/nodes/readers.js"></script>
+    <script src="js/nodes/geometry.js"></script>
+    <script src="js/nodes/utils.js"></script>
+    <script src="js/nodes/spatial.js"></script>
+    <script src="js/nodes/attributes.js"></script>
+    <script src="js/nodes/raster.js"></script>
+    <script src="js/nodes/writers.js"></script>
+    <script src="js/tools.js"></script>
+    <script src="js/schemaUI.js"></script>
+    <script src="js/core/workerPool.js"></script>
+    <script src="js/state/history.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/processNode.js"></script>
+    <script src="js/visualization.js"></script>
+    <script src="js/templates.js"></script>
+    <script src="js/packages.js"></script>
+    <script src="js/smoke.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.warn('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>
+
+
