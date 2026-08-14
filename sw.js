@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jetl-mobile-cache-v6';
+const CACHE_NAME = 'jetl-mobile-cache-v7';
 const coreAssets = [
     './',
     './index.html',
@@ -13,18 +13,8 @@ const coreAssets = [
     './js/vendor/leaflet.js',
     './js/vendor/turf.min.js',
     './js/vendor/drawflow.min.js',
-    './js/vendor/shp.js',
-    './js/vendor/geoblaze.web.min.js',
-    './js/vendor/geotiff.js',
-    './js/vendor/osmtogeojson.js',
-    './js/vendor/proj4.js',
-    './js/vendor/wellknown.js',
-    './js/vendor/anime.min.js',
-    './js/vendor/geopackage.min.js',
-    './js/vendor/parquet.min.js',
-    './js/vendor/parquet_bundled.js',
-    './js/vendor/jsts.min.js',
-    './js/vendor/rbush.min.js',
+    // Las librerías GIS pesadas se cachean al usarse. No deben retrasar
+    // la activación de una nueva versión de la aplicación.
 
     // Core JS
     './js/core.js',
@@ -96,6 +86,26 @@ self.addEventListener('fetch', event => {
                     return response;
                 })
                 .catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
+        );
+        return;
+    }
+
+    const requestURL = new URL(event.request.url);
+    const isVersionedAppAsset = requestURL.origin === self.location.origin &&
+        ['script', 'style', 'manifest'].includes(event.request.destination);
+
+    // El código de la aplicación debe comprobar la red primero para evitar que
+    // una versión antigua del SW deje JS/CSS obsoleto tras un despliegue.
+    if (isVersionedAppAsset) {
+        event.respondWith(
+            fetch(event.request)
+                .then(networkResponse => {
+                    if (networkResponse && networkResponse.ok) {
+                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
+                    }
+                    return networkResponse;
+                })
+                .catch(() => caches.match(event.request))
         );
         return;
     }

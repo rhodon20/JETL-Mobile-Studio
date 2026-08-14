@@ -1010,7 +1010,9 @@ function togglePanelHeight() {
             ? '<i class="fas fa-chevron-up"></i><span class="panel-action-label">Mostrar</span>'
             : '<i class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span>';
     }
-    setTimeout(() => map.invalidateSize(), 350);
+    setTimeout(() => {
+        if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
+    }, 350);
 }
 
 function updateMapExpandButton() {
