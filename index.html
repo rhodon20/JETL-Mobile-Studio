@@ -553,12 +553,16 @@
         }
 
         .drawflow .connection .main-path {
-            stroke-width: 3px;
+            stroke-width: 5px;
             stroke: #666;
+            transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease;
         }
 
-        .drawflow .connection.selected .main-path {
+        .drawflow .connection.selected .main-path,
+        .drawflow .connection .main-path.selected {
             stroke: var(--accent);
+            stroke-width: 8px;
+            filter: drop-shadow(0 0 4px rgba(52, 152, 219, .65));
         }
 
         /* Junction */
@@ -3462,7 +3466,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(10, 14, &quot;history.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/core/workerPool.js&quot;)"></script>
 
-    <script defer src="js/state/history.js?v=20260814-6"
+    <script defer src="js/state/history.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(11, 14, &quot;processNode.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/state/history.js&quot;)"></script>
 
@@ -3470,7 +3474,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-16"
+    <script defer src="js/engine.js?v=20260814-17"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 

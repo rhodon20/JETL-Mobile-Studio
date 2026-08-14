@@ -139,6 +139,53 @@ test('un nodo nuevo se autoconecta desde la selección compatible', () => {
     assert.match(addSource, /selectCanvasNode\(id\)/);
 });
 
+test('insertar sobre una conexión conserva sus extremos y puertos', () => {
+    const start = engine.indexOf('function graphHasConnection');
+    const end = engine.indexOf('window.JETLReplaceConnectionWithNode', start);
+    assert.ok(start >= 0 && end > start, 'falta la sustitución de conexiones');
+    const graph = {
+        1: { outputs: { output_2: { connections: [{ node: '2', output: 'input_3' }] } }, inputs: {} },
+        2: { outputs: {}, inputs: { input_3: { connections: [{ node: '1', input: 'output_2' }] } } },
+        7: { outputs: { output_1: { connections: [] } }, inputs: { input_1: { connections: [] } } }
+    };
+    const remove = (sourceId, targetId, outputPort, inputPort) => {
+        const out = graph[sourceId]?.outputs?.[outputPort]?.connections || [];
+        const index = out.findIndex((item) => String(item.node) === String(targetId) && item.output === inputPort);
+        if (index < 0) return false;
+        out.splice(index, 1);
+        const input = graph[targetId].inputs[inputPort].connections;
+        const inputIndex = input.findIndex((item) => String(item.node) === String(sourceId) && item.input === outputPort);
+        if (inputIndex >= 0) input.splice(inputIndex, 1);
+        return true;
+    };
+    const add = (sourceId, targetId, outputPort, inputPort) => {
+        graph[sourceId].outputs[outputPort].connections.push({ node: String(targetId), output: inputPort });
+        graph[targetId].inputs[inputPort].connections.push({ node: String(sourceId), input: outputPort });
+    };
+    const context = {
+        window: {}, console, selectedCanvasConnection: {},
+        _getGraphDataSafe() { return graph; },
+        editor: { removeSingleConnection: remove, addConnection: add },
+        Object, String, Error
+    };
+    vm.runInNewContext(`${engine.slice(start, end)}; window.replace = replaceConnectionWithNode;`, context);
+    assert.equal(context.window.replace({ output_id: '1', input_id: '2', output_class: 'output_2', input_class: 'input_3' }, '7'), true);
+    assert.equal(graph[1].outputs.output_2.connections[0].node, '7');
+    assert.equal(graph[1].outputs.output_2.connections[0].output, 'input_1');
+    assert.equal(graph[7].outputs.output_1.connections[0].node, '2');
+    assert.equal(graph[7].outputs.output_1.connections[0].output, 'input_3');
+    assert.equal(graph[2].inputs.input_3.connections[0].node, '7');
+});
+
+test('la inserción sobre conexión es una única operación deshacible y da feedback', () => {
+    const addSource = engine.match(/function addNodeClick\(k\)[\s\S]*?\n}\n/)?.[0] ?? '';
+    assert.match(addSource, /getSelectedCanvasConnection\(\)/);
+    assert.match(addSource, /replaceConnectionWithNode\(connection, id\)/);
+    assert.match(addSource, /JETLHistoryTransaction\(mutation\)/);
+    assert.match(addSource, /Nodo insertado en la conexión/);
+    assert.match(index, /\.drawflow \.connection \.main-path\.selected/);
+});
+
 test('el historial ofrece detalle, KPIs, filtro y exportación por ejecución', () => {
     assert.match(index, /id="run-history-detail"/);
     assert.match(index, /data-run-history-export="json"/);

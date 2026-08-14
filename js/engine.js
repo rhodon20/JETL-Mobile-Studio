@@ -5,6 +5,7 @@ let editor, map, mapLayers = {}, executionData = {};
 window.executionData = executionData;
 window.lastRunReport = null;
 let dirtyNodeMap = {};
+let selectedCanvasConnection = null;
 const LOCAL_DRAFT_KEY = 'jetl_flow_optimized';
 
 function hasLocalDraft() {
@@ -274,6 +275,19 @@ function initializeJETLApp() {
     syncCanvasViewport();
     window.JETLSyncCanvasViewport = syncCanvasViewport;
 
+    editor.on('connectionSelected', (connection) => {
+        selectedCanvasConnection = connection ? {
+            output_id: String(connection.output_id),
+            input_id: String(connection.input_id),
+            output_class: String(connection.output_class),
+            input_class: String(connection.input_class)
+        } : null;
+        if (selectedCanvasConnection && typeof showToast === 'function') {
+            showToast('Conexión seleccionada · añade un nodo para insertarlo', 'info');
+        }
+    });
+    editor.on('connectionUnselected', () => { selectedCanvasConnection = null; });
+
     // El borrador local no se restaura silenciosamente. El usuario puede
     // recuperarlo desde Proyecto > Restaurar.
     updateLocalDraftUI();
@@ -295,6 +309,10 @@ function initializeJETLApp() {
                 if (srcId) invalidateNodeAndDownstream(srcId, ev);
                 if (dstId) invalidateNodeAndDownstream(dstId, ev);
                 if (!srcId && !dstId) invalidateAllNodes(ev);
+                if (ev === 'connectionRemoved' && selectedCanvasConnection &&
+                    srcId === selectedCanvasConnection.output_id && dstId === selectedCanvasConnection.input_id) {
+                    selectedCanvasConnection = null;
+                }
             }
             SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
             updateLocalDraftUI();
@@ -1141,6 +1159,69 @@ function getSingleSelectedCanvasNodeId() {
     return editorSelection ? String(editorSelection).replace('node-', '') : null;
 }
 
+function getSelectedCanvasConnection() {
+    return selectedCanvasConnection ? { ...selectedCanvasConnection } : null;
+}
+
+function getConnectionNodePlacement(connection, fallbackRect) {
+    const data = _getGraphDataSafe();
+    const source = data[String(connection?.output_id)];
+    const target = data[String(connection?.input_id)];
+    if (!source || !target || !editor?.precanvas) {
+        return { x: fallbackRect.width / 2 + fallbackRect.left, y: fallbackRect.height / 2 + fallbackRect.top };
+    }
+    const canvasRect = editor.precanvas.getBoundingClientRect();
+    const zoom = Number(editor.zoom || 1);
+    return {
+        x: canvasRect.left + ((Number(source.pos_x || 0) + Number(target.pos_x || 0)) / 2) * zoom,
+        y: canvasRect.top + ((Number(source.pos_y || 0) + Number(target.pos_y || 0)) / 2) * zoom
+    };
+}
+
+function graphHasConnection(sourceId, targetId, outputPort, inputPort) {
+    const source = _getGraphDataSafe()[String(sourceId)];
+    return !!source?.outputs?.[outputPort]?.connections?.some((connection) =>
+        String(connection.node) === String(targetId) && connection.output === inputPort);
+}
+
+function replaceConnectionWithNode(connection, nodeId) {
+    if (!connection || !nodeId || typeof editor?.removeSingleConnection !== 'function' ||
+        typeof editor?.addConnection !== 'function') return false;
+    const data = _getGraphDataSafe();
+    const sourceId = String(connection.output_id);
+    const targetId = String(connection.input_id);
+    const newId = String(nodeId);
+    const source = data[sourceId];
+    const target = data[targetId];
+    const inserted = data[newId];
+    const sourcePort = connection.output_class;
+    const targetPort = connection.input_class;
+    const insertedInput = Object.keys(inserted?.inputs || {})[0];
+    const insertedOutput = Object.keys(inserted?.outputs || {})[0];
+    if (!source?.outputs?.[sourcePort] || !target?.inputs?.[targetPort] || !insertedInput || !insertedOutput) return false;
+    if (!graphHasConnection(sourceId, targetId, sourcePort, targetPort)) return false;
+
+    const removed = editor.removeSingleConnection(sourceId, targetId, sourcePort, targetPort);
+    if (!removed) return false;
+    try {
+        editor.addConnection(sourceId, newId, sourcePort, insertedInput);
+        if (!graphHasConnection(sourceId, newId, sourcePort, insertedInput)) throw new Error('No se creó la conexión de entrada');
+        editor.addConnection(newId, targetId, insertedOutput, targetPort);
+        if (!graphHasConnection(newId, targetId, insertedOutput, targetPort)) throw new Error('No se creó la conexión de salida');
+        selectedCanvasConnection = null;
+        return true;
+    } catch (error) {
+        editor.removeSingleConnection(sourceId, newId, sourcePort, insertedInput);
+        editor.removeSingleConnection(newId, targetId, insertedOutput, targetPort);
+        if (!graphHasConnection(sourceId, targetId, sourcePort, targetPort)) {
+            editor.addConnection(sourceId, targetId, sourcePort, targetPort);
+        }
+        console.warn('[JETL] No se pudo insertar el nodo en la conexión', error);
+        return false;
+    }
+}
+window.JETLReplaceConnectionWithNode = replaceConnectionWithNode;
+
 function getConnectedNodePlacement(sourceId, fallbackRect) {
     const source = _getGraphDataSafe()[String(sourceId)];
     if (!source || !editor?.precanvas) {
@@ -1184,15 +1265,41 @@ function selectCanvasNode(nodeId) {
 
 function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
-    const sourceId = getSingleSelectedCanvasNodeId();
-    const placement = sourceId ? getConnectedNodePlacement(sourceId, rect) : {
+    const connection = getSelectedCanvasConnection();
+    const tool = TOOL_REGISTRY[k];
+    if (connection && (!tool || Number(tool.in || 0) < 1 || Number(tool.out || 0) < 1)) {
+        if (typeof showToast === 'function') showToast('Ese nodo no puede insertarse: necesita entrada y salida', 'warning');
+        return null;
+    }
+    const sourceId = connection ? null : getSingleSelectedCanvasNodeId();
+    const placement = connection ? getConnectionNodePlacement(connection, rect) : sourceId ? getConnectedNodePlacement(sourceId, rect) : {
         x: rect.width / 2 + rect.left,
         y: rect.height / 2 + rect.top
     };
-    const id = addNode(k, placement.x, placement.y);
-    const connected = sourceId ? connectNewNodeFromSelection(sourceId, id) : false;
+    let id = null;
+    let connected = false;
+    let inserted = false;
+    const mutation = () => {
+        id = addNode(k, placement.x, placement.y);
+        if (connection) {
+            inserted = replaceConnectionWithNode(connection, id);
+            if (!inserted) {
+                editor.removeNodeId('node-' + id);
+                id = null;
+            }
+        } else {
+            connected = sourceId ? connectNewNodeFromSelection(sourceId, id) : false;
+        }
+    };
+    if (connection && typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
+    else mutation();
+    if (!id) {
+        if (typeof showToast === 'function') showToast('No se pudo insertar el nodo en esa conexión', 'error');
+        return null;
+    }
     selectCanvasNode(id);
-    if (connected && typeof showToast === 'function') showToast('Nodo añadido y conectado', 'success');
+    if (inserted && typeof showToast === 'function') showToast('Nodo insertado en la conexión', 'success');
+    else if (connected && typeof showToast === 'function') showToast('Nodo añadido y conectado', 'success');
     if (window.innerWidth < 768) {
         window.JETLNativeNav?.('flow');
         window.JETLMobile?.fitFlowToViewport();

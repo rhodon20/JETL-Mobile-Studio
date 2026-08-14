@@ -2,6 +2,8 @@ const historyStack = [];
 let historyIndex = -1;
 let isUndoRedoAction = false;
 let historyShadowState = null;
+let historyTransactionDepth = 0;
+let historyTransactionPending = false;
 
 const HISTORY_LIMIT = 200;
 
@@ -204,6 +206,10 @@ function _importHistoryState(state) {
 
 function addToHistory() {
     if (isUndoRedoAction) return;
+    if (historyTransactionDepth > 0) {
+        historyTransactionPending = true;
+        return;
+    }
 
     const current = _exportState();
 
@@ -229,6 +235,21 @@ function addToHistory() {
     historyShadowState = current;
     _enforceHistoryLimit();
 }
+
+function runHistoryTransaction(callback) {
+    historyTransactionDepth++;
+    try {
+        return callback();
+    } finally {
+        historyTransactionDepth--;
+        if (historyTransactionDepth === 0 && historyTransactionPending) {
+            historyTransactionPending = false;
+            addToHistory();
+        }
+    }
+}
+
+window.JETLHistoryTransaction = runHistoryTransaction;
 
 function undo() {
     if (historyIndex <= 0) return;

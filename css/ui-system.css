@@ -297,6 +297,18 @@ body.modal-open {
     width: min(680px, calc(100vw - 32px));
 }
 
+.drawflow .connection .main-path {
+    stroke-width: 5px;
+    transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease;
+}
+
+.drawflow .connection.selected .main-path,
+.drawflow .connection .main-path.selected {
+    stroke: var(--accent);
+    stroke-width: 8px;
+    filter: drop-shadow(0 0 4px rgba(52, 152, 219, .65));
+}
+
 .run-history-content {
     width: min(920px, calc(100vw - 32px));
 }

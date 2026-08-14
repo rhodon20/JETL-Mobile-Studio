@@ -13,7 +13,7 @@ sistema de archivos.
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
 | Pan, zoom, selección y centrado | Implementado | Regresión táctil en Safari y Chromium móvil |
 | Navegador/resumen de flujo | Parcial | Añadir minimapa y navegación en flujos grandes |
-| Insertar un nodo sobre una conexión | Pendiente | Dividir la conexión preservando puertos compatibles |
+| Insertar un nodo sobre una conexión | Implementado | Dividir la conexión, preservar puertos y agruparlo en un solo deshacer |
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
