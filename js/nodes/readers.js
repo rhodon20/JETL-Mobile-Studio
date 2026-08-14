@@ -127,6 +127,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 Carga optimizada con referencia en memoria.
             </div>`,
         run: async (id, i, d) => {
+            await window.JETLLoadScriptOnce('js/vendor/geotiff.js', 'GeoTIFF');
             const fileInput = d.querySelector('[df-file]');
             if (!fileInput.files || fileInput.files.length === 0) throw new Error("Selecciona un archivo TIFF");
 

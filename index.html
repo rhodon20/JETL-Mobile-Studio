@@ -27,6 +27,23 @@
                 diagnostic.style.color = '#ff8a80';
             }
         }
+        window.JETLLoadScriptOnce = function (src, globalVar) {
+            window.__JETL_LAZY_SCRIPTS = window.__JETL_LAZY_SCRIPTS || {};
+            if (globalVar && window[globalVar]) return Promise.resolve(window[globalVar]);
+            if (window.__JETL_LAZY_SCRIPTS[src]) return window.__JETL_LAZY_SCRIPTS[src];
+            window.__JETL_LAZY_SCRIPTS[src] = new Promise(function (resolve, reject) {
+                var script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = function () { resolve(globalVar ? window[globalVar] : true); };
+                script.onerror = function () {
+                    delete window.__JETL_LAZY_SCRIPTS[src];
+                    reject(new Error('No se pudo cargar ' + src));
+                };
+                document.head.appendChild(script);
+            });
+            return window.__JETL_LAZY_SCRIPTS[src];
+        };
         window.JETLBootModuleLoaded = (loaded, total, nextName) => {
             window.__JETL_BOOT.stage = loaded >= total
                 ? 'modules-ready'
@@ -91,7 +108,7 @@
         (function installDockCapture() {
             var lastCaptureAt = 0;
             var dockActions = ['nodes', 'flow', 'run', 'results', 'project'];
-            var diagnosticBuild = 'TOUCH-10';
+            var diagnosticBuild = 'TOUCH-11';
 
             function getPoint(event) {
                 var touch = (event.touches && event.touches[0]) || (event.changedTouches && event.changedTouches[0]);
@@ -109,8 +126,24 @@
                 var dock = document.getElementById('mobile-dock');
                 if (!dock || window.innerWidth > 768) return;
                 var point = getPoint(event);
-                var rect = dock.getBoundingClientRect();
-                if (point.x < rect.left || point.x > rect.right || point.y < rect.top || point.y > rect.bottom) return;
+                var target = event.target && typeof event.target.closest === 'function'
+                    ? event.target.closest('#mobile-dock .mobile-dock-btn')
+                    : null;
+                var action = target && target.id === 'mobile-run'
+                    ? 'run'
+                    : target && target.getAttribute('data-mobile-view');
+
+                // En algunos navegadores iOS la barra fija se pinta fuera del
+                // rectángulo que informa getBoundingClientRect(). Si el target
+                // no identifica el botón, usamos la franja inferior real del
+                // viewport como respaldo y no la caja CSS del dock.
+                if (!action) {
+                    var bottomBand = Math.max(112, dock.offsetHeight || 0);
+                    if (point.y < window.innerHeight - bottomBand) return;
+                    var viewportWidth = Math.max(1, window.innerWidth);
+                    var fallbackIndex = Math.min(4, Math.floor(Math.max(0, point.x) / (viewportWidth / 5)));
+                    action = dockActions[fallbackIndex];
+                }
 
                 event.preventDefault();
                 event.stopPropagation();
@@ -120,9 +153,6 @@
                 if (now - lastCaptureAt < 550) return;
                 lastCaptureAt = now;
 
-                var relativeX = Math.max(0, Math.min(rect.width - 1, point.x - rect.left));
-                var index = Math.min(4, Math.floor(relativeX / (rect.width / 5)));
-                var action = dockActions[index];
                 showDiagnostic(event.type + ' → ' + action);
                 window.JETLMarkInteraction('capture:' + action);
                 if (action === 'run') window.JETLNativeRun();
@@ -1902,7 +1932,7 @@ body.modal-open {
             data-ui-action="cancel-run">Cancelar Operación</button>
     </div>
     <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
-    <div id="interaction-diagnostic" role="status" aria-live="polite">TOUCH-10 · esperando toque</div>
+    <div id="interaction-diagnostic" role="status" aria-live="polite">TOUCH-11 · esperando toque</div>
 
     <div id="quick-search">
         <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
@@ -2722,6 +2752,7 @@ body.modal-open {
         exts: ['zip'],
         label: 'Shapefile ZIP',
         read: async (file) => {
+            await window.JETLLoadScriptOnce('js/vendor/shp.js', 'shp');
             const buffer = await file.arrayBuffer();
             const result = await shp(buffer);
             return Array.isArray(result) ? turf.featureCollection(result.flatMap(r => r.features)) : result;
@@ -2970,7 +3001,7 @@ body.modal-open {
 window.JETLBootModuleLoaded(1, 14, "readers.js");
     </script>
 
-    <script defer src="js/nodes/readers.js?v=20260814-6"
+    <script defer src="js/nodes/readers.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(2, 14, &quot;geometry.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
 
@@ -2990,7 +3021,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(6, 14, &quot;raster.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
 
-    <script defer src="js/nodes/raster.js?v=20260814-6"
+    <script defer src="js/nodes/raster.js?v=20260814-7"
         onload="window.JETLBootModuleLoaded(7, 14, &quot;writers.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/raster.js&quot;)"></script>
 
@@ -3032,20 +3063,14 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             window.__JETL_RESOLVE_RUNTIME = resolve;
         });
 
-        // Safari puede ejecutar varios scripts `async` pesados mientras todavía
-        // analiza el HTML. Cargarlos de uno en uno después del primer render evita
-        // que 3+ MB de motores GIS bloqueen el arranque de la interfaz.
+        // Sólo se cargan módulos de interfaz después del primer render. Los
+        // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
+        // el hilo principal estaba congelando la interacción en Safari móvil.
         const JETL_POST_BOOT_SCRIPTS = [
             'js/schemaUI.js',
             'js/templates.js',
             'js/packages.js',
-            'js/modalSystem.js',
-            'js/smoke.js',
-            'js/vendor/shp.js',
-            'js/vendor/geotiff.js',
-            'js/vendor/geoblaze.web.min.js',
-            'js/vendor/geopackage.min.js',
-            'js/vendor/parquet.min.js'
+            'js/modalSystem.js'
         ];
 
         const JETL_RUNTIME_SCRIPTS = [
