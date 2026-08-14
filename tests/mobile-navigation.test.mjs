@@ -42,12 +42,21 @@ function bootNavigation() {
     elements.set('sidebar-overlay', createElement('sidebar-overlay'));
     elements.set('mobile-project-sheet', createElement('mobile-project-sheet'));
     elements.set('sys-status', createElement('sys-status'));
+    elements.set('map', createElement('map'));
+    elements.set('logs', createElement('logs'));
+    elements.set('table-container', createElement('table-container'));
 
     const buttons = ['nodes', 'flow', 'results', 'project'].map((view) => {
         const button = createElement(`button-${view}`);
         button.dataset.mobileView = view;
         const getAttribute = button.getAttribute.bind(button);
         button.getAttribute = (name) => name === 'data-mobile-view' ? view : getAttribute(name);
+        return button;
+    });
+    const resultButtons = ['map', 'table', 'logs'].map((view) => {
+        const button = createElement(`result-${view}`, view === 'map' ? ['active'] : []);
+        const getAttribute = button.getAttribute.bind(button);
+        button.getAttribute = (name) => name === 'data-results-view' ? view : getAttribute(name);
         return button;
     });
     const listeners = new Map();
@@ -57,6 +66,7 @@ function bootNavigation() {
         getElementById(id) { return elements.get(id) ?? null; },
         querySelectorAll(selector) {
             if (selector === '[data-mobile-view]') return buttons;
+            if (selector === '#panel-tabs [data-results-view]') return resultButtons;
             if (selector === '.mobile-view-state') return [...elements.values()].filter((element) => element.classList.contains('mobile-view-state'));
             return [];
         },
@@ -85,7 +95,7 @@ function bootNavigation() {
     };
     window.window = window;
     vm.runInNewContext(headScript, context, { filename: 'index-head.js' });
-    return { window, document, elements, buttons, listeners };
+    return { window, document, elements, buttons, resultButtons, listeners };
 }
 
 function expectView(env, view) {
@@ -122,6 +132,26 @@ test('la navegación no captura ni cancela fases del mismo gesto', () => {
     assert.doesNotMatch(mobile, /addEventListener\(['"](?:pointerdown|touchstart|touchend)['"]/);
     assert.doesNotMatch(index.match(/<nav id="mobile-dock"[\s\S]*?<\/nav>/)?.[0] ?? '', /ontouch|preventDefault|stopPropagation/);
     assert.doesNotMatch(index.match(/<label id="sidebar-overlay"[^>]*>/)?.[0] ?? '', /data-ui-action/);
+});
+
+test('cada vista de resultados tiene una acción directa y feedback inmediato', async () => {
+    for (const view of ['map', 'table', 'logs']) {
+        assert.match(index, new RegExp(`data-results-view="${view}"[^>]+onclick="event\\.stopPropagation\\(\\); JETLNativeResultTab\\('${view}'\\)"`));
+    }
+
+    const env = bootNavigation();
+    for (const view of ['table', 'logs', 'map']) {
+        await env.window.JETLNativeResultTab(view);
+        const visibleId = view === 'table' ? 'table-container' : view;
+        for (const id of ['map', 'logs', 'table-container']) {
+            assert.equal(env.elements.get(id).style.display, id === visibleId ? 'block' : 'none', `${view}: contenido ${id}`);
+        }
+        env.resultButtons.forEach((button) => {
+            const active = button.getAttribute('data-results-view') === view;
+            assert.equal(button.classList.contains('active'), active, `${view}: estado visual`);
+            assert.equal(button.getAttribute('aria-selected'), String(active), `${view}: estado accesible`);
+        });
+    }
 });
 
 test('la transición es determinista, idempotente y permite cambiar de vista', () => {

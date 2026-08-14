@@ -192,9 +192,10 @@
 
     #panel-tabs {
         min-height: 54px;
+        flex: 0 0 54px;
         flex-wrap: nowrap;
         padding: 6px 8px;
-        overflow-x: auto;
+        overflow: hidden;
     }
 
     #panel-tabs .panel-tabs-main {
@@ -214,6 +215,36 @@
     #panel-tabs .tab-btn {
         min-width: 0;
         justify-content: center;
+    }
+
+    #results-context-bar {
+        flex: 0 0 auto;
+        min-height: 48px;
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    #results-context-bar:empty {
+        display: none;
+        min-height: 0;
+        padding: 0;
+    }
+
+    #results-context-bar #feature-cache-browser,
+    #results-context-bar #port-inspector {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        border-left: 0 !important;
+    }
+
+    #results-context-bar #feature-cache-node {
+        min-width: 150px !important;
+        max-width: 44vw;
+    }
+
+    #results-context-bar #feature-cache-port {
+        min-width: 92px !important;
+        max-width: 29vw;
     }
 
     .tab-btn,

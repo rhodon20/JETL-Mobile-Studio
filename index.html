@@ -118,6 +118,27 @@
             if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
             reportJETLBootError('El motor no está disponible');
         };
+        window.JETLNativeResultTab = async function (view) {
+            if (!['map', 'table', 'logs'].includes(view)) return false;
+            window.JETLMarkInteraction('results:' + view);
+
+            document.querySelectorAll('#panel-tabs [data-results-view]').forEach(function (button) {
+                var active = button.getAttribute('data-results-view') === view;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+            ['map', 'logs', 'table-container'].forEach(function (id) {
+                var element = document.getElementById(id);
+                if (element) element.style.display = id === (view === 'table' ? 'table-container' : view) ? 'block' : 'none';
+            });
+
+            var runtime = typeof window.JETLEnsureRuntime === 'function'
+                ? window.JETLEnsureRuntime()
+                : window.JETLRuntimeReady;
+            var ready = runtime ? await runtime : true;
+            if (ready !== false && typeof window.switchTab === 'function') window.switchTab(view);
+            return ready !== false;
+        };
         // La navegación usa un único estado nativo: los <label> cambian el
         // radio asociado y este listener sincroniza las clases auxiliares. No
         // se interceptan pointer/touch/click, por lo que un mismo gesto nunca
@@ -1126,6 +1147,40 @@
     --focus-ring: 0 0 0 3px rgba(52, 152, 219, .3);
 }
 
+/* Drawflow ships with cyan/red demo surfaces. Keep state in the border and
+   preserve the same neutral surface language as the rest of Studio. */
+.drawflow .drawflow-node,
+.drawflow .drawflow-node.selected {
+    color: var(--text);
+    background: var(--node);
+}
+
+.drawflow .drawflow-node {
+    width: 240px;
+    min-height: 0;
+    padding: 0;
+    align-items: stretch;
+    flex-direction: column;
+    border-width: 1px;
+    border-radius: 8px;
+    border-color: rgba(255, 255, 255, .16);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
+}
+
+.drawflow .drawflow-node:hover {
+    border-color: rgba(255, 255, 255, .28);
+}
+
+.drawflow .drawflow-node.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, .24), 0 14px 34px rgba(0, 0, 0, .42) !important;
+}
+
+.drawflow .drawflow-node .drawflow_content_node,
+.drawflow .drawflow-node .node-body {
+    background: var(--node);
+}
+
 #bottom-panel {
     --panel-collapsed-height: 44px;
     min-height: 0;
@@ -1144,6 +1199,26 @@ body.panel-collapsed #panel-content {
     min-height: 42px;
     gap: 6px;
     flex-wrap: nowrap;
+}
+
+#results-context-bar {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+#results-context-bar:empty {
+    display: none;
+}
+
+#results-context-bar > div {
+    flex: 0 0 auto;
 }
 
 .panel-tabs-main,
@@ -1635,9 +1710,10 @@ body.modal-open {
 
     #panel-tabs {
         min-height: 54px;
+        flex: 0 0 54px;
         flex-wrap: nowrap;
         padding: 6px 8px;
-        overflow-x: auto;
+        overflow: hidden;
     }
 
     #panel-tabs .panel-tabs-main {
@@ -1657,6 +1733,36 @@ body.modal-open {
     #panel-tabs .tab-btn {
         min-width: 0;
         justify-content: center;
+    }
+
+    #results-context-bar {
+        flex: 0 0 auto;
+        min-height: 48px;
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    #results-context-bar:empty {
+        display: none;
+        min-height: 0;
+        padding: 0;
+    }
+
+    #results-context-bar #feature-cache-browser,
+    #results-context-bar #port-inspector {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        border-left: 0 !important;
+    }
+
+    #results-context-bar #feature-cache-node {
+        min-width: 150px !important;
+        max-width: 44vw;
+    }
+
+    #results-context-bar #feature-cache-port {
+        min-width: 92px !important;
+        max-width: 29vw;
     }
 
     .tab-btn,
@@ -2012,10 +2118,10 @@ body.modal-open {
                 <button class="btn" data-ui-action="zoom-all"><i class="fas fa-expand"></i></button>
                 <button class="btn" id="btn-map-expand" data-ui-action="toggle-map-expand" title="Ampliar mapa"><i
                         class="fas fa-up-right-and-down-left-from-center"></i></button>
-                <button class="tab-btn active" data-ui-action="tab-map"><i class="fas fa-map-marked-alt"></i>
+                <button class="tab-btn active" data-ui-action="tab-map" data-results-view="map" aria-selected="true" onclick="event.stopPropagation(); JETLNativeResultTab('map')"><i class="fas fa-map-marked-alt"></i>
                     Mapa</button>
-                <button class="tab-btn" data-ui-action="tab-table"><i class="fas fa-table"></i> Datos</button>
-                <button class="tab-btn" data-ui-action="tab-logs"><i class="fas fa-terminal"></i>
+                <button class="tab-btn" data-ui-action="tab-table" data-results-view="table" aria-selected="false" onclick="event.stopPropagation(); JETLNativeResultTab('table')"><i class="fas fa-table"></i> Datos</button>
+                <button class="tab-btn" data-ui-action="tab-logs" data-results-view="logs" aria-selected="false" onclick="event.stopPropagation(); JETLNativeResultTab('logs')"><i class="fas fa-terminal"></i>
                     Consola</button>
             </div>
             <div class="panel-tabs-actions">
@@ -2024,8 +2130,9 @@ body.modal-open {
                         class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span></button>
             </div>
         </div>
+        <div id="results-context-bar" aria-label="Origen de resultados"></div>
         <div id="panel-content">
-            <div id="logs" style="display:block">Sistema listo.</div>
+            <div id="logs">Sistema listo.</div>
 
             <div id="table-container">
                 <div id="table-toolbar">
@@ -3063,7 +3170,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-12"
+    <script defer src="js/engine.js?v=20260814-13"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3115,10 +3222,12 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             });
         }
 
+        const JETL_RUNTIME_VERSION = '20260814-13';
+
         function loadJETLScript(src) {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
-                script.src = src + '?v=20260814-6';
+                script.src = src + '?v=' + JETL_RUNTIME_VERSION;
                 script.async = true;
                 script.onload = () => resolve(src);
                 script.onerror = () => reject(new Error(`No se pudo descargar ${src}`));

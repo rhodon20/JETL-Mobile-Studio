@@ -78,8 +78,8 @@ window.resetNodeDisplayPorts = function (nodeId) {
 
 function ensurePortInspectorUI() {
     if (portInspectorReady) return;
-    const tabs = document.getElementById('panel-tabs');
-    if (!tabs) return;
+    const contextBar = document.getElementById('results-context-bar');
+    if (!contextBar) return;
     if (document.getElementById('port-inspector')) {
         portInspectorReady = true;
         return;
@@ -96,7 +96,7 @@ function ensurePortInspectorUI() {
         <span style="font-size:11px;color:#9aa0a6">Puerto</span>
         <select id="port-inspector-select" class="node-control" style="height:28px; min-width:92px; background:#111; color:#eee; border:1px solid #444; padding:2px 6px"></select>
     `;
-    tabs.insertBefore(wrap, tabs.lastElementChild);
+    contextBar.appendChild(wrap);
 
     const sel = wrap.querySelector('#port-inspector-select');
     if (sel) {
@@ -203,8 +203,8 @@ window.openFeatureCacheEntry = openFeatureCacheEntry;
 
 function ensureFeatureCacheBrowserUI() {
     if (featureCacheBrowserReady) return;
-    const tabs = document.getElementById('panel-tabs');
-    if (!tabs) return;
+    const contextBar = document.getElementById('results-context-bar');
+    if (!contextBar) return;
     if (document.getElementById('feature-cache-browser')) {
         featureCacheBrowserReady = true;
         return;
@@ -225,7 +225,7 @@ function ensureFeatureCacheBrowserUI() {
             <i class="fas fa-database"></i>
         </button>
     `;
-    tabs.insertBefore(wrap, tabs.lastElementChild);
+    contextBar.appendChild(wrap);
 
     const nodeSel = wrap.querySelector('#feature-cache-node');
     const portSel = wrap.querySelector('#feature-cache-port');
@@ -1049,12 +1049,12 @@ function toggleMapPanelExpand(forceState) {
 window.toggleMapPanelExpand = toggleMapPanelExpand;
 
 function switchTab(t) {
-    const evt = arguments[1] || window.event;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    if (evt && evt.target) {
-        const btn = evt.target.closest('button');
-        if (btn) btn.classList.add('active');
-    }
+    if (!['map', 'table', 'logs'].includes(t)) return false;
+    document.querySelectorAll('#panel-tabs [data-results-view]').forEach((button) => {
+        const active = button.getAttribute('data-results-view') === t;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
 
     ['map', 'logs', 'table-container'].forEach(x => {
         const el = document.getElementById(x);
@@ -1070,7 +1070,7 @@ function switchTab(t) {
     if (t === 'map') {
         if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
         setTimeout(() => {
-            map.invalidateSize();
+            if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
             if (selectedFeatureIndex !== null && currentNodeId) syncMapFocus(currentNodeId);
         }, 300);
         const panel = document.getElementById('symbology-panel');
@@ -1085,7 +1085,9 @@ function switchTab(t) {
         const panel = document.getElementById('symbology-panel');
         if (panel) panel.style.display = 'none';
     }
+    return true;
 }
+window.switchTab = switchTab;
 
 // Sincronización
 function syncMapFocus(nodeId) {

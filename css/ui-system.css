@@ -8,6 +8,40 @@
     --focus-ring: 0 0 0 3px rgba(52, 152, 219, .3);
 }
 
+/* Drawflow ships with cyan/red demo surfaces. Keep state in the border and
+   preserve the same neutral surface language as the rest of Studio. */
+.drawflow .drawflow-node,
+.drawflow .drawflow-node.selected {
+    color: var(--text);
+    background: var(--node);
+}
+
+.drawflow .drawflow-node {
+    width: 240px;
+    min-height: 0;
+    padding: 0;
+    align-items: stretch;
+    flex-direction: column;
+    border-width: 1px;
+    border-radius: 8px;
+    border-color: rgba(255, 255, 255, .16);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
+}
+
+.drawflow .drawflow-node:hover {
+    border-color: rgba(255, 255, 255, .28);
+}
+
+.drawflow .drawflow-node.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, .24), 0 14px 34px rgba(0, 0, 0, .42) !important;
+}
+
+.drawflow .drawflow-node .drawflow_content_node,
+.drawflow .drawflow-node .node-body {
+    background: var(--node);
+}
+
 #bottom-panel {
     --panel-collapsed-height: 44px;
     min-height: 0;
@@ -26,6 +60,26 @@ body.panel-collapsed #panel-content {
     min-height: 42px;
     gap: 6px;
     flex-wrap: nowrap;
+}
+
+#results-context-bar {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+#results-context-bar:empty {
+    display: none;
+}
+
+#results-context-bar > div {
+    flex: 0 0 auto;
 }
 
 .panel-tabs-main,
