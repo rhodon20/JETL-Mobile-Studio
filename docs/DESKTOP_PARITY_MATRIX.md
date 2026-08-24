@@ -14,7 +14,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Catálogo objetivo de nodos | 115 Desktop en alcance / 112 IDs compartidos | Cerrar 3 Writers vectoriales/tabulares y resolver extensiones incompatibles |
+| Catálogo objetivo de nodos | 115 Desktop en alcance / 115 IDs compartidos | Catálogo objetivo cerrado; mantener contratos y compatibilidad bidireccional |
 | Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
@@ -24,7 +24,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial y FeatureReader comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Utils y Writers |
+| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial, FeatureReader y Utils comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Readers y Writers avanzados |
 
 ## Ejecución y diagnóstico
 
@@ -35,7 +35,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Historial maestro/detalle | Implementado v2 | KPIs, detalle por nodo, filtro, errores y salto al canvas |
 | Exportar informe JSON/CSV | Implementado | Exportar la ejecución seleccionada |
 | Perfiles normal/baja memoria/automático | Parcial | Exponer perfil efectivo y justificar la selección |
-| Ejecución por lotes y workspace runner | Pendiente web | Diseñar cola persistente compatible con las APIs web |
+| Ejecución por lotes y workspace runner | Compatibilidad de proyecto; ejecución externa requiere servicio | Diseñar cola persistente compatible con las APIs web |
 | Diagnóstico progresivo durante el run | Implementado v1 | Estado por nodo, avance real, tiempos, cancelación y salto al error |
 
 ## Datos y visualización
@@ -55,7 +55,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | --- | --- | --- |
 | Importar/exportar proyecto | Implementado | Compatibilidad bidireccional de versión y validación |
 | Autoguardado y recuperación | Parcial | Versionado, conflicto y restauración explícitos |
-| Editor de fuentes | Pendiente | Diseñar alternativa web segura y limitada |
+| Editor de fuentes | Valorado; prioridad posterior al cierre de catálogo | Modal táctil con fuente, capa/hoja, esquema, CRS y previsualización |
 | Transformers, paquetes y plantillas | Pendiente | Catálogo compatible con el runtime web |
 | Ajustes, apariencia e idioma | Parcial | Completar preferencias reproducibles por proyecto/dispositivo |
 | Backend y sistema de archivos local | Adaptación explícita: Readers locales cuando es viable; GDB/FeatureReader requieren servicio | Sustituir solo cuando exista una Web API segura |

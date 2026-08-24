@@ -74,8 +74,8 @@ test('el inventario Studio es reproducible y la paridad de catálogo queda fijad
         encoding: 'utf8'
     });
     const report = JSON.parse(output);
-    assert.equal(report.studioCount, 116);
-    assert.equal(report.studio.length, 116);
+    assert.equal(report.studioCount, 119);
+    assert.equal(report.studio.length, 119);
     assert.match(parity, /mismo catálogo funcional vectorial y tabular/);
     assert.match(parity, /requiere\s+backend/);
 });
@@ -91,9 +91,9 @@ test('el manifiesto Desktop expone la brecha y los contratos de puertos', () => 
     assert.equal(run.status, 1, 'la brecha debe bloquear el gate estricto');
     const report = JSON.parse(run.stdout);
     assert.equal(report.desktopCount, 134);
-    assert.equal(report.studioCount, 116);
-    assert.equal(report.sharedIdCount, 115);
-    assert.equal(report.missingInStudio.length, 19);
+    assert.equal(report.studioCount, 119);
+    assert.equal(report.sharedIdCount, 118);
+    assert.equal(report.missingInStudio.length, 16);
     assert.deepEqual(report.studioOnly, ['reader_file']);
     assert.ok(report.contractMismatches.length > 0);
     assert.equal(report.categoryCoverage.raster.missing, 12);

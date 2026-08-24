@@ -9,6 +9,7 @@ const spatialSource = readFileSync(new URL('../js/nodes/spatial.js', import.meta
 const geometrySource = readFileSync(new URL('../js/nodes/geometry.js', import.meta.url), 'utf8');
 const utilsSource = readFileSync(new URL('../js/nodes/utils.js', import.meta.url), 'utf8');
 const readersSource = readFileSync(new URL('../js/nodes/readers.js', import.meta.url), 'utf8');
+const writersSource = readFileSync(new URL('../js/nodes/writers.js', import.meta.url), 'utf8');
 
 function featureCollection(features) {
     return { type: 'FeatureCollection', features };
@@ -149,6 +150,14 @@ function loadReaders(windowOverrides = {}, contextOverrides = {}) {
     };
     vm.runInNewContext(readersSource, context, { filename: 'readers.js' });
     return window.TOOL_REGISTRY;
+}
+
+function loadWriters(windowOverrides = {}, contextOverrides = {}) {
+    const window = { TOOL_REGISTRY: {}, ...windowOverrides };
+    const downloads = [];
+    const context = { window, globalThis: window, console, Blob, URL, setTimeout, turf: { featureCollection }, download: (content, filename, mimeType) => downloads.push({ content, filename, mimeType }), toCSV: () => '', wellknown: { stringify: () => '' }, log: () => {}, ...contextOverrides };
+    vm.runInNewContext(writersSource, context, { filename: 'writers.js' });
+    return { registry: window.TOOL_REGISTRY, downloads };
 }
 
 test('FeatureJoiner conserva los tres puertos y separa el secundario no usado', async () => {
@@ -424,19 +433,45 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const manifestUrl = new URL('../docs/desktop-node-manifest.json', import.meta.url);
     const scopeUrl = new URL('../docs/studio-node-scope.json', import.meta.url);
     const result = spawnSync(process.execPath, [auditUrl.pathname, manifestUrl.pathname, scopeUrl.pathname], { encoding: 'utf8' });
-    assert.equal(result.status, 1, 'el gate debe seguir detectando nodos objetivo pendientes');
+    assert.equal(result.status, 0, 'el catálogo objetivo debe estar cerrado');
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 115);
-    assert.equal(report.studioCount, 116);
-    assert.equal(report.targetSharedIdCount, 112);
-    assert.equal(report.targetMissingInStudio.length, 3);
+    assert.equal(report.studioCount, 119);
+    assert.equal(report.targetSharedIdCount, 115);
+    assert.equal(report.targetMissingInStudio.length, 0);
     assert.equal(report.excludedDesktop.length, 19);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
     assert.ok(!report.targetMissingInStudio.includes('writer_geotiff'));
     assert.ok(!report.targetMissingInStudio.includes('util_python_caller'));
     assert.ok(!report.targetMissingInStudio.includes('util_system_caller'));
+});
+
+test('Writers registra los tres contratos Desktop pendientes', () => {
+    const { registry } = loadWriters();
+    for (const id of ['writer_gdb', 'writer_shp', 'writer_xlsx']) assert.ok(registry[id], `${id} debe estar registrado`);
+    assert.equal(registry.writer_gdb.dynamicInputs, true); assert.equal(registry.writer_shp.in, 1); assert.equal(registry.writer_xlsx.out, 0);
+});
+
+test('XLSX Writer genera un libro local con atributos normalizados', async () => {
+    let appended; const XLSX = { utils: { book_new: () => ({}), json_to_sheet: (rows) => ({ rows }), book_append_sheet: (book, sheet, name) => { appended = { sheet, name }; } }, write: () => new Uint8Array([1, 2, 3]) };
+    const { registry, downloads } = loadWriters({ XLSX });
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1, nested: { ok: true } } }]);
+    const controls = { '[df-fn]': { value: 'table.xlsx' }, '[df-sheet]': { value: 'Results' } };
+    assert.equal(await registry.writer_xlsx.run('1', [input], { querySelector: (selector) => controls[selector] }), input);
+    assert.equal(appended.name, 'Results'); assert.equal(appended.sheet.rows[0].nested, '{"ok":true}'); assert.equal(downloads[0].filename, 'table.xlsx');
+});
+
+test('SHP Writer descarga un ZIP local y GDB exige backend real', async () => {
+    const shpwrite = { zip: async () => new Uint8Array([80, 75]) }; const { registry, downloads } = loadWriters({ shpwrite });
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 1 } }]);
+    const shpControls = { '[df-fn]': { value: 'layer.zip' }, '[df-layer-name]': { value: 'places' } };
+    await registry.writer_shp.run('2', [input], { querySelector: (selector) => shpControls[selector] }); assert.equal(downloads[0].filename, 'layer.zip');
+    const gdbControls = { '[df-fn]': { value: 'data.gdb.zip' }, '[df-layer-name]': { value: 'layer' } };
+    await assert.rejects(() => registry.writer_gdb.run('3', [input], { querySelector: (selector) => gdbControls[selector] }), /requiere un backend/);
+    let payload; const backend = loadWriters({ JETLBackend: { exportVector: async (format, data, options) => { payload = { format, data, options }; return { downloaded: true }; } } }).registry;
+    assert.equal(await backend.writer_gdb.run('4', [input], { querySelector: (selector) => gdbControls[selector] }), input); assert.equal(payload.format, 'gdb'); assert.equal(payload.options.layers.length, 1);
 });
 
 test('Creator genera atributos tipados, sustitución e índice de instancia', () => {

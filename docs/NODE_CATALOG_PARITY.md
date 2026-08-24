@@ -32,8 +32,8 @@ El alcance Studio excluye 19 (14 Raster, tres lectores/escritores Raster/LiDAR
 y dos callers dependientes del sistema),
 PythonCaller y SystemCaller también quedan fuera: el navegador no dispone de un
 runtime Python ni de acceso seguro al sistema operativo. Por tanto, el catálogo
-objetivo verificable es de **115 nodos**. Studio registra ahora 116: 112
-compartidos dentro de alcance y 3 ausencias objetivo (los Writers pendientes).
+objetivo verificable es de **115 nodos**. Studio registra ahora 119: los **115
+nodos del alcance están compartidos** y no quedan ausencias objetivo.
 
 ## Editor avanzado de Readers: valoración
 
@@ -58,9 +58,9 @@ mostrar una ruta como si siguiera siendo válida cuando el permiso ya expiró.
 | Geometry | 37 | 37 | 0 | 100 % |
 | Raster | 14 | 2 | 12 | Fuera de alcance |
 | Utils | 14 | 12 | 2 | 85,7 % (100 % del alcance) |
-| Writers | 10 | 6 | 4 | 60,0 % |
+| Writers | 10 | 9 | 1 | 90 % (100 % del alcance) |
 
-De los 19 ausentes totales, 3 están dentro del alcance objetivo. El manifiesto
+Los 16 ausentes totales están fuera del alcance objetivo. El manifiesto
 trazable está en `desktop-node-manifest.json` y conserva el estado de runtime de
 cada nodo; el informe separa `missingByRuntime` de `targetMissingByRuntime` para
 que una dependencia excluida no altere la priorización.
@@ -101,6 +101,9 @@ hacen fallar el gate ni se contabilizan como deuda.
    GraphQL Request y Response Inspector se ejecutan en navegador; Workspace
    Runner conserva proyectos Desktop como paso transparente. PythonCaller y
    SystemCaller se excluyen porque no existe un runtime honesto para ellos.
+   **Writers completada en alcance (9/9):** XLSX y SHP exportan localmente en el
+   navegador. GDB conserva el contrato Desktop, entradas múltiples y delegación
+   explícita en un backend compatible; nunca genera un archivo simulado.
    **Spatial completada (18/18):** los seis Overlayers Point/Line/Area conservan
    dos entradas, salidas matched/unmatched, multiplicidad de coincidencias y
    prefijos de atributos. Anchored Snapper conserva sus cuatro salidas Desktop;
