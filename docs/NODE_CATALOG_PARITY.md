@@ -21,9 +21,23 @@ es paridad.
 
 ## Línea base verificable
 
-A 24 de agosto de 2026, Studio registra **67 tipos de nodo** distribuidos en
-siete módulos. Esta cifra no se declara equivalente a Desktop hasta importar el
-manifiesto canónico de Desktop y comparar ambos catálogos por identificador.
+A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**
+y Studio registra **67**. Comparten 66 identificadores; faltan 68 nodos Desktop
+y `reader_file` es una abstracción exclusiva de Studio.
+
+| Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
+| --- | ---: | ---: | ---: | ---: |
+| Attributes | 22 | 14 | 8 | 63,6 % |
+| Readers | 19 | 10 | 9 | 52,6 % |
+| Spatial | 18 | 9 | 9 | 50,0 % |
+| Geometry | 37 | 20 | 17 | 54,1 % |
+| Raster | 14 | 2 | 12 | 14,3 % |
+| Utils | 14 | 5 | 9 | 35,7 % |
+| Writers | 10 | 6 | 4 | 60,0 % |
+
+De los 68 ausentes, 43 son frontend, 21 backend-ready y 4 híbridos en Desktop.
+El manifiesto trazable está en `desktop-node-manifest.json` y conserva el estado
+de runtime de cada nodo.
 
 El control local se ejecuta con:
 
@@ -39,13 +53,18 @@ existen en Studio, de modo que la diferencia pueda protegerse en CI.
 
 1. **P0 — Manifiesto y compatibilidad:** exportar el catálogo canónico de
    Desktop, fijar identificadores compartidos y generar la brecha real.
-2. **P1 — Nodos de flujo habitual:** portar primero lectores, transformaciones,
+   **Completado:** manifiesto de 134 nodos y gate automático.
+2. **P0 — Contratos compartidos:** corregir primero puertos y resultados de los
+   nodos que ya existen en ambos productos. FeatureJoiner, Snapper y Clipper ya
+   recuperan sus salidas Desktop; las salidas de rechazo adicionales de Keeper y
+   Attr Creator requieren una decisión explícita de compatibilidad.
+3. **P1 — Nodos de flujo habitual:** portar primero lectores, transformaciones,
    operaciones espaciales y escritores que puedan ejecutarse enteramente en web.
-3. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
+4. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
    nodos complejos y garantizar importación/exportación sin pérdida.
-4. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
+5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
    de servicio y ofrecer diagnóstico accionable cuando el backend no exista.
-5. **P2 — Visores especializados:** vector, raster, 3D y LiDAR con sus metadatos
+6. **P2 — Visores especializados:** vector, raster, 3D y LiDAR con sus metadatos
    y límites de rendimiento.
 
 La paridad del catálogo es el eje principal del roadmap. El pulido visual y el

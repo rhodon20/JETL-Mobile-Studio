@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -78,4 +78,23 @@ test('el inventario Studio es reproducible y la paridad de catálogo queda fijad
     assert.equal(report.studio.length, 67);
     assert.match(parity, /mismo catálogo funcional de nodos/);
     assert.match(parity, /requiere\s+backend/);
+});
+
+test('el manifiesto Desktop expone la brecha y los contratos de puertos', () => {
+    const run = spawnSync(process.execPath, [
+        'scripts/audit-node-parity.mjs',
+        'docs/desktop-node-manifest.json'
+    ], {
+        cwd: new URL('..', import.meta.url),
+        encoding: 'utf8'
+    });
+    assert.equal(run.status, 1, 'la brecha debe bloquear el gate estricto');
+    const report = JSON.parse(run.stdout);
+    assert.equal(report.desktopCount, 134);
+    assert.equal(report.studioCount, 67);
+    assert.equal(report.sharedIdCount, 66);
+    assert.equal(report.missingInStudio.length, 68);
+    assert.deepEqual(report.studioOnly, ['reader_file']);
+    assert.ok(report.contractMismatches.length > 0);
+    assert.equal(report.categoryCoverage.raster.missing, 12);
 });

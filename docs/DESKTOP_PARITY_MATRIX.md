@@ -13,7 +13,8 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Catálogo completo de nodos | 67 nodos Studio; brecha exacta pendiente de manifiesto Desktop | Comparación automática por ID y backlog completo por categoría |
+| Catálogo completo de nodos | 134 Desktop / 67 Studio / 66 IDs compartidos | Cerrar 68 ausencias por categoría y resolver extensiones incompatibles |
+| Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
 | Pan, zoom, selección y centrado | Implementado | Regresión táctil en Safari y Chromium móvil |

@@ -822,7 +822,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_join_adv: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Join', icon: 'fa-link', color: '#27ae60', in: 2, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'FeatureJoiner', icon: 'fa-link', color: '#27ae60', in: 2, out: 3,
         help: 'Join tabular por claves (left/inner).',
         tpl: () => `
             <div style="margin-bottom:4px">
@@ -850,7 +850,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <span style="font-size:0.7em;color:#aaa">Prefijo</span>
                 <input type="text" df-prefix class="node-control" value="j_">
             </div>
-            <div style="font-size:0.6em;color:#888">Out 1: Join | Out 2: Sin Match</div>`,
+            <div style="font-size:0.6em;color:#888">Out 1: Joined | Out 2: Unjoined Left | Out 3: Unused Right</div>`,
         run: async (id, inputs, dom) => {
             const mapStr = resolveParamText(dom.querySelector('[df-map]').value);
             const joinType = resolveParamText(dom.querySelector('[df-join]').value) || 'left';
@@ -883,24 +883,34 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const index = new Map();
             right.forEach(f => {
                 const key = getKey(f.properties || {}, rightKeys);
-                if (!index.has(key)) index.set(key, f);
+                if (!index.has(key)) index.set(key, []);
+                index.get(key).push(f);
             });
             const joined = [];
             const unmatched = [];
+            const rightUsed = new Set();
             left.forEach(f => {
                 if (!f.properties) f.properties = {};
                 const key = getKey(f.properties || {}, leftKeys);
-                const match = index.get(key);
-                if (match) {
-                    const nf = JETLClone(f);
-                    Object.keys(match.properties || {}).forEach(k => nf.properties[prefix + k] = match.properties[k]);
-                    joined.push(nf);
+                const matches = index.get(key) || [];
+                if (matches.length) {
+                    matches.forEach((match) => {
+                        rightUsed.add(match);
+                        const nf = JETLClone(f);
+                        Object.keys(match.properties || {}).forEach(k => nf.properties[prefix + k] = match.properties[k]);
+                        joined.push(nf);
+                    });
                 } else {
                     if (joinType === 'left') joined.push(f);
                     unmatched.push(f);
                 }
             });
-            return { output_1: turf.featureCollection(joined), output_2: turf.featureCollection(unmatched) };
+            const unusedRight = right.filter((feature) => !rightUsed.has(feature));
+            return {
+                output_1: turf.featureCollection(joined),
+                output_2: turf.featureCollection(unmatched),
+                output_3: turf.featureCollection(unusedRight)
+            };
         }
     },
     attr_calc_pro: {
@@ -1028,7 +1038,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                         multiplier,
                         onError
                     }, 45000);
-                    if (wres && wres.status === 'ok') return wres.data;
+                    if (wres && wres.status === 'ok' && wres.data?.output_3) return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
                     console.warn("Worker Area Calc fallo, fallback local:", e);

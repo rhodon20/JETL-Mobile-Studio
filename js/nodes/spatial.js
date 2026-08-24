@@ -291,7 +291,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_snap: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Snapper', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 1,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Snapper', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 3,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Distancia de Atracción</span>
@@ -305,7 +305,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 </div>
             </div>
             <div style="font-size:0.6em;color:#888;margin-top:2px">
-                Input 1 (Data) se mueve hacia Input 2 (Ancla).
+                Out 1: Snapped | Out 2: Untouched | Out 3: Collapsed
             </div>`,
         run: async (id, inputs, dom) => {
             const val = parseFloat(dom.querySelector('[df-dist]').value);
@@ -336,7 +336,17 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
                     // Tiempo extendido (60s) para snapping masivo
                     const wres = await postWorkerTask(payload, 60000);
-                    if (wres && wres.status === 'ok') return wres.data;
+                    if (wres && wres.status === 'ok') {
+                        const data = wres.data;
+                        if (data?.output_1) return data;
+                        if (data?.type === 'FeatureCollection') {
+                            return {
+                                output_1: data,
+                                output_2: turf.featureCollection([]),
+                                output_3: turf.featureCollection([])
+                            };
+                        }
+                    }
 
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
@@ -368,7 +378,11 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             });
 
-            return sourceClone;
+            return {
+                output_1: sourceClone,
+                output_2: turf.featureCollection([]),
+                output_3: turf.featureCollection([])
+            };
         }
     },
 
@@ -777,8 +791,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_clip: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Clipper (Robust)', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 1,
-        tpl: () => `<div>Data &#8745; Mask</div>`,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Clipper (Robust)', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 2,
+        tpl: () => `<div>Out 1: Inside | Out 2: Outside</div>`,
         run: async (id, i) => {
             if (!i[0] || !i[1] || !i[1].features.length) throw new Error("Faltan datos");
             if (!i[0].features || i[0].features.length === 0) throw new Error("Data vacía");
@@ -802,7 +816,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     const payload = { task: 'clip', features: { type: 'FeatureCollection', features }, mask, chunk: CHUNK };
                     const wres = await postWorkerTask(payload, 30000);
                     if (wres && (wres.status === 'ok' || wres.status === 'partial')) {
-                        return normalizeResult(wres.data || wres.result || wres);
+                        const workerResult = normalizeResult(wres.data || wres.result || wres);
+                        if (workerResult?.output_1 && workerResult?.output_2) return workerResult;
                     }
                 }
             } catch (e) {
@@ -811,18 +826,29 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             }
 
             // Fallback Main Thread
-            const res = [];
+            const inside = [];
+            const outside = [];
             for (let idx = 0; idx < features.length; idx++) {
                 if (typeof window.JETLThrowIfCancelled === 'function') window.JETLThrowIfCancelled();
                 if (idx % 50 === 0 && typeof window.JETLNextTick === 'function') await window.JETLNextTick();
                 const f = features[idx];
                 try {
-                    if (!turf.booleanIntersects(f, mask)) continue;
+                    if (!turf.booleanIntersects(f, mask)) {
+                        outside.push(f);
+                        continue;
+                    }
                     const clipped = turf.intersect(f, mask);
-                    if (clipped) { clipped.properties = f.properties; res.push(clipped); }
-                } catch (e) { }
+                    if (clipped) { clipped.properties = f.properties; inside.push(clipped); }
+                    const remainder = turf.difference(f, mask);
+                    if (remainder) { remainder.properties = f.properties; outside.push(remainder); }
+                } catch (e) {
+                    outside.push(f);
+                }
             }
-            return turf.featureCollection(res);
+            return {
+                output_1: turf.featureCollection(inside),
+                output_2: turf.featureCollection(outside)
+            };
         }
     }
 });

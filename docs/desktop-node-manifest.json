@@ -1,0 +1,1214 @@
+{
+  "source": "rhodon20/JETL-Desktop@main",
+  "sourcePath": "docs/architecture/code_graph.generated.json",
+  "sourceBlobSha": "f191f87de3b7e2b528534523a330ed169f3f6812",
+  "generatedAt": "2026-07-17T09:19:22.153Z",
+  "nodes": [
+    {
+      "id": "attr_aggregator",
+      "label": "Aggregator",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_area",
+      "label": "Area Calc",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_calc_pro",
+      "label": "Field Calculator Pro",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_counter",
+      "label": "Counter",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "attr_creator",
+      "label": "Attr Creator",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "attr_feature_merger",
+      "label": "Feature Merger",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 2,
+      "outputs": 3,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_join_adv",
+      "label": "FeatureJoiner",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 2,
+      "outputs": 3,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "attr_keeper",
+      "label": "Keeper",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_length",
+      "label": "Length Calc",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_list_concatenator",
+      "label": "List Concatenator",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_list_exploder",
+      "label": "List Exploder",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_manager",
+      "label": "Attribute Manager",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_manager_v2",
+      "label": "Attribute Manager v2",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_matcher",
+      "label": "Matcher",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_renamer",
+      "label": "Renamer",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_sorter",
+      "label": "Sorter",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "attr_splitter",
+      "label": "Attribute Splitter",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_stats",
+      "label": "Stats Calc",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "attr_string_formatter",
+      "label": "String Formatter",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "attr_string_replacer",
+      "label": "String Replacer",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_substring",
+      "label": "Substring Extractor",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "attr_test",
+      "label": "Tester",
+      "category": "attributes",
+      "cat": "2.4 VECTOR - ATTRIBUTES",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "gen_grid",
+      "label": "Grid Generator",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "gen_point",
+      "label": "Point Creator",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "gen_random",
+      "label": "Random Points",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_angle_calculator",
+      "label": "Angle Calculator",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_area_builder",
+      "label": "Area Builder",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_bbox",
+      "label": "Envelope",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_buffer",
+      "label": "Bufferer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_centerline_replacer",
+      "label": "Centerline Replacer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_centroid",
+      "label": "CenterPoint",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_chunk",
+      "label": "Line Chopper",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_coordinate_extractor",
+      "label": "Coordinate Extractor",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_crs_extractor",
+      "label": "CRS Extractor",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "geo_crs_setter",
+      "label": "Coordinate System Setter",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_deaggregator",
+      "label": "Deaggregator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_densifier",
+      "label": "Densifier",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_dissolve",
+      "label": "Dissolver",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_donut_extractor",
+      "label": "Donut Extractor",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_explode",
+      "label": "Exploder",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "geo_extruder",
+      "label": "Extruder",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_generalizer",
+      "label": "Generalizer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_geometry_coercer",
+      "label": "Geometry Coercer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_horizontal_angle_calculator",
+      "label": "Horizontal Angle Calculator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_hull_creator",
+      "label": "Hull Creator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_kink_remover",
+      "label": "Kink Remover",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_line_builder",
+      "label": "Line Builder",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_line_closer",
+      "label": "Line Closer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "geo_line_merge",
+      "label": "Line Merger",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "geo_line_to_polygon",
+      "label": "Line to Polygon",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_measure_extractor",
+      "label": "MeasureExtractor",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_multi_bufferer",
+      "label": "MultiBufferer",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_offsetter",
+      "label": "Offsetter",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_point_surf",
+      "label": "CenterPointInside",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_polygon_to_line",
+      "label": "Polygon to Line",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_random_fill",
+      "label": "Random Fill",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_repair",
+      "label": "Geometry Repair",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_reproject",
+      "label": "Reproject",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_rotator",
+      "label": "Rotator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_simplify",
+      "label": "Simplifier",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_snap",
+      "label": "Snapper",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 3,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_topo_simplify",
+      "label": "Topo Simplify",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_triangulator",
+      "label": "Triangulator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "geo_vertex_creator",
+      "label": "Vertex Creator",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "geo_voronoi",
+      "label": "Voronoi",
+      "category": "geometry",
+      "cat": "2.1 VECTOR - GEOMETRY",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_calculator",
+      "label": "Raster Calculator",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_clip",
+      "label": "Clip Raster",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_formula",
+      "label": "Raster Formula",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_merge",
+      "label": "Merge Raster",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_ndvi",
+      "label": "Raster NDVI",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_rasterize",
+      "label": "Rasterize",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_reclassify",
+      "label": "Raster Reclassify",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_reproject",
+      "label": "Reproject Raster",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_resample",
+      "label": "Resample Raster",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_stats",
+      "label": "Raster Stats",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_to_vector",
+      "label": "Raster to Vector",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "raster_warp",
+      "label": "Warp/Clip Raster",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_bbox_gen",
+      "label": "BBox Creator",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_csv",
+      "label": "CSV Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_excel",
+      "label": "Excel Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_feature_reader",
+      "label": "FeatureReader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 1,
+      "outputs": 3,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_gdb",
+      "label": "GDB Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": null,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_geojson",
+      "label": "GeoJSON Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_geotiff",
+      "label": "GeoTIFF Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_gpkg",
+      "label": "GPKG Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": null,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_gpx",
+      "label": "GPX Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": null,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_http",
+      "label": "HTTP JSON",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_kml",
+      "label": "KML Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_lidar",
+      "label": "LiDAR Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_osm",
+      "label": "OSM Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_parquet",
+      "label": "Parquet Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_shp",
+      "label": "SHP Reader",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "reader_wkt",
+      "label": "WKT/Text",
+      "category": "readers",
+      "cat": "1. READERS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_anchored_snapper",
+      "label": "Anchored Snapper",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 4,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_area_area_overlayer",
+      "label": "AreaOnArea Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_clip",
+      "label": "Clipper (Robust)",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_intersector",
+      "label": "Intersector",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "sp_line_area_overlayer",
+      "label": "LineOnArea Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_line_line_overlayer",
+      "label": "LineOnLine Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_min_area_solver",
+      "label": "MinArea Solver",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 1,
+      "outputs": 3,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_nearest_neighbor",
+      "label": "Nearest Neighbor",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "sp_neighbor_finder",
+      "label": "Neighbor Finder",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_point_area_overlayer",
+      "label": "PointOnArea Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_point_line_overlayer",
+      "label": "PointOnLine Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_point_point_overlayer",
+      "label": "PointOnPoint Overlayer",
+      "category": "spatial",
+      "cat": "2.2 VECTOR - OVERLAYERS",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_point_sampling",
+      "label": "Multi-Band Sampler",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_spatial_filter",
+      "label": "Spatial Filter",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_spatial_join",
+      "label": "Spatial Join",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 2,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "sp_spatial_relator",
+      "label": "Spatial Relator",
+      "category": "spatial",
+      "cat": "2.3 VECTOR - SPATIAL",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "sp_zonal_stats",
+      "label": "Zonal Stats",
+      "category": "raster",
+      "cat": "4. RASTER",
+      "inputs": 2,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_creator",
+      "label": "Creator",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 0,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "util_filter_geo",
+      "label": "Geometry Filter",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 3,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_graphql_request",
+      "label": "GraphQL Request",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_holder",
+      "label": "Inspector",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "util_http_caller",
+      "label": "Http Caller",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_junction",
+      "label": "Junction",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 5,
+      "outputs": 1,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "util_python_caller",
+      "label": "Python Caller",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "util_response_inspector",
+      "label": "Response Inspector",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_rest_request",
+      "label": "REST Request",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_runner",
+      "label": "Feature Holder",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 5,
+      "outputs": 0,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "util_sampler",
+      "label": "Random Sampler",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "util_system_caller",
+      "label": "System Caller",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "util_tee",
+      "label": "Junction Splitter",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 4,
+      "backendStatus": "ready"
+    },
+    {
+      "id": "util_workspace_runner",
+      "label": "Workspace Runner",
+      "category": "utils",
+      "cat": "3. UTILS",
+      "inputs": 1,
+      "outputs": 1,
+      "backendStatus": "hybrid"
+    },
+    {
+      "id": "writer_csv",
+      "label": "CSV",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_gdb",
+      "label": "GDB",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_geojson",
+      "label": "GeoJSON",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_geotiff",
+      "label": "GeoTIFF",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_gpkg",
+      "label": "GPKG",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_kml",
+      "label": "KML",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_parquet",
+      "label": "Parquet",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_shp",
+      "label": "SHP",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_wkt",
+      "label": "WKT Console",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    },
+    {
+      "id": "writer_xlsx",
+      "label": "XLSX",
+      "category": "writers",
+      "cat": "5. WRITERS",
+      "inputs": 1,
+      "outputs": 0,
+      "backendStatus": "frontend"
+    }
+  ]
+}
