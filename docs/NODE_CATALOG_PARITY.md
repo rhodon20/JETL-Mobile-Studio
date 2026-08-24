@@ -28,9 +28,26 @@ es paridad.
 ## Línea base verificable
 
 A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**.
-El alcance Studio excluye 17 (14 Raster y tres lectores/escritores Raster/LiDAR),
-por lo que el catálogo objetivo verificable es de **117 nodos**. Studio registra
-ahora 110: 106 compartidos dentro de alcance y 11 ausencias objetivo.
+El alcance Studio excluye 19 (14 Raster, tres lectores/escritores Raster/LiDAR
+y dos callers dependientes del sistema),
+PythonCaller y SystemCaller también quedan fuera: el navegador no dispone de un
+runtime Python ni de acceso seguro al sistema operativo. Por tanto, el catálogo
+objetivo verificable es de **115 nodos**. Studio registra ahora 116: 112
+compartidos dentro de alcance y 3 ausencias objetivo (los Writers pendientes).
+
+## Editor avanzado de Readers: valoración
+
+El modo de edición de Readers de Desktop es valioso y debe portarse, pero no como
+una copia literal del selector nativo de escritorio. En Studio debe convertirse
+en un modal centrado y táctil que agrupe fuente, capa/hoja, esquema, CRS, vista
+previa y opciones específicas del formato. La prioridad es alta después de cerrar
+los Writers porque reduce errores antes de ejecutar y evita sobrecargar las
+tarjetas del canvas.
+
+Hay una limitación web real: Safari no permite conservar rutas locales como
+Desktop. El editor deberá trabajar con archivos seleccionados, handles cuando el
+navegador los soporte y una copia gestionada en almacenamiento local; nunca debe
+mostrar una ruta como si siguiera siendo válida cuando el permiso ya expiró.
 `reader_file` es una abstracción exclusiva de Studio.
 
 | Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
@@ -40,10 +57,10 @@ ahora 110: 106 compartidos dentro de alcance y 11 ausencias objetivo.
 | Spatial | 18 | 18 | 0 | 100 % |
 | Geometry | 37 | 37 | 0 | 100 % |
 | Raster | 14 | 2 | 12 | Fuera de alcance |
-| Utils | 14 | 6 | 8 | 42,9 % |
+| Utils | 14 | 12 | 2 | 85,7 % (100 % del alcance) |
 | Writers | 10 | 6 | 4 | 60,0 % |
 
-De los 25 ausentes totales, 11 están dentro del alcance objetivo. El manifiesto
+De los 19 ausentes totales, 3 están dentro del alcance objetivo. El manifiesto
 trazable está en `desktop-node-manifest.json` y conserva el estado de runtime de
 cada nodo; el informe separa `missingByRuntime` de `targetMissingByRuntime` para
 que una dependencia excluida no altere la priorización.
@@ -80,6 +97,10 @@ hacen fallar el gate ni se contabilizan como deuda.
    Generalizer, Geometry Coercer, Line Builder, MultiBufferer y Offsetter se
    ejecutan en navegador. Centerline Replacer conserva sus dos salidas y exige
    explícitamente el backend Python, sin simular un resultado local incorrecto.
+   **Utils completada en alcance (12/12):** Creator, HTTP Caller, REST Request,
+   GraphQL Request y Response Inspector se ejecutan en navegador; Workspace
+   Runner conserva proyectos Desktop como paso transparente. PythonCaller y
+   SystemCaller se excluyen porque no existe un runtime honesto para ellos.
    **Spatial completada (18/18):** los seis Overlayers Point/Line/Area conservan
    dos entradas, salidas matched/unmatched, multiplicidad de coincidencias y
    prefijos de atributos. Anchored Snapper conserva sus cuatro salidas Desktop;

@@ -123,10 +123,10 @@ function loadGeometry(windowOverrides = {}) {
     return window.TOOL_REGISTRY;
 }
 
-function loadUtils() {
-    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)) };
-    const turf = { featureCollection, getType: (feature) => feature.geometry?.type || '' };
-    vm.runInNewContext(utilsSource, { window, globalThis: window, console, turf }, { filename: 'utils.js' });
+function loadUtils(windowOverrides = {}, contextOverrides = {}) {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)), ...windowOverrides };
+    const turf = { featureCollection, feature: (geometry, properties = {}) => ({ type: 'Feature', geometry, properties }), getType: (feature) => feature.geometry?.type || '' };
+    vm.runInNewContext(utilsSource, { window, globalThis: window, console, turf, URL, fetch, AbortController, setTimeout, clearTimeout, btoa, ...contextOverrides }, { filename: 'utils.js' });
     return window.TOOL_REGISTRY;
 }
 
@@ -427,14 +427,47 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     assert.equal(result.status, 1, 'el gate debe seguir detectando nodos objetivo pendientes');
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
-    assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 110);
-    assert.equal(report.targetSharedIdCount, 106);
-    assert.equal(report.targetMissingInStudio.length, 11);
-    assert.equal(report.excludedDesktop.length, 17);
+    assert.equal(report.targetDesktopCount, 115);
+    assert.equal(report.studioCount, 116);
+    assert.equal(report.targetSharedIdCount, 112);
+    assert.equal(report.targetMissingInStudio.length, 3);
+    assert.equal(report.excludedDesktop.length, 19);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
     assert.ok(!report.targetMissingInStudio.includes('writer_geotiff'));
+    assert.ok(!report.targetMissingInStudio.includes('util_python_caller'));
+    assert.ok(!report.targetMissingInStudio.includes('util_system_caller'));
+});
+
+test('Creator genera atributos tipados, sustitución e índice de instancia', () => {
+    const tool = loadUtils().util_creator;
+    const config = { count: 2, geometry_mode: 'point', x: -3.7, y: 40.4, instance_attr: 'row', attributes: [{ name: 'name', value: 'item-{i}', type: 'string' }, { name: 'value', value: '7', type: 'number' }] };
+    const result = tool.run('1', [], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(result.features.length, 2); assert.equal(result.features[1].properties.name, 'item-2'); assert.equal(result.features[0].properties.value, 7); assert.equal(JSON.stringify(result.features[0].geometry.coordinates), JSON.stringify([-3.7, 40.4]));
+});
+
+test('HTTP Caller produce una respuesta inspeccionable y respeta configuración', async () => {
+    let captured;
+    const fakeFetch = async (url, options) => { captured = { url, options }; return { ok: true, status: 201, url, headers: { get: () => 'application/json', forEach: (fn) => fn('application/json', 'content-type') }, text: async () => '{"ok":true}' }; };
+    const tool = loadUtils({}, { fetch: fakeFetch }).util_http_caller;
+    const config = { method: 'POST', url: 'https://api.example.test/items', headers: { 'X-Test': 'yes' }, body: '{"a":1}' };
+    const result = await tool.run('1', [], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(captured.options.method, 'POST'); assert.equal(captured.options.body, '{"a":1}'); assert.equal(result.features[0].properties.response_status_code, 201); assert.equal(JSON.stringify(result.features[0].properties.response_json), JSON.stringify({ ok: true }));
+});
+
+test('REST y GraphQL construyen URLs y cuerpos ejecutables en navegador', async () => {
+    const calls = []; const fakeFetch = async (url, options) => { calls.push({ url, options }); return { ok: true, status: 200, url, headers: { get: () => 'application/json', forEach: () => {} }, text: async () => '{}' }; };
+    const registry = loadUtils({}, { fetch: fakeFetch });
+    await registry.util_rest_request.run('1', [], { querySelector: () => ({ value: JSON.stringify({ base_url: 'https://api.example.test', path: 'users', query: { page: 2 } }) }) });
+    await registry.util_graphql_request.run('2', [], { querySelector: () => ({ value: JSON.stringify({ endpoint: 'https://api.example.test/graphql', query: 'query Ping { ping }', variables: { n: 1 } }) }) });
+    assert.match(calls[0].url, /users\?page=2/); assert.equal(calls[1].options.method, 'POST'); assert.equal(JSON.parse(calls[1].options.body).variables.n, 1);
+});
+
+test('Response Inspector y Workspace Runner preservan la colección', () => {
+    const registry = loadUtils(); const input = featureCollection([{ type: 'Feature', geometry: null, properties: { response_status_code: 204, response_ok: true, response_body: 'done' } }]);
+    const controls = {}; const dom = { querySelector: (selector) => controls[selector] ||= { textContent: '' } };
+    assert.equal(registry.util_response_inspector.run('1', [input], dom), input); assert.match(controls['[data-response-status]'].textContent, /204/);
+    assert.equal(registry.util_workspace_runner.hidden, true); assert.equal(registry.util_workspace_runner.run('2', [input]), input);
 });
 
 test('List Concatenator replica listas directas y rutas anidadas de Desktop', async () => {

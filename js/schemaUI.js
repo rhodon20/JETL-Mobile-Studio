@@ -1213,6 +1213,47 @@
                 { key: 'csv.encoding', label: 'CSV · codificación', type: 'text', value: 'utf-8' }
             ],
             summary: (config) => `${String(config.format || 'csv').toUpperCase()} · ${{ attribute: 'atributo', static: 'ruta fija', template: 'plantilla' }[config.path_mode] || config.path_mode}`
+        },
+        util_creator: {
+            title: 'Creator', subtitle: 'Genera entidades sin depender de una fuente', storage: '[df-creator-config]',
+            fields: [
+                { key: 'count', label: 'Cantidad', type: 'number', value: 1, min: 1 },
+                { key: 'geometry_mode', label: 'Geometría', type: 'select', value: 'none', options: [['none', 'Sin geometría'], ['point', 'Punto']] },
+                { key: 'x', label: 'Coordenada X', type: 'number', value: 0 }, { key: 'y', label: 'Coordenada Y', type: 'number', value: 0 },
+                { key: 'crs', label: 'CRS', type: 'text', value: '' }, { key: 'instance_attr', label: 'Atributo de instancia', type: 'text', value: '_creation_instance' },
+                { key: 'attributes', label: 'Atributos (JSON)', type: 'json', value: [{ enabled: true, name: 'path', value: '', type: 'string' }] }
+            ], summary: (config) => `${config.count || 1} entidades · ${config.geometry_mode === 'point' ? 'punto' : 'sin geometría'}`
+        },
+        util_http_caller: {
+            title: 'HTTP Caller', subtitle: 'Petición HTTP ejecutada por el navegador', storage: '[df-http-config]',
+            fields: [
+                { key: 'url', label: 'URL', type: 'text', value: '' }, { key: 'method', label: 'Método', type: 'select', value: 'GET', options: [['GET','GET'],['POST','POST'],['PUT','PUT'],['PATCH','PATCH'],['DELETE','DELETE']] },
+                { key: 'timeout', label: 'Timeout (s)', type: 'number', value: 15, min: 1 }, { key: 'auth', label: 'Autenticación', type: 'select', value: 'none', options: [['none','Ninguna'],['basic','Basic'],['bearer','Bearer'],['api_key','API key']] },
+                { key: 'user', label: 'Usuario', type: 'text', value: '' }, { key: 'pass', label: 'Contraseña', type: 'password', value: '' }, { key: 'token', label: 'Token', type: 'password', value: '' },
+                { key: 'api_key_header', label: 'Cabecera API key', type: 'text', value: 'X-API-Key' }, { key: 'api_key_value', label: 'API key', type: 'password', value: '' },
+                { key: 'headers', label: 'Cabeceras (JSON)', type: 'json', value: {} }, { key: 'body', label: 'Body', type: 'textarea', value: '' }
+            ], summary: (config) => `${config.method || 'GET'} · ${config.url || 'sin URL'}`
+        },
+        util_rest_request: {
+            title: 'REST Request', subtitle: 'Endpoint REST con ruta y parámetros', storage: '[df-rest-config]',
+            fields: [
+                { key: 'base_url', label: 'URL base', type: 'text', value: '' }, { key: 'path', label: 'Ruta', type: 'text', value: '' },
+                { key: 'method', label: 'Método', type: 'select', value: 'GET', options: [['GET','GET'],['POST','POST'],['PUT','PUT'],['PATCH','PATCH'],['DELETE','DELETE']] }, { key: 'timeout', label: 'Timeout (s)', type: 'number', value: 15, min: 1 },
+                { key: 'auth', label: 'Autenticación', type: 'select', value: 'none', options: [['none','Ninguna'],['basic','Basic'],['bearer','Bearer'],['api_key','API key']] },
+                { key: 'user', label: 'Usuario', type: 'text', value: '' }, { key: 'pass', label: 'Contraseña', type: 'password', value: '' }, { key: 'token', label: 'Token', type: 'password', value: '' },
+                { key: 'api_key_header', label: 'Cabecera API key', type: 'text', value: 'X-API-Key' }, { key: 'api_key_value', label: 'API key', type: 'password', value: '' },
+                { key: 'query', label: 'Query params (JSON)', type: 'json', value: {} }, { key: 'headers', label: 'Cabeceras (JSON)', type: 'json', value: {} }, { key: 'body', label: 'Body', type: 'textarea', value: '' }
+            ], summary: (config) => `${config.method || 'GET'} · ${config.path || config.base_url || 'sin endpoint'}`
+        },
+        util_graphql_request: {
+            title: 'GraphQL Request', subtitle: 'Consulta GraphQL ejecutada por el navegador', storage: '[df-graphql-config]',
+            fields: [
+                { key: 'endpoint', label: 'Endpoint', type: 'text', value: '' }, { key: 'operation_name', label: 'Operation name', type: 'text', value: '' },
+                { key: 'query', label: 'Query', type: 'textarea', value: '' }, { key: 'variables', label: 'Variables (JSON)', type: 'json', value: {} }, { key: 'headers', label: 'Cabeceras (JSON)', type: 'json', value: {} },
+                { key: 'timeout', label: 'Timeout (s)', type: 'number', value: 15, min: 1 }, { key: 'auth', label: 'Autenticación', type: 'select', value: 'none', options: [['none','Ninguna'],['basic','Basic'],['bearer','Bearer'],['api_key','API key']] },
+                { key: 'user', label: 'Usuario', type: 'text', value: '' }, { key: 'pass', label: 'Contraseña', type: 'password', value: '' }, { key: 'token', label: 'Token', type: 'password', value: '' },
+                { key: 'api_key_header', label: 'Cabecera API key', type: 'text', value: 'X-API-Key' }, { key: 'api_key_value', label: 'API key', type: 'password', value: '' }
+            ], summary: (config) => config.operation_name || config.endpoint || 'Sin consulta'
         }
     };
 
@@ -1260,6 +1301,9 @@
                 const option = document.createElement('option'); option.value = optionValue; option.textContent = optionLabel; control.appendChild(option);
             });
             control.value = String(value ?? field.value ?? '');
+        } else if (field.type === 'textarea' || field.type === 'json') {
+            control = document.createElement('textarea'); control.rows = field.rows || 4;
+            control.value = field.type === 'json' ? JSON.stringify(value ?? field.value ?? {}, null, 2) : (value ?? field.value ?? '');
         } else {
             control = document.createElement('input');
             control.type = field.type === 'checkbox' ? 'checkbox' : field.type;
@@ -1313,7 +1357,9 @@
                 const config = _readGeometryTransformConfig(nodeEl, definition);
                 definition.fields.forEach((field) => {
                     const control = document.querySelector(`[data-geometry-transform-field="${field.key}"]`);
-                    _geometryTransformSet(config, field.key, field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value);
+                    let value = field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value;
+                    if (field.type === 'json') value = JSON.parse(control.value || '{}');
+                    _geometryTransformSet(config, field.key, value);
                 });
                 _commitNodeControl(_geometryTransformStorage(nodeEl, definition), JSON.stringify(config));
                 _syncGeometryTransformSummary(nodeEl, definition, config);

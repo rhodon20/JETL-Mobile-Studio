@@ -6,8 +6,10 @@
   "excludedNodeIds": [
     "reader_lidar",
     "reader_geotiff",
-    "writer_geotiff"
+    "writer_geotiff",
+    "util_python_caller",
+    "util_system_caller"
   ],
   "existingStudioPolicy": "legacy-read-compatible",
-  "reason": "Studio está orientado a flujos vectoriales y tabulares en web/móvil; Raster y LiDAR masivos quedan fuera del alcance de producto."
+  "reason": "Studio está orientado a flujos vectoriales y tabulares en web/móvil; Raster y LiDAR masivos quedan fuera del alcance. PythonCaller y SystemCaller requieren un backend o acceso al sistema operativo inexistentes en el runtime web."
 }
