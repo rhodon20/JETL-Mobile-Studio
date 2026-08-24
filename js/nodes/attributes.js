@@ -51,6 +51,37 @@ function resolveParamText(raw) {
     return String(raw == null ? '' : raw);
 }
 
+function normalizeSubstringIndex(index, length) {
+    const parsed = Number.isFinite(Number(index)) ? parseInt(index, 10) : 0;
+    return parsed < 0 ? length + parsed : parsed;
+}
+
+function extractFmeSubstring(value, start, end) {
+    const text = String(value ?? '');
+    const length = text.length;
+    let from = Math.max(0, normalizeSubstringIndex(start, length));
+    let to = Math.min(length - 1, normalizeSubstringIndex(end, length));
+    if (from > to || from >= length) return '';
+    return text.slice(from, to + 1);
+}
+
+function readNestedListValues(properties, path) {
+    const parts = String(path || '').split(/\{\}\.?/).filter(Boolean);
+    if (parts.length < 2) {
+        const value = properties?.[parts[0] || path];
+        return Array.isArray(value) ? value : [];
+    }
+    const list = properties?.[parts[0]];
+    if (!Array.isArray(list)) return [];
+    const childPath = parts.slice(1);
+    return list.map((entry) => childPath.reduce((value, key) => value?.[key], entry));
+}
+
+function cloneFeatureForAttributeTool(feature) {
+    if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(feature);
+    return JSON.parse(JSON.stringify(feature));
+}
+
 function computeBasicStats(values) {
     const nums = values.filter((v) => typeof v === 'number' && !isNaN(v));
     if (!nums.length) return null;
@@ -584,6 +615,67 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 return dir === 'asc' ? comparison : -comparison;
             });
 
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_list_concatenator: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Concatenator', icon: 'fa-list', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-list"></i>
+                <div><strong data-attribute-text-summary>_list → concatenated</strong><small>Unir lista con “,”</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="list-concat-open-editor">
+                <i class="fas fa-pen"></i> Configurar
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-list-concat-config class="node-control" tabindex="-1">{"list_attr":"_list","target_attr":"concatenated","delimiter":",","drop_empty":false}</textarea>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            let config = { list_attr: '_list', target_attr: 'concatenated', delimiter: ',', drop_empty: false };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-list-concat-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.list_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de lista y destino');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                let values = readNestedListValues(clone.properties, source)
+                    .map((value) => value == null ? '' : String(value));
+                if (config.drop_empty) values = values.filter((value) => value !== '');
+                clone.properties[target] = values.join(String(config.delimiter ?? ','));
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_substring: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Substring Extractor', icon: 'fa-i-cursor', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-i-cursor"></i>
+                <div><strong data-attribute-text-summary>Fecha → Ano</strong><small>Caracteres 0–3 (inclusivo)</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="substring-open-editor">
+                <i class="fas fa-pen"></i> Configurar
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-substring-config class="node-control" tabindex="-1">{"source_attr":"Fecha","target_attr":"Ano","start":0,"end":3}</textarea>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            let config = { source_attr: 'Fecha', target_attr: 'Ano', start: 0, end: 3 };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-substring-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.source_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de origen y destino');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                clone.properties[target] = extractFmeSubstring(clone.properties[source], config.start, config.end);
+                return clone;
+            });
             return turf.featureCollection(features);
         }
     },

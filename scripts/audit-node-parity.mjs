@@ -43,6 +43,18 @@ const desktopManifest = JSON.parse(readFileSync(resolve(manifestPath), 'utf8'));
 const desktop = Array.isArray(desktopManifest) ? desktopManifest : desktopManifest.nodes;
 if (!Array.isArray(desktop)) throw new Error('El manifiesto Desktop debe ser un array o contener nodes[]');
 
+const scopePath = process.argv[3];
+const scope = scopePath
+    ? JSON.parse(readFileSync(resolve(scopePath), 'utf8'))
+    : { excludedCategories: [], excludedNodeIds: [] };
+const excludedCategories = new Set((scope.excludedCategories || []).map((value) => String(value).toLowerCase()));
+const excludedNodeIds = new Set((scope.excludedNodeIds || []).map(String));
+const desktopId = (node) => String(node.id || node.key || '');
+const isExcluded = (node) => excludedNodeIds.has(desktopId(node)) ||
+    excludedCategories.has(String(node.category || node.cat || '').toLowerCase());
+const excludedDesktop = desktop.filter(isExcluded);
+const targetDesktop = desktop.filter((node) => !isExcluded(node));
+
 const studioIds = new Set(studio.map((node) => node.id));
 const desktopIds = new Set(desktop.map((node) => String(node.id || node.key || '')));
 const studioById = new Map(studio.map((node) => [node.id, node]));
@@ -51,8 +63,18 @@ const missingInStudio = desktop
     .map((node) => String(node.id || node.key || ''))
     .filter(Boolean)
     .sort();
+const targetMissingInStudio = targetDesktop
+    .filter((node) => !studioIds.has(desktopId(node)))
+    .map(desktopId)
+    .filter(Boolean)
+    .sort();
 const studioOnly = studio.filter((node) => !desktopIds.has(node.id)).map((node) => node.id);
 const shared = desktop.filter((node) => studioIds.has(String(node.id || node.key || '')));
+const targetShared = targetDesktop.filter((node) => studioIds.has(desktopId(node)));
+const legacyStudioOutOfScope = excludedDesktop
+    .filter((node) => studioIds.has(desktopId(node)))
+    .map(desktopId)
+    .sort();
 const contractMismatches = shared.flatMap((node) => {
     const id = String(node.id || node.key || '');
     const studioNode = studioById.get(id);
@@ -78,17 +100,30 @@ const missingByRuntime = missingInStudio.reduce((summary, id) => {
     summary[status] = (summary[status] || 0) + 1;
     return summary;
 }, {});
+const targetMissingByRuntime = targetMissingInStudio.reduce((summary, id) => {
+    const node = targetDesktop.find((candidate) => desktopId(candidate) === id);
+    const status = String(node?.backendStatus || 'frontend');
+    summary[status] = (summary[status] || 0) + 1;
+    return summary;
+}, {});
 
 console.log(JSON.stringify({
     desktopSource: desktopManifest.source || manifestPath,
     desktopCount: desktop.length,
+    scopePolicy: scope.policy || null,
+    targetDesktopCount: targetDesktop.length,
+    excludedDesktop: excludedDesktop.map(desktopId).sort(),
     studioCount: studio.length,
     sharedIdCount: shared.length,
+    targetSharedIdCount: targetShared.length,
     missingInStudio,
+    targetMissingInStudio,
+    legacyStudioOutOfScope,
     studioOnly,
     contractMismatches,
     categoryCoverage,
-    missingByRuntime
+    missingByRuntime,
+    targetMissingByRuntime
 }, null, 2));
 
-if (missingInStudio.length) process.exitCode = 1;
+if (targetMissingInStudio.length) process.exitCode = 1;

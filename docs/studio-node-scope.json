@@ -1,0 +1,13 @@
+{
+  "policy": "vector-tabular-web",
+  "excludedCategories": [
+    "raster"
+  ],
+  "excludedNodeIds": [
+    "reader_lidar",
+    "reader_geotiff",
+    "writer_geotiff"
+  ],
+  "existingStudioPolicy": "legacy-read-compatible",
+  "reason": "Studio está orientado a flujos vectoriales y tabulares en web/móvil; Raster y LiDAR masivos quedan fuera del alcance de producto."
+}

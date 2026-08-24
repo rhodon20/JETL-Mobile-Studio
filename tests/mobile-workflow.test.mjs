@@ -50,6 +50,8 @@ test('quicksearch está en la cabecera entre marca y acciones', () => {
 test('abrir un editor de nodo carga su módulo diferido en el primer toque', () => {
     assert.match(engine, /schemaAction === 'calc-open-editor'/);
     assert.match(engine, /schemaAction === 'formatter-open-editor'/);
+    assert.match(engine, /'list-concat-open-editor'/);
+    assert.match(engine, /'substring-open-editor'/);
     assert.match(engine, /window\.JETLEnsureExtras\?\.\(\)\.then/);
     assert.match(engine, /window\.JETLSchemaUI\.openFormatterEditor\(nodeId\)/);
 });

@@ -5,15 +5,16 @@ La paridad significa conservar la capacidad y adaptar la interacción a móvil;
 no copiar literalmente paneles de escritorio ni dependencias de Python o del
 sistema de archivos.
 
-**Regla no negociable:** Studio debe converger al mismo catálogo de nodos que
-Desktop. El inventario, los estados de compatibilidad y el control automático se
+**Regla no negociable:** Studio debe converger al catálogo vectorial y tabular de
+Desktop. Raster y LiDAR quedan fuera de alcance por su volumen; las capacidades
+heredadas no se eliminan, pero tampoco se cuentan como deuda. El inventario, los estados de compatibilidad y el control automático se
 mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 ## Flujo y edición
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Catálogo completo de nodos | 134 Desktop / 67 Studio / 66 IDs compartidos | Cerrar 68 ausencias por categoría y resolver extensiones incompatibles |
+| Catálogo objetivo de nodos | 117 Desktop en alcance / 65 IDs compartidos | Cerrar 52 ausencias vectoriales/tabulares y resolver extensiones incompatibles |
 | Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
@@ -23,7 +24,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Parcial — Calculator y String Formatter | Extender el patrón probado de resumen + JSON + Guardar/Cancelar a los nodos complejos restantes |
+| Nodo compacto + editor modal estilo Desktop | Parcial — Calculator, String Formatter, List Concatenator y Substring Extractor | Extender el patrón probado de resumen + JSON + Guardar/Cancelar a los nodos complejos restantes |
 
 ## Ejecución y diagnóstico
 
@@ -42,7 +43,8 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
 | Consola, tabla y mapa | Implementado | Conservar tabs táctiles y estado por salida |
-| Visores vector/raster/3D/LiDAR | Parcial | Inventariar herramientas y validar cada tipo de salida |
+| Visores vector y 3D web | Parcial | Inventariar herramientas y validar cada tipo de salida compatible |
+| Raster y LiDAR masivos | Fuera de alcance | Conservar proyectos heredados sin ampliar el catálogo ni prometer ejecución web |
 | Esquema y metadatos | Parcial | Inspector móvil con tipos, campos y estadísticas |
 | Visualización progresiva | Parcial | Evitar bloquear UI con datasets grandes |
 | Caché por nodo | Implementado | Hacer visibles hits, invalidación y tamaño |

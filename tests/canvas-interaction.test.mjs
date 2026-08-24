@@ -17,5 +17,5 @@ test('el zoom del editor escala también la cuadrícula visible', () => {
 });
 
 test('Pages solicita la revisión del motor que contiene el feedback del lienzo', () => {
-    assert.match(index, /js\/engine\.js\?v=20260824-20/);
+    assert.match(index, /js\/engine\.js\?v=20260824-21/);
 });

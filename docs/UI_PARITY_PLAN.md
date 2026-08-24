@@ -10,6 +10,8 @@ ni se trasladan contratos que dependan de Python o del sistema de archivos local
 - Paridad de lenguaje visual y de interacción, no copia literal del escritorio.
 - El lienzo y los nodos Drawflow mantienen geometría, puertos y comportamiento.
 - Todas las operaciones posibles permanecen locales y compatibles con PWA.
+- Raster y LiDAR masivos quedan fuera de alcance; la convergencia funcional se
+  limita al catálogo vectorial y tabular de Desktop.
 - En móvil, los paneles secundarios se presentan como hojas y nunca bloquean la
   barra de navegación de forma accidental. Los editores de nodos conservan, en
   cambio, el contrato modal de Desktop.
@@ -62,8 +64,8 @@ La referencia funcional es `JETL-Desktop/docs/guides/MODAL_EDITOR_GUIDE.md`:
   casi toda la superficie disponible, sin convertirse en inspector lateral ni
   en hoja inferior.
 
-Implementado como patrón inicial en **Field Calculator Pro** y **String
-Formatter**. El segundo conserva la configuración en JSON y admite la apertura
+Implementado como patrón inicial en **Field Calculator Pro**, **String
+Formatter**, **List Concatenator** y **Substring Extractor**. Los editores conservan la configuración en JSON y admiten la apertura
 mediante botón o doble clic, con compatibilidad de lectura y guardado para los
 flujos creados antes de esta migración.
 

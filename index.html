@@ -2685,6 +2685,31 @@ body.modal-open {
             </div>
         </div>
     </div>
+    <div id="attribute-text-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="attribute-text-editor-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i id="attribute-text-editor-icon" class="fas fa-list"></i><div><strong id="attribute-text-editor-title">Editor de atributos</strong><small id="attribute-text-editor-subtitle">Configura la transformación</small></div></div>
+                <button class="modal-close" data-ui-action="close-attribute-text-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span id="attribute-text-source-label">Campo de origen</span><input id="attribute-text-source" class="node-control" autocomplete="off"></label>
+                <label class="form-field"><span>Campo de destino</span><input id="attribute-text-target" class="node-control" autocomplete="off"></label>
+                <div id="attribute-text-list-fields">
+                    <label class="form-field"><span>Separador</span><input id="attribute-text-delimiter" class="node-control" autocomplete="off"></label>
+                    <label class="form-field form-inline"><input id="attribute-text-drop-empty" type="checkbox"> <span>Omitir valores vacíos</span></label>
+                </div>
+                <div id="attribute-text-substring-fields" class="form-inline" hidden>
+                    <label class="form-field"><span>Inicio</span><input id="attribute-text-start" type="number" class="node-control"></label>
+                    <label class="form-field"><span>Fin inclusivo</span><input id="attribute-text-end" type="number" class="node-control"></label>
+                </div>
+                <div id="attribute-text-editor-help" class="modal-help"><i class="fas fa-circle-info"></i> Admite listas directas y rutas anidadas como <code>items{}.name</code>.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-attribute-text-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-attribute-text-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
     <style>
         .ctx-item {
             padding: 8px 12px;
@@ -3555,7 +3580,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(5, 14, &quot;attributes.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/spatial.js&quot;)"></script>
 
-    <script defer src="js/nodes/attributes.js?v=20260824-8"
+    <script defer src="js/nodes/attributes.js?v=20260824-9"
         onload="window.JETLBootModuleLoaded(6, 14, &quot;raster.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
 
@@ -3583,7 +3608,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260824-20"
+    <script defer src="js/engine.js?v=20260824-21"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3611,7 +3636,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260824-14';
+        const JETL_EXTRAS_VERSION = '20260824-15';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

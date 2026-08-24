@@ -672,6 +672,89 @@
         currentFormatterNodeId = null;
     }
 
+    let currentAttributeTextEditor = null;
+
+    function _readAttributeTextConfig(nodeEl, kind) {
+        const selector = kind === 'substring' ? '[df-substring-config]' : '[df-list-concat-config]';
+        const defaults = kind === 'substring'
+            ? { source_attr: 'Fecha', target_attr: 'Ano', start: 0, end: 3 }
+            : { list_attr: '_list', target_attr: 'concatenated', delimiter: ',', drop_empty: false };
+        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector(selector)?.value || '{}') }; }
+        catch (e) { return defaults; }
+    }
+
+    function _syncAttributeTextSummary(nodeEl, kind, config) {
+        const summary = nodeEl?.querySelector('[data-attribute-text-summary]');
+        const detail = summary?.nextElementSibling;
+        if (kind === 'substring') {
+            if (summary) summary.textContent = `${config.source_attr} → ${config.target_attr}`;
+            if (detail) detail.textContent = `Caracteres ${config.start}–${config.end} (inclusivo)`;
+        } else {
+            if (summary) summary.textContent = `${config.list_attr} → ${config.target_attr}`;
+            if (detail) detail.textContent = `Unir lista con “${config.delimiter}”${config.drop_empty ? ' · sin vacíos' : ''}`;
+        }
+    }
+
+    function updateAttributeTextNode(nodeId) {
+        const safe = _safeGetNode(nodeId);
+        const node = safe.node;
+        if (!node || (node.name !== 'attr_list_concatenator' && node.name !== 'attr_substring')) return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const kind = node.name === 'attr_substring' ? 'substring' : 'list';
+        if (nodeEl) _syncAttributeTextSummary(nodeEl, kind, _readAttributeTextConfig(nodeEl, kind));
+    }
+
+    function openAttributeTextEditor(nodeId, kind) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('attribute-text-editor-modal');
+        if (!nodeEl || !modal) return false;
+        const resolvedKind = kind === 'substring' ? 'substring' : 'list';
+        const config = _readAttributeTextConfig(nodeEl, resolvedKind);
+        currentAttributeTextEditor = { nodeId: String(nodeId), kind: resolvedKind };
+
+        document.getElementById('attribute-text-editor-title').textContent = resolvedKind === 'substring' ? 'Substring Extractor' : 'List Concatenator';
+        document.getElementById('attribute-text-editor-subtitle').textContent = resolvedKind === 'substring'
+            ? 'Extrae un intervalo de caracteres con fin inclusivo'
+            : 'Convierte una lista de atributos en texto';
+        document.getElementById('attribute-text-source-label').textContent = resolvedKind === 'substring' ? 'Campo de origen' : 'Atributo de lista';
+        document.getElementById('attribute-text-source').value = resolvedKind === 'substring' ? config.source_attr : config.list_attr;
+        document.getElementById('attribute-text-target').value = config.target_attr;
+        document.getElementById('attribute-text-list-fields').hidden = resolvedKind === 'substring';
+        document.getElementById('attribute-text-substring-fields').hidden = resolvedKind !== 'substring';
+        if (resolvedKind === 'substring') {
+            document.getElementById('attribute-text-start').value = config.start;
+            document.getElementById('attribute-text-end').value = config.end;
+            document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> El índice final es inclusivo. Los índices negativos cuentan desde el final, igual que en Desktop.';
+        } else {
+            document.getElementById('attribute-text-delimiter').value = config.delimiter;
+            document.getElementById('attribute-text-drop-empty').checked = !!config.drop_empty;
+            document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> Admite listas directas y rutas anidadas como <code>items{}.name</code>.';
+        }
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeAttributeTextEditor(save) {
+        const modal = document.getElementById('attribute-text-editor-modal');
+        if (!modal) return;
+        if (save && currentAttributeTextEditor) {
+            const { nodeId, kind } = currentAttributeTextEditor;
+            const nodeEl = document.getElementById('node-' + nodeId);
+            if (nodeEl) {
+                const source = document.getElementById('attribute-text-source').value.trim();
+                const target = document.getElementById('attribute-text-target').value.trim();
+                const config = kind === 'substring'
+                    ? { source_attr: source || 'Fecha', target_attr: target || 'Ano', start: Number(document.getElementById('attribute-text-start').value), end: Number(document.getElementById('attribute-text-end').value) }
+                    : { list_attr: source || '_list', target_attr: target || 'concatenated', delimiter: document.getElementById('attribute-text-delimiter').value, drop_empty: document.getElementById('attribute-text-drop-empty').checked };
+                const control = nodeEl.querySelector(kind === 'substring' ? '[df-substring-config]' : '[df-list-concat-config]');
+                _commitNodeControl(control, JSON.stringify(config));
+                _syncAttributeTextSummary(nodeEl, kind, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentAttributeTextEditor = null;
+    }
+
     function updateNode(nodeId) {
         updateJoinNode(nodeId);
         updateCalcNode(nodeId);
@@ -682,6 +765,7 @@
         updateMatcherNode(nodeId);
         updateStatsNode(nodeId);
         updateTesterNode(nodeId);
+        updateAttributeTextNode(nodeId);
     }
 
     function refreshAll() {
@@ -710,6 +794,12 @@
             } else if (action === 'formatter-open-editor') {
                 evt.stopPropagation();
                 openFormatterEditor(nodeId);
+            } else if (action === 'list-concat-open-editor') {
+                evt.stopPropagation();
+                openAttributeTextEditor(nodeId, 'list');
+            } else if (action === 'substring-open-editor') {
+                evt.stopPropagation();
+                openAttributeTextEditor(nodeId, 'substring');
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -753,12 +843,16 @@
             else if (action === 'calc-editor-insert') insertCalcFieldInModal();
             else if (action === 'close-formatter-editor') closeFormatterEditor(false);
             else if (action === 'save-formatter-editor') closeFormatterEditor(true);
+            else if (action === 'close-attribute-text-editor') closeAttributeTextEditor(false);
+            else if (action === 'save-attribute-text-editor') closeAttributeTextEditor(true);
         });
 
         document.addEventListener('dblclick', (evt) => {
             const nodeEl = evt.target.closest('.drawflow-node');
             if (nodeEl?.classList.contains('attr_calc_pro')) openCalcEditor(nodeEl.id.replace('node-', ''));
             else if (nodeEl?.classList.contains('attr_string_formatter')) openFormatterEditor(nodeEl.id.replace('node-', ''));
+            else if (nodeEl?.classList.contains('attr_list_concatenator')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'list');
+            else if (nodeEl?.classList.contains('attr_substring')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'substring');
         });
 
         document.addEventListener('change', (evt) => {
@@ -909,6 +1003,7 @@
         appendRenamerPair,
         insertCalcField,
         openCalcEditor,
-        openFormatterEditor
+        openFormatterEditor,
+        openAttributeTextEditor
     };
 })();

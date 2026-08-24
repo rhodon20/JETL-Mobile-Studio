@@ -1508,13 +1508,14 @@ function initEngineDelegation() {
         const schemaActionEl = e.target.closest('[data-schema-action]');
         const schemaAction = schemaActionEl?.getAttribute('data-schema-action');
         if (schemaActionEl && !window.JETLSchemaUI &&
-            (schemaAction === 'calc-open-editor' || schemaAction === 'formatter-open-editor')) {
+            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor'].includes(schemaAction)) {
             e.preventDefault();
             const nodeId = schemaActionEl.closest('.drawflow-node')?.id.replace('node-', '');
             window.JETLEnsureExtras?.().then(() => {
                 if (!nodeId || !window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
                 if (schemaAction === 'calc-open-editor') window.JETLSchemaUI.openCalcEditor(nodeId);
-                else window.JETLSchemaUI.openFormatterEditor(nodeId);
+                else if (schemaAction === 'formatter-open-editor') window.JETLSchemaUI.openFormatterEditor(nodeId);
+                else window.JETLSchemaUI.openAttributeTextEditor(nodeId, schemaAction === 'substring-open-editor' ? 'substring' : 'list');
             }).catch((error) => {
                 console.error('[JETL] Error abriendo editor de nodo', error);
                 if (typeof showToast === 'function') showToast('No se pudo abrir el editor del nodo', 'error');

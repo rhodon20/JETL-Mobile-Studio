@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import vm from 'node:vm';
 
@@ -101,4 +102,44 @@ test('Clipper separa geometría interior y exterior en dos puertos', async () =>
     const result = await tool.run('1', [source, mask]);
     assert.equal(result.output_1.features.length, 1);
     assert.equal(result.output_2.features.length, 2);
+});
+
+test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilidad heredada', () => {
+    const auditUrl = new URL('../scripts/audit-node-parity.mjs', import.meta.url);
+    const manifestUrl = new URL('../docs/desktop-node-manifest.json', import.meta.url);
+    const scopeUrl = new URL('../docs/studio-node-scope.json', import.meta.url);
+    const result = spawnSync(process.execPath, [auditUrl.pathname, manifestUrl.pathname, scopeUrl.pathname], { encoding: 'utf8' });
+    assert.equal(result.status, 1, 'el gate debe seguir detectando nodos objetivo pendientes');
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.desktopCount, 134);
+    assert.equal(report.targetDesktopCount, 117);
+    assert.equal(report.studioCount, 69);
+    assert.equal(report.targetSharedIdCount, 65);
+    assert.equal(report.targetMissingInStudio.length, 52);
+    assert.equal(report.excludedDesktop.length, 17);
+    assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
+    assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
+    assert.ok(!report.targetMissingInStudio.includes('writer_geotiff'));
+});
+
+test('List Concatenator replica listas directas y rutas anidadas de Desktop', async () => {
+    const tool = loadAttributes().attr_list_concatenator;
+    assert.equal(tool.in, 1);
+    assert.equal(tool.out, 1);
+    const config = { list_attr: 'items{}.name', target_attr: 'names', delimiter: '|', drop_empty: true };
+    const dom = { querySelector: () => ({ value: JSON.stringify(config) }) };
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { items: [{ name: 'a' }, { name: '' }, { name: null }, { name: 'b' }] } }]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.features[0].properties.names, 'a|b');
+    assert.equal(input.features[0].properties.names, undefined, 'no debe mutar la entrada');
+});
+
+test('Substring Extractor usa fin inclusivo e índices negativos como Desktop', async () => {
+    const tool = loadAttributes().attr_substring;
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { date: '2026-08-24' } }]);
+    const run = async (config) => tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    const year = await run({ source_attr: 'date', target_attr: 'part', start: 0, end: 3 });
+    const day = await run({ source_attr: 'date', target_attr: 'part', start: -2, end: -1 });
+    assert.equal(year.features[0].properties.part, '2026');
+    assert.equal(day.features[0].properties.part, '24');
 });

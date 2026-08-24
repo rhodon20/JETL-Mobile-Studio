@@ -2,9 +2,15 @@
 
 ## Objetivo de producto
 
-Studio debe ofrecer el mismo catálogo funcional de nodos que JETL Desktop. La
+Studio debe ofrecer el mismo catálogo funcional vectorial y tabular que JETL Desktop. La
 adaptación a navegador o a pantalla táctil puede cambiar la forma de configurar
 un nodo, pero no es motivo para que el nodo desaparezca silenciosamente.
+
+**Límite de producto:** los nodos Raster y LiDAR quedan expresamente fuera del
+catálogo objetivo. Studio no está diseñado para procesar esos volúmenes masivos
+en un navegador móvil. Los nodos de esas familias que ya existen se conservan
+para no romper proyectos, pero se consideran compatibilidad heredada y no deuda
+de paridad. La regla ejecutable vive en `studio-node-scope.json`.
 
 Un nodo cuenta como equivalente únicamente si conserva:
 
@@ -21,33 +27,37 @@ es paridad.
 
 ## Línea base verificable
 
-A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**
-y Studio registra **67**. Comparten 66 identificadores; faltan 68 nodos Desktop
-y `reader_file` es una abstracción exclusiva de Studio.
+A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**.
+El alcance Studio excluye 17 (14 Raster y tres lectores/escritores Raster/LiDAR),
+por lo que el catálogo objetivo verificable es de **117 nodos**. Studio registra
+ahora 69: 65 compartidos dentro de alcance y 52 ausencias objetivo.
+`reader_file` es una abstracción exclusiva de Studio.
 
 | Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
 | --- | ---: | ---: | ---: | ---: |
-| Attributes | 22 | 14 | 8 | 63,6 % |
+| Attributes | 22 | 16 | 6 | 72,7 % |
 | Readers | 19 | 10 | 9 | 52,6 % |
 | Spatial | 18 | 9 | 9 | 50,0 % |
 | Geometry | 37 | 20 | 17 | 54,1 % |
-| Raster | 14 | 2 | 12 | 14,3 % |
+| Raster | 14 | 2 | 12 | Fuera de alcance |
 | Utils | 14 | 5 | 9 | 35,7 % |
 | Writers | 10 | 6 | 4 | 60,0 % |
 
-De los 68 ausentes, 43 son frontend, 21 backend-ready y 4 híbridos en Desktop.
-El manifiesto trazable está en `desktop-node-manifest.json` y conserva el estado
-de runtime de cada nodo.
+De los 66 ausentes totales, 52 están dentro del alcance objetivo. El manifiesto
+trazable está en `desktop-node-manifest.json` y conserva el estado de runtime de
+cada nodo; el informe separa `missingByRuntime` de `targetMissingByRuntime` para
+que una dependencia excluida no altere la priorización.
 
 El control local se ejecuta con:
 
 ```bash
 node scripts/audit-node-parity.mjs
-node scripts/audit-node-parity.mjs /ruta/desktop-node-manifest.json
+node scripts/audit-node-parity.mjs docs/desktop-node-manifest.json docs/studio-node-scope.json
 ```
 
-El segundo comando termina con error si Desktop contiene identificadores que no
-existen en Studio, de modo que la diferencia pueda protegerse en CI.
+El segundo comando termina con error si faltan identificadores Desktop dentro
+del alcance Studio. Raster y LiDAR siguen apareciendo en el informe, pero no
+hacen fallar el gate ni se contabilizan como deuda.
 
 ## Orden de trabajo
 
@@ -60,12 +70,14 @@ existen en Studio, de modo que la diferencia pueda protegerse en CI.
    Attr Creator requieren una decisión explícita de compatibilidad.
 3. **P1 — Nodos de flujo habitual:** portar primero lectores, transformaciones,
    operaciones espaciales y escritores que puedan ejecutarse enteramente en web.
+   **En curso:** List Concatenator y Substring Extractor ya conservan contrato,
+   configuración y semántica Desktop con editor modal adaptado.
 4. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
    nodos complejos y garantizar importación/exportación sin pérdida.
 5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
    de servicio y ofrecer diagnóstico accionable cuando el backend no exista.
-6. **P2 — Visores especializados:** vector, raster, 3D y LiDAR con sus metadatos
-   y límites de rendimiento.
+6. **Fuera de alcance — Raster y LiDAR:** conservar sólo compatibilidad de
+   lectura de proyectos existentes; no portar nodos ni visores de datos masivos.
 
 La paridad del catálogo es el eje principal del roadmap. El pulido visual y el
 movimiento avanzan en paralelo, pero no sustituyen capacidad funcional.
