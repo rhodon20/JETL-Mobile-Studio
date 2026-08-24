@@ -8,6 +8,9 @@ function resolveParamTextReader(raw) {
 }
 
 const READER_MULTI_OUTPUTS = 16;
+const READER_EDITABLE_NODES = new Set(['reader_csv', 'reader_excel', 'reader_geojson']);
+const READER_EDIT_MAX_FEATURES = 5000;
+const READER_EDIT_MAX_CHARS = 2 * 1024 * 1024;
 const FEATURE_READER_DEFAULT_CONFIG = {
     version: 1,
     format: 'csv',
@@ -48,6 +51,30 @@ function readerConfigCompat(dom, nodeName) {
     const defaults = READER_NODE_DEFAULTS[nodeName] || {};
     try { return { ...defaults, ...JSON.parse(dom?.querySelector?.('[df-reader-config]')?.value || '{}') }; }
     catch (_) { return readerCloneCompat(defaults); }
+}
+
+function readerEditedDataCompat(dom, nodeName) {
+    if (!READER_EDITABLE_NODES.has(nodeName)) return null;
+    const raw = dom?.querySelector?.('[df-reader-edited-data]')?.value || '';
+    if (!String(raw).trim()) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.type !== 'FeatureCollection' || !Array.isArray(parsed.features)) return null;
+        return readerFeatureCollectionCompat(parsed, { ...(parsed.metadata || {}), edited_copy: true, reader: nodeName });
+    } catch (_) { return null; }
+}
+
+function readerEditedOrNullCompat(dom, nodeName, config = {}) {
+    const edited = readerEditedDataCompat(dom, nodeName);
+    if (!edited) return null;
+    edited.metadata = {
+        ...(edited.metadata || {}),
+        ...(config.crs ? { crs: config.crs } : {}),
+        edited_copy: true,
+        source_mode: 'project_working_copy',
+        feature_count: edited.features.length
+    };
+    return edited;
 }
 
 function readerSourceNameCompat(source, index = 0) {
@@ -260,18 +287,20 @@ function readerMultiOutputCompat(result) {
 }
 
 function readerFileTemplateCompat(accept, detail = '', defaults = {}) {
-    return `<div class="node-editor-summary"><i class="fas fa-file-import"></i><div><strong data-reader-file-summary>Sin fuente</strong><small>${detail}</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="reader-open-editor"><i class="fas fa-pen"></i> Abrir editor</button><div class="node-editor-storage" aria-hidden="true"><input type="file" df-file class="node-control" accept="${accept}" multiple tabindex="-1"><textarea df-reader-config class="node-control" tabindex="-1">${JSON.stringify(defaults)}</textarea></div>`;
+    return `<div class="node-editor-summary"><i class="fas fa-file-import"></i><div><strong data-reader-file-summary>Sin fuente</strong><small>${detail}</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="reader-open-editor"><i class="fas fa-pen"></i> Abrir editor</button><div class="node-editor-storage" aria-hidden="true"><input type="file" df-file class="node-control" accept="${accept}" multiple tabindex="-1"><textarea df-reader-config class="node-control" tabindex="-1">${JSON.stringify(defaults)}</textarea><textarea df-reader-edited-data class="node-control" tabindex="-1"></textarea></div>`;
 }
 
 async function readerInspectCompat(dom, nodeName, configOverride = null) {
     const sources = readerSelectedFilesCompat(dom); const config = configOverride || readerConfigCompat(dom, nodeName);
-    if (!sources.length) return { sources: [], fields: [], types: {}, geometry_types: [], feature_count: 0, rows: [], notice: 'Selecciona una fuente para inspeccionarla.' };
+    const edited = readerEditedDataCompat(dom, nodeName);
+    if (!sources.length && !edited) return { sources: [], fields: [], types: {}, geometry_types: [], feature_count: 0, rows: [], notice: 'Selecciona una fuente para inspeccionarla.', editable: false, data: null };
     const source = sources[0];
-    if (Number(source?.size || 0) > 25 * 1024 * 1024) return { sources: sources.map(readerSourceNameCompat), fields: [], types: {}, geometry_types: [], feature_count: null, rows: [], notice: 'La previsualización se omite por encima de 25 MB; el archivo sí podrá ejecutarse.' };
+    if (!edited && Number(source?.size || 0) > 25 * 1024 * 1024) return { sources: sources.map(readerSourceNameCompat), fields: [], types: {}, geometry_types: [], feature_count: null, rows: [], notice: 'La previsualización se omite por encima de 25 MB; el archivo sí podrá ejecutarse.', editable: false, data: null };
     const formats = { reader_geojson: 'geojson', reader_kml: 'kml', reader_csv: 'csv', reader_excel: 'xlsx', reader_shp: 'shp', reader_gpx: 'gpx', reader_gdb: 'gdb' };
     const format = formats[nodeName]; if (!format) throw new Error('Este Reader no dispone de inspección avanzada');
     let result;
-    if (format === 'gdb') {
+    if (edited) result = edited;
+    else if (format === 'gdb') {
         const owner = typeof window.JETLBackendIntegration?.readFile === 'function' ? window.JETLBackendIntegration : window.JETLBackend;
         if (typeof owner?.readFile !== 'function') return { sources: sources.map(readerSourceNameCompat), fields: [], types: {}, geometry_types: [], feature_count: null, rows: [], notice: 'La inspección GDB requiere backend.' };
         result = readerMultiOutputCompat(await owner.readFile(source, 'gdb', { all_layers: true, selected_layers: config.selected_layers || [] }));
@@ -282,18 +311,40 @@ async function readerInspectCompat(dom, nodeName, configOverride = null) {
         const value = features.find((feature) => feature.properties?.[field] != null)?.properties?.[field];
         return [field, Array.isArray(value) ? 'array' : value === null || value === undefined ? 'null' : typeof value];
     }));
-    return { sources: sources.map(readerSourceNameCompat), fields, types, geometry_types: Array.from(new Set(features.map((feature) => feature.geometry?.type || 'Null'))), feature_count: features.length, rows: features.slice(0, 5).map((feature) => ({ ...(feature.properties || {}) })), notice: sources.length > 1 ? `Vista previa de ${sources[0].name}; se ejecutarán ${sources.length} fuentes.` : '' };
+    const editable = Boolean(edited || (READER_EDITABLE_NODES.has(nodeName) && sources.length === 1 && features.length <= READER_EDIT_MAX_FEATURES));
+    const serializedSize = editable ? JSON.stringify(result).length : 0;
+    const withinSize = serializedSize <= READER_EDIT_MAX_CHARS;
+    const editNotice = edited
+        ? 'Mostrando la copia de trabajo guardada en el proyecto.'
+        : sources.length > 1
+            ? `Vista previa de ${sources[0].name}; se ejecutarán ${sources.length} fuentes y la edición requiere una sola fuente.`
+            : READER_EDITABLE_NODES.has(nodeName) && features.length > READER_EDIT_MAX_FEATURES
+                ? `Solo lectura: el editor móvil admite hasta ${READER_EDIT_MAX_FEATURES} entidades.`
+                : editable && !withinSize
+                    ? 'Solo lectura: la copia editable supera 2 MB.'
+                    : READER_EDITABLE_NODES.has(nodeName) ? 'Puedes editar una copia de trabajo; el archivo original no se sobrescribe.' : 'Vista previa de solo lectura para este formato.';
+    return {
+        sources: sources.map(readerSourceNameCompat), fields, types,
+        geometry_types: Array.from(new Set(features.map((feature) => feature.geometry?.type || 'Null'))),
+        feature_count: features.length,
+        rows: features.slice(0, 25).map((feature) => ({ ...(feature.properties || {}) })),
+        notice: editNotice,
+        editable: editable && withinSize,
+        edited: Boolean(edited),
+        data: editable && withinSize ? readerFeatureCollectionCompat(result?.type === 'FeatureCollection' ? result : turf.featureCollection(features), result?.metadata || {}) : null
+    };
 }
 
-if (typeof window !== 'undefined') window.JETLReaderTools = { inspect: readerInspectCompat, config: readerConfigCompat, defaults: READER_NODE_DEFAULTS };
+if (typeof window !== 'undefined') window.JETLReaderTools = { inspect: readerInspectCompat, config: readerConfigCompat, editedData: readerEditedDataCompat, defaults: READER_NODE_DEFAULTS, editLimits: { features: READER_EDIT_MAX_FEATURES, chars: READER_EDIT_MAX_CHARS } };
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_geojson: {
         cat: '1. READERS', label: 'GeoJSON Reader', icon: 'fa-file-code', color: '#e67e22', in: 0, out: 1,
         help: 'Lee uno o varios GeoJSON localmente en Studio.',
         tpl: () => readerFileTemplateCompat('.geojson,.json', 'GeoJSON · colección', READER_NODE_DEFAULTS.reader_geojson),
         run: async (id, inputs, dom) => {
+            const options = readerConfigCompat(dom, 'reader_geojson'); const edited = readerEditedOrNullCompat(dom, 'reader_geojson', options); if (edited) return edited;
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios GeoJSON');
-            return await readerCollectionCompat(sources, 'geojson', readerConfigCompat(dom, 'reader_geojson'));
+            return await readerCollectionCompat(sources, 'geojson', options);
         }
     },
 
@@ -312,8 +363,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         help: 'Lee CSV localmente y detecta coordenadas lat/lon o WKT.',
         tpl: () => readerFileTemplateCompat('.csv', 'CSV · lat/lon o WKT', READER_NODE_DEFAULTS.reader_csv),
         run: async (id, inputs, dom) => {
-            const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios CSV');
             const options = readerConfigCompat(dom, 'reader_csv');
+            const edited = readerEditedOrNullCompat(dom, 'reader_csv', options); if (edited) return edited;
+            const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios CSV');
             return await readerCollectionCompat(sources, 'csv', options);
         }
     },
@@ -323,8 +375,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         help: 'Lee Excel localmente y detecta coordenadas lat/lon.',
         tpl: () => readerFileTemplateCompat('.xlsx,.xls', 'Excel · hoja y esquema', READER_NODE_DEFAULTS.reader_excel),
         run: async (id, inputs, dom) => {
-            const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios Excel');
             const options = readerConfigCompat(dom, 'reader_excel');
+            const edited = readerEditedOrNullCompat(dom, 'reader_excel', options); if (edited) return edited;
+            const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios Excel');
             return await readerCollectionCompat(sources, 'xlsx', options);
         }
     },

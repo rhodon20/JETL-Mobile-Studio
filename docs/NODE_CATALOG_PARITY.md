@@ -37,17 +37,21 @@ nodos del alcance están compartidos** y no quedan ausencias objetivo.
 
 ## Editor avanzado de Readers
 
-La primera versión está implementada para GeoJSON, KML, CSV, Excel, SHP, GPX y
-GDB como modal centrado y táctil. Agrupa selección de fuentes, opciones específicas
-del formato, política de esquema, CRS, tipos, geometrías y una muestra de cinco
-filas antes de ejecutar. Los archivos de más de 25 MB omiten la previsualización
-para no bloquear el navegador móvil, pero siguen disponibles para ejecución.
+El editor está implementado para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB como
+modal centrado y táctil. Agrupa selección de fuentes, opciones específicas del
+formato, política de esquema, CRS, tipos, geometrías y datos paginados antes de
+ejecutar. CSV, Excel y GeoJSON admiten búsqueda, edición de celdas, altas y bajas
+sobre una copia de trabajo persistida dentro del nodo. Esa copia gobierna las
+ejecuciones posteriores. KML, GPX, SHP y GDB permanecen en inspección de solo
+lectura porque reescribirlos exige reempaquetado o backend. Los archivos de más
+de 25 MB omiten la previsualización para no bloquear el navegador móvil, pero
+siguen disponibles para ejecución.
 
-Hay una limitación web real: Safari no permite conservar rutas locales como
-Desktop. El editor deberá trabajar con archivos seleccionados, handles cuando el
-navegador los soporte y una copia gestionada en almacenamiento local; nunca debe
-mostrar una ruta como si siguiera siendo válida cuando el permiso ya expiró.
-`reader_file` es una abstracción exclusiva de Studio.
+Hay una limitación web real: Safari no permite conservar rutas ni sobrescribir de
+forma fiable archivos locales como Desktop. Studio conserva una copia editable
+en el proyecto (máximo 5.000 entidades y 2 MB) y nunca presenta esa copia como
+una modificación del original. Al seleccionar otra fuente se descarta la copia
+anterior. `reader_file` es una abstracción exclusiva de Studio.
 
 | Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
 | --- | ---: | ---: | ---: | ---: |

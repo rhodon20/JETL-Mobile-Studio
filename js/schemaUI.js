@@ -1379,14 +1379,73 @@
         if (value == null) return '—'; if (typeof value === 'object') return JSON.stringify(value); return String(value);
     }
 
+    function _readerClone(value) { return value == null ? value : JSON.parse(JSON.stringify(value)); }
+
+    function _readerEditorStatus() {
+        const status = document.getElementById('reader-editor-preview-status'); if (!status || !currentReaderEditor) return;
+        const state = currentReaderEditor;
+        const dirty = state.dirty ? ` · ${state.dirtyCount || 1} cambios pendientes` : '';
+        status.textContent = `${state.featureCount == null ? 'Recuento no disponible' : `${state.featureCount} entidades`} · ${(state.geometryTypes || []).join(', ') || 'sin geometría'}${state.notice ? ` · ${state.notice}` : ''}${dirty}`;
+        status.dataset.dirty = state.dirty ? '1' : '0';
+    }
+
+    function _readerCastEdit(value, previous) {
+        if (value === '') return null;
+        if (typeof previous === 'number') { const number = Number(value); return Number.isFinite(number) ? number : value; }
+        if (typeof previous === 'boolean' && /^(true|false)$/i.test(value)) return value.toLowerCase() === 'true';
+        if (previous && typeof previous === 'object') { try { return JSON.parse(value); } catch (_) { return value; } }
+        return value;
+    }
+
+    function _readerVisibleFeatures() {
+        if (!currentReaderEditor?.workingData?.features) return [];
+        const search = String(currentReaderEditor.search || '').trim().toLowerCase();
+        return currentReaderEditor.workingData.features.map((feature, index) => ({ feature, index })).filter(({ feature }) => {
+            if (!search) return true;
+            return Object.values(feature.properties || {}).some((value) => _readerCell(value).toLowerCase().includes(search));
+        });
+    }
+
+    function _renderReaderDataTable() {
+        if (!currentReaderEditor) return;
+        const state = currentReaderEditor; const table = document.getElementById('reader-editor-preview-table'); const pagination = document.getElementById('reader-editor-pagination');
+        if (!table || !pagination) return;
+        table.innerHTML = '';
+        const fields = state.fields || [];
+        const entries = state.editable ? _readerVisibleFeatures() : (state.previewRows || []).map((properties, index) => ({ feature: { properties }, index }));
+        if (!fields.length || !entries.length) { pagination.hidden = true; return; }
+        const pageCount = Math.max(1, Math.ceil(entries.length / state.pageSize)); state.page = Math.min(Math.max(1, state.page || 1), pageCount);
+        const rows = entries.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+        const head = document.createElement('thead'); const headRow = document.createElement('tr');
+        if (state.editable) { const action = document.createElement('th'); action.textContent = ''; headRow.appendChild(action); }
+        fields.forEach((field) => { const th = document.createElement('th'); th.textContent = field; headRow.appendChild(th); }); head.appendChild(headRow); table.appendChild(head);
+        const body = document.createElement('tbody');
+        rows.forEach(({ feature, index }) => {
+            const tr = document.createElement('tr');
+            if (state.editable) {
+                const actionCell = document.createElement('td'); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn'; remove.dataset.readerDeleteRow = String(index); remove.title = 'Borrar fila'; remove.innerHTML = '<i class="fas fa-trash"></i>'; actionCell.appendChild(remove); tr.appendChild(actionCell);
+            }
+            fields.forEach((field) => {
+                const td = document.createElement('td'); const value = feature.properties?.[field];
+                if (state.editable) {
+                    const input = document.createElement('input'); input.className = 'source-editor-cell'; input.value = value == null ? '' : _readerCell(value); input.dataset.readerRowIndex = String(index); input.dataset.readerField = field; input.setAttribute('aria-label', `${field}, fila ${index + 1}`); td.appendChild(input);
+                } else { td.textContent = _readerCell(value); td.title = td.textContent; }
+                tr.appendChild(td);
+            }); body.appendChild(tr);
+        }); table.appendChild(body);
+        pagination.hidden = entries.length <= state.pageSize;
+        const pageInfo = document.getElementById('reader-editor-page-info'); if (pageInfo) pageInfo.textContent = `Página ${state.page} / ${pageCount} · ${entries.length} filas`;
+    }
+
     function _renderReaderPreview(result) {
-        const status = document.getElementById('reader-editor-preview-status'); const schema = document.getElementById('reader-editor-schema'); const table = document.getElementById('reader-editor-preview-table');
-        if (!status || !schema || !table) return;
-        status.textContent = `${result.feature_count == null ? 'Recuento no disponible' : `${result.feature_count} entidades`} · ${(result.geometry_types || []).join(', ') || 'sin geometría'}${result.notice ? ` · ${result.notice}` : ''}`;
+        const schema = document.getElementById('reader-editor-schema'); const toolbar = document.getElementById('reader-editor-data-toolbar');
+        if (!schema || !toolbar || !currentReaderEditor) return;
+        Object.assign(currentReaderEditor, { featureCount: result.feature_count, geometryTypes: result.geometry_types || [], notice: result.notice || '', fields: result.fields || [], types: result.types || {}, previewRows: result.rows || [], editable: Boolean(result.editable), workingData: result.data ? _readerClone(result.data) : null, dirty: false, dirtyCount: 0, page: 1, search: '', persistedEdited: Boolean(result.edited) });
+        const search = document.getElementById('reader-editor-search'); if (search) search.value = '';
+        toolbar.hidden = !currentReaderEditor.editable;
         schema.innerHTML = ''; (result.fields || []).forEach((field) => { const chip = document.createElement('span'); chip.textContent = `${field}: ${result.types?.[field] || 'null'}`; schema.appendChild(chip); });
-        table.innerHTML = ''; const fields = result.fields || []; if (!fields.length || !(result.rows || []).length) return;
-        const head = document.createElement('thead'); const headRow = document.createElement('tr'); fields.forEach((field) => { const th = document.createElement('th'); th.textContent = field; headRow.appendChild(th); }); head.appendChild(headRow); table.appendChild(head);
-        const body = document.createElement('tbody'); result.rows.forEach((row) => { const tr = document.createElement('tr'); fields.forEach((field) => { const td = document.createElement('td'); td.textContent = _readerCell(row[field]); td.title = td.textContent; tr.appendChild(td); }); body.appendChild(tr); }); table.appendChild(body);
+        const discard = toolbar.querySelector('[data-ui-action="reader-discard-edits"]'); if (discard) discard.hidden = !currentReaderEditor.persistedEdited;
+        _readerEditorStatus(); _renderReaderDataTable();
     }
 
     async function refreshReaderEditorPreview() {
@@ -1401,16 +1460,46 @@
     function openReaderEditor(nodeId) {
         const node = _safeGetNode(nodeId).node; const definition = _readerEditorDefinition(node?.name); const nodeEl = document.getElementById('node-' + nodeId); const modal = document.getElementById('reader-editor-modal');
         if (!definition || !nodeEl || !modal) return false;
-        currentReaderEditor = { nodeId: String(nodeId), name: node.name };
+        currentReaderEditor = { nodeId: String(nodeId), name: node.name, page: 1, pageSize: 25, search: '', dirty: false, dirtyCount: 0 };
         document.getElementById('reader-editor-title').textContent = definition.title; document.getElementById('reader-editor-subtitle').textContent = definition.subtitle;
         const fields = document.getElementById('reader-editor-fields'); fields.innerHTML = ''; const config = _readerEditorConfig(nodeEl, definition);
         definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, _geometryTransformGet(config, field.key))));
         _renderReaderEditorSources(nodeEl); modal.style.display = 'flex'; refreshReaderEditorPreview(); return true;
     }
 
-    function closeReaderEditor(save) {
+    function _readerMarkDirty() {
+        if (!currentReaderEditor) return; currentReaderEditor.dirty = true; currentReaderEditor.dirtyCount = (currentReaderEditor.dirtyCount || 0) + 1; _readerEditorStatus();
+    }
+
+    function addReaderEditorRow() {
+        if (!currentReaderEditor?.editable || !currentReaderEditor.workingData) return false;
+        const properties = Object.fromEntries((currentReaderEditor.fields || []).map((field) => [field, null]));
+        currentReaderEditor.workingData.features.push({ type: 'Feature', geometry: null, properties }); currentReaderEditor.featureCount = currentReaderEditor.workingData.features.length; currentReaderEditor.page = Math.ceil(currentReaderEditor.featureCount / currentReaderEditor.pageSize); _readerMarkDirty(); _renderReaderDataTable(); return true;
+    }
+
+    function applyReaderEditorChanges() {
+        if (!currentReaderEditor?.editable || !currentReaderEditor.workingData) return false;
+        const nodeEl = document.getElementById('node-' + currentReaderEditor.nodeId); const storage = nodeEl?.querySelector('[df-reader-edited-data]'); if (!storage) return false;
+        const data = _readerClone(currentReaderEditor.workingData); data.metadata = { ...(data.metadata || {}), edited_copy: true, source_mode: 'project_working_copy', feature_count: data.features.length };
+        const serialized = JSON.stringify(data); const limits = window.JETLReaderTools?.editLimits || { features: 5000, chars: 2097152 };
+        if (data.features.length > limits.features || serialized.length > limits.chars) { const status = document.getElementById('reader-editor-preview-status'); if (status) status.textContent = `No se puede aplicar: máximo ${limits.features} entidades y 2 MB por copia editable.`; return false; }
+        _commitNodeControl(storage, serialized); currentReaderEditor.dirty = false; currentReaderEditor.dirtyCount = 0; currentReaderEditor.persistedEdited = true; currentReaderEditor.notice = 'Copia de trabajo aplicada; será la fuente de la próxima ejecución.';
+        const discard = document.querySelector('#reader-editor-data-toolbar [data-ui-action="reader-discard-edits"]'); if (discard) discard.hidden = false;
+        const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary && !summary.textContent.includes('editada')) summary.textContent += ' · editada';
+        _readerEditorStatus(); return true;
+    }
+
+    async function discardReaderEditorCopy() {
+        if (!currentReaderEditor) return false; const nodeEl = document.getElementById('node-' + currentReaderEditor.nodeId); const storage = nodeEl?.querySelector('[df-reader-edited-data]');
+        if (storage) _commitNodeControl(storage, '');
+        const summary = nodeEl?.querySelector('[data-reader-file-summary]'); if (summary) { const files = _readerEditorSources(nodeEl); summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Sin fuente'; }
+        return await refreshReaderEditorPreview();
+    }
+
+    async function closeReaderEditor(save) {
         const modal = document.getElementById('reader-editor-modal'); if (!modal) return;
         if (save && currentReaderEditor) {
+            if (currentReaderEditor.dirty && !applyReaderEditorChanges()) return;
             const { nodeId, name } = currentReaderEditor; const nodeEl = document.getElementById('node-' + nodeId); const definition = _readerEditorDefinition(name);
             if (nodeEl && definition) {
                 const config = _readerEditorFormConfig(definition); _commitNodeControl(nodeEl.querySelector('[df-reader-config]'), JSON.stringify(config));
@@ -1604,6 +1693,15 @@
             else if (action === 'save-reader-editor') closeReaderEditor(true);
             else if (action === 'reader-refresh-preview') refreshReaderEditorPreview();
             else if (action === 'reader-select-files' && currentReaderEditor) document.getElementById('node-' + currentReaderEditor.nodeId)?.querySelector('[df-file]')?.click();
+            else if (action === 'reader-add-row') addReaderEditorRow();
+            else if (action === 'reader-apply-edits') applyReaderEditorChanges();
+            else if (action === 'reader-discard-edits') discardReaderEditorCopy();
+            else if (action === 'reader-prev-page' && currentReaderEditor) { currentReaderEditor.page = Math.max(1, currentReaderEditor.page - 1); _renderReaderDataTable(); }
+            else if (action === 'reader-next-page' && currentReaderEditor) { currentReaderEditor.page += 1; _renderReaderDataTable(); }
+            const deleteRow = evt.target.closest('[data-reader-delete-row]');
+            if (deleteRow && currentReaderEditor?.editable) {
+                const index = Number(deleteRow.dataset.readerDeleteRow); if (Number.isInteger(index) && currentReaderEditor.workingData?.features?.[index]) { currentReaderEditor.workingData.features.splice(index, 1); currentReaderEditor.featureCount = currentReaderEditor.workingData.features.length; _readerMarkDirty(); _renderReaderDataTable(); }
+            }
         });
 
         document.addEventListener('dblclick', (evt) => {
@@ -1631,10 +1729,19 @@
             if (!summary) return;
             const files = Array.from(input.files || []);
             summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Seleccionar archivo';
+            const editedStorage = input.closest('.drawflow-node')?.querySelector('[df-reader-edited-data]'); if (editedStorage?.value) _commitNodeControl(editedStorage, '');
             if (currentReaderEditor && input.closest('.drawflow-node')?.id === 'node-' + currentReaderEditor.nodeId) {
                 _renderReaderEditorSources(input.closest('.drawflow-node'));
                 refreshReaderEditorPreview();
             }
+        });
+
+        document.addEventListener('input', (evt) => {
+            if (evt.target.id === 'reader-editor-search' && currentReaderEditor) { currentReaderEditor.search = evt.target.value; currentReaderEditor.page = 1; _renderReaderDataTable(); return; }
+            const cell = evt.target.closest('[data-reader-row-index][data-reader-field]');
+            if (!cell || !currentReaderEditor?.editable) return;
+            const index = Number(cell.dataset.readerRowIndex); const field = cell.dataset.readerField; const feature = currentReaderEditor.workingData?.features?.[index]; if (!feature || !field) return;
+            feature.properties = feature.properties || {}; feature.properties[field] = _readerCastEdit(cell.value, feature.properties[field]); cell.classList.add('is-edited'); _readerMarkDirty();
         });
 
         document.addEventListener('change', (evt) => {
@@ -1792,6 +1899,9 @@
         openAttributeManagerEditor,
         openGeometryTransformEditor,
         openReaderEditor,
-        refreshReaderEditorPreview
+        refreshReaderEditorPreview,
+        addReaderEditorRow,
+        applyReaderEditorChanges,
+        discardReaderEditorCopy
     };
 })();

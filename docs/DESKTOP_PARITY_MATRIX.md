@@ -55,7 +55,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | --- | --- | --- |
 | Importar/exportar proyecto | Implementado | Compatibilidad bidireccional de versión y validación |
 | Autoguardado y recuperación | Parcial | Versionado, conflicto y restauración explícitos |
-| Editor de Readers | Implementado v1 para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB | Selección táctil, configuración, esquema, tipos, geometrías, muestra y aviso de permisos web |
+| Editor de Readers | Implementado para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB; edición de filas en CSV, Excel y GeoJSON | Configuración e inspección para todos; copia de trabajo con búsqueda, paginación, altas, bajas y cambios para formatos web seguros |
 | Transformers, paquetes y plantillas | Pendiente | Catálogo compatible con el runtime web |
 | Ajustes, apariencia e idioma | Parcial | Completar preferencias reproducibles por proyecto/dispositivo |
 | Backend y sistema de archivos local | Adaptación explícita: Readers locales cuando es viable; GDB/FeatureReader requieren servicio | Sustituir solo cuando exista una Web API segura |

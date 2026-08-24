@@ -2833,10 +2833,17 @@ body.modal-open {
                     <div id="reader-editor-fields" class="modal-form"></div>
                 </section>
                 <section>
-                    <div class="reader-editor-preview-head"><div class="reader-editor-section-title">Inspección previa</div><button type="button" class="btn" data-ui-action="reader-refresh-preview"><i class="fas fa-rotate"></i> Actualizar</button></div>
+                    <div class="reader-editor-preview-head"><div class="reader-editor-section-title">Datos</div><button type="button" class="btn" data-ui-action="reader-refresh-preview"><i class="fas fa-rotate"></i> Actualizar</button></div>
                     <div id="reader-editor-preview-status" class="reader-editor-preview-status">Selecciona una fuente.</div>
                     <div id="reader-editor-schema" class="reader-editor-schema"></div>
+                    <div id="reader-editor-data-toolbar" class="reader-editor-data-toolbar" hidden>
+                        <label class="reader-editor-search"><i class="fas fa-search"></i><input id="reader-editor-search" class="node-control" type="search" placeholder="Buscar en los datos"></label>
+                        <button type="button" class="btn" data-ui-action="reader-add-row"><i class="fas fa-plus"></i> Fila</button>
+                        <button type="button" class="btn btn-primary" data-ui-action="reader-apply-edits"><i class="fas fa-check"></i> Aplicar cambios</button>
+                        <button type="button" class="btn" data-ui-action="reader-discard-edits"><i class="fas fa-rotate-left"></i> Descartar copia</button>
+                    </div>
                     <div class="reader-editor-table-wrap"><table id="reader-editor-preview-table" class="reader-editor-preview-table"></table></div>
+                    <div id="reader-editor-pagination" class="reader-editor-pagination" hidden><button type="button" class="btn" data-ui-action="reader-prev-page" aria-label="Página anterior"><i class="fas fa-chevron-left"></i></button><span id="reader-editor-page-info">Página 1 / 1</span><button type="button" class="btn" data-ui-action="reader-next-page" aria-label="Página siguiente"><i class="fas fa-chevron-right"></i></button></div>
                 </section>
             </div>
             <div class="modal-footer"><button class="btn" data-ui-action="close-reader-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-reader-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
@@ -2848,10 +2855,18 @@ body.modal-open {
         .reader-editor-preview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
         .reader-editor-schema { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
         .reader-editor-schema span { border:1px solid #3a3a3a; border-radius:999px; padding:4px 8px; color:#bbb; font-size:.72rem; }
+        .reader-editor-data-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+        .reader-editor-data-toolbar[hidden],.reader-editor-pagination[hidden] { display:none; }
+        .reader-editor-search { display:flex; align-items:center; gap:7px; flex:1 1 180px; border:1px solid #3a3a3a; border-radius:8px; padding:0 9px; color:#888; }
+        .reader-editor-search input { min-width:0; width:100%; border:0; background:transparent; }
         .reader-editor-table-wrap { width:100%; overflow:auto; border:1px solid #353535; border-radius:8px; max-height:240px; }
         .reader-editor-preview-table { border-collapse:collapse; min-width:100%; font-size:.72rem; color:#ddd; }
         .reader-editor-preview-table th,.reader-editor-preview-table td { padding:7px 9px; border-bottom:1px solid #333; text-align:left; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
         .reader-editor-preview-table th { position:sticky; top:0; background:#252525; color:#9ed5ff; }
+        .reader-editor-preview-table input { min-width:110px; width:100%; border:1px solid transparent; background:#161616; color:#eee; padding:6px 7px; border-radius:5px; }
+        .reader-editor-preview-table input:focus,.reader-editor-preview-table input.is-edited { border-color:#3498db; outline:0; }
+        .reader-editor-preview-table tr.is-deleted { opacity:.4; text-decoration:line-through; }
+        .reader-editor-pagination { display:flex; justify-content:center; align-items:center; gap:10px; color:#aaa; font-size:.78rem; margin-top:8px; }
         .ctx-item {
             padding: 8px 12px;
             font-size: 0.85rem;
@@ -3705,7 +3720,7 @@ body.modal-open {
 window.JETLBootModuleLoaded(1, 14, "readers.js");
     </script>
 
-    <script defer src="js/nodes/readers.js?v=20260824-2"
+    <script defer src="js/nodes/readers.js?v=20260824-3"
         onload="window.JETLBootModuleLoaded(2, 14, &quot;geometry.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
 
@@ -3777,7 +3792,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260824-23';
+        const JETL_EXTRAS_VERSION = '20260824-24';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

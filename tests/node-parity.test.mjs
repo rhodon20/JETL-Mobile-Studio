@@ -407,6 +407,26 @@ test('la configuración guardada por el editor gobierna la ejecución del CSV Re
     assert.equal(JSON.stringify(result.features[0].geometry.coordinates), JSON.stringify([-3.7, 40.4])); assert.equal(result.features[0].properties.label, 'Madrid');
 });
 
+test('la copia editada del Reader gobierna la ejecución aunque el archivo original no esté disponible', async () => {
+    const registry = loadReaders();
+    const edited = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [-3.7, 40.4] }, properties: { id: 7, name: 'Madrid editado' } }]);
+    const controls = { '[df-file]': { files: [] }, '[df-reader-config]': { value: JSON.stringify({ crs: 'EPSG:4326' }) }, '[df-reader-edited-data]': { value: JSON.stringify(edited) } };
+    const result = await registry.reader_csv.run('1', [], { querySelector: (selector) => controls[selector] });
+    assert.equal(result.features[0].properties.name, 'Madrid editado');
+    assert.equal(result.metadata.edited_copy, true);
+    assert.equal(result.metadata.source_mode, 'project_working_copy');
+    assert.equal(result.metadata.crs, 'EPSG:4326');
+});
+
+test('el editor solo habilita copia modificable para un Reader web seguro y una fuente', async () => {
+    const overrides = {}; const registry = loadReaders(overrides);
+    assert.match(registry.reader_geojson.tpl(), /df-reader-edited-data/);
+    const file = { name: 'data.geojson', size: 128, text: async () => JSON.stringify(featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1 } }])) };
+    const controls = { '[df-file]': { files: [file] }, '[df-reader-config]': { value: '{}' }, '[df-reader-edited-data]': { value: '' } };
+    const result = await overrides.__window.JETLReaderTools.inspect({ querySelector: (selector) => controls[selector] }, 'reader_geojson');
+    assert.equal(result.editable, true); assert.equal(result.data.features.length, 1); assert.match(result.notice, /archivo original no se sobrescribe/);
+});
+
 test('GPX conserva capas y completa las 16 salidas Desktop', async () => {
     const textNode = (value) => ({ textContent: value });
     const pointNode = (lon, lat, name) => ({
