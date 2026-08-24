@@ -2853,7 +2853,10 @@ body.modal-open {
             <div class="modal-body modal-form">
                 <section class="reader-editor-source">
                     <div class="reader-editor-section-title">Fuente</div>
-                    <button type="button" class="btn btn-primary" data-ui-action="reader-select-files"><i class="fas fa-folder-open"></i> Seleccionar archivos</button>
+                    <label class="reader-editor-native-picker" for="reader-editor-file-input">
+                        <span><i class="fas fa-folder-open"></i> Cargar datos desde el dispositivo</span>
+                        <input id="reader-editor-file-input" type="file" multiple aria-describedby="reader-editor-source-list">
+                    </label>
                     <div id="reader-editor-source-list" class="reader-editor-source-list">Sin archivos seleccionados</div>
                     <div class="modal-help"><i class="fas fa-shield-halved"></i> El navegador no conserva rutas locales. Si se recarga la página, será necesario volver a autorizar los archivos.</div>
                 </section>
@@ -2880,6 +2883,9 @@ body.modal-open {
     </div>
     <style>
         .reader-editor-section-title { font-weight:700; color:#eee; margin:2px 0 8px; }
+        .reader-editor-native-picker { display:grid; gap:8px; padding:12px; border:1px solid #3f6480; border-radius:10px; background:#182532; color:#bfe4ff; font-weight:700; cursor:pointer; }
+        .reader-editor-native-picker input[type="file"] { display:block; width:100%; min-height:44px; color:#d8d8dc; font:inherit; cursor:pointer; }
+        .reader-editor-native-picker input[type="file"]::file-selector-button { min-height:44px; margin-right:10px; padding:9px 13px; border:1px solid #4aa9e8; border-radius:8px; background:#2687c8; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
         .reader-editor-source-list,.reader-editor-preview-status { color:#aaa; font-size:.82rem; line-height:1.4; margin:8px 0; }
         .reader-editor-preview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
         .reader-editor-schema { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
@@ -3753,7 +3759,7 @@ body.modal-open {
 window.JETLBootModuleLoaded(1, 14, "readers.js");
     </script>
 
-    <script defer src="js/nodes/readers.js?v=20260824-3"
+    <script defer src="js/nodes/readers.js?v=20260824-4"
         onload="window.JETLBootModuleLoaded(2, 14, &quot;geometry.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
 
@@ -3825,7 +3831,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260824-25';
+        const JETL_EXTRAS_VERSION = '20260824-26';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

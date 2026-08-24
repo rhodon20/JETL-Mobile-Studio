@@ -90,8 +90,10 @@ inferior en móvil.
 
 FeatureReader también reutiliza este editor modal, con soporte para campos JSON
 anidados y persistencia en `df-fr-config`. Los lectores basados en archivos
-mantienen el selector nativo en el nodo y ofrecen feedback inmediato con el
-nombre o número de archivos seleccionados. CSV, Excel y GeoJSON añaden un editor
+exponen el selector nativo directamente dentro del modal y ofrecen feedback
+inmediato con el nombre o número de archivos seleccionados. No dependen de abrir
+por JavaScript un input oculto, evitando el bloqueo de gestos de iOS. CSV, Excel
+y GeoJSON añaden un editor
 de datos inspirado en Desktop: búsqueda, páginas, edición, altas y bajas. En
 Safari los cambios se guardan como copia de trabajo del proyecto y no intentan
 sobrescribir el archivo local sin un permiso que el navegador no puede mantener.

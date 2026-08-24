@@ -43,6 +43,10 @@ function readerCloneCompat(value) {
 }
 
 function readerSelectedFilesCompat(dom) {
+    const stored = typeof window !== 'undefined' && window.JETLReaderFileStore?.get
+        ? window.JETLReaderFileStore.get(dom)
+        : null;
+    if (Array.isArray(stored) && stored.length) return stored.filter(Boolean);
     const input = dom?.querySelector?.('[df-file]');
     return input?.files ? Array.from(input.files).filter(Boolean) : [];
 }

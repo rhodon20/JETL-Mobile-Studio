@@ -1528,6 +1528,11 @@
 
     let currentReaderEditor = null;
 
+    function _readerFileStore() {
+        if (!window.JETLReaderFileStore?.get || !window.JETLReaderFileStore?.set) window.JETLReaderFileStore = new WeakMap();
+        return window.JETLReaderFileStore;
+    }
+
     function _readerEditorDefinition(name) { return READER_EDITOR_DEFINITIONS[name] || null; }
 
     function _readerEditorConfig(nodeEl, definition) {
@@ -1548,7 +1553,9 @@
     }
 
     function _readerEditorSources(nodeEl) {
-        return Array.from(nodeEl?.querySelector('[df-file]')?.files || []);
+        const stored = nodeEl ? _readerFileStore().get(nodeEl) : null;
+        if (Array.isArray(stored) && stored.length) return stored.filter(Boolean);
+        return Array.from(nodeEl?.querySelector('[df-file]')?.files || []).filter(Boolean);
     }
 
     function _renderReaderEditorSources(nodeEl) {
@@ -1644,6 +1651,13 @@
         if (!definition || !nodeEl || !modal) return false;
         currentReaderEditor = { nodeId: String(nodeId), name: node.name, page: 1, pageSize: 25, search: '', dirty: false, dirtyCount: 0 };
         document.getElementById('reader-editor-title').textContent = definition.title; document.getElementById('reader-editor-subtitle').textContent = definition.subtitle;
+        const sourceInput = nodeEl.querySelector('[df-file]'); const picker = document.getElementById('reader-editor-file-input');
+        if (picker) {
+            picker.value = '';
+            picker.accept = sourceInput?.accept || '';
+            picker.multiple = sourceInput?.multiple !== false;
+            picker.setAttribute('aria-label', `Cargar datos para ${definition.title}`);
+        }
         const fields = document.getElementById('reader-editor-fields'); fields.innerHTML = ''; const config = _readerEditorConfig(nodeEl, definition);
         definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, _geometryTransformGet(config, field.key))));
         _renderReaderEditorSources(nodeEl); modal.style.display = 'flex'; refreshReaderEditorPreview(); return true;
@@ -1890,7 +1904,6 @@
             else if (action === 'close-reader-editor') closeReaderEditor(false);
             else if (action === 'save-reader-editor') closeReaderEditor(true);
             else if (action === 'reader-refresh-preview') refreshReaderEditorPreview();
-            else if (action === 'reader-select-files' && currentReaderEditor) document.getElementById('node-' + currentReaderEditor.nodeId)?.querySelector('[df-file]')?.click();
             else if (action === 'reader-add-row') addReaderEditorRow();
             else if (action === 'reader-apply-edits') applyReaderEditorChanges();
             else if (action === 'reader-discard-edits') discardReaderEditorCopy();
@@ -1923,8 +1936,30 @@
         document.getElementById('strrep-editor-no-match')?.addEventListener('change', _syncStringReplacerNoMatch);
 
         document.addEventListener('change', (evt) => {
+            if (evt.target.id === 'reader-editor-file-input') {
+                if (!currentReaderEditor) return;
+                const nodeEl = document.getElementById('node-' + currentReaderEditor.nodeId);
+                const files = Array.from(evt.target.files || []).filter(Boolean);
+                if (!nodeEl || !files.length) return;
+                _readerFileStore().set(nodeEl, files);
+                const sourceInput = nodeEl.querySelector('[df-file]');
+                if (sourceInput) {
+                    try { sourceInput.files = evt.target.files; } catch (_) { /* Safari usa el almacén temporal seguro. */ }
+                }
+                const editedStorage = nodeEl.querySelector('[df-reader-edited-data]');
+                if (editedStorage?.value) _commitNodeControl(editedStorage, '');
+                const summary = nodeEl.querySelector('[data-reader-file-summary]');
+                if (summary) summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0].name;
+                _renderReaderEditorSources(nodeEl);
+                const status = document.getElementById('reader-editor-preview-status');
+                if (status) status.textContent = `${files.length} ${files.length === 1 ? 'archivo recibido' : 'archivos recibidos'} · preparando vista previa…`;
+                refreshReaderEditorPreview();
+                return;
+            }
             const input = evt.target.closest('input[type="file"][df-file]');
             if (!input) return;
+            const nodeEl = input.closest('.drawflow-node');
+            if (nodeEl) _readerFileStore().set(nodeEl, Array.from(input.files || []).filter(Boolean));
             const summary = input.closest('.drawflow-node')?.querySelector('[data-reader-file-summary]');
             if (!summary) return;
             const files = Array.from(input.files || []);

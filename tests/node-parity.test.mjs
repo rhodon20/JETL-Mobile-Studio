@@ -424,6 +424,17 @@ test('CSV Reader detecta lat/lon, tipa valores y concatena archivos sin mutació
     assert.equal(result.metadata.source_count, 2);
 });
 
+test('el selector móvil entrega archivos aunque Safari no permita asignarlos al input oculto', async () => {
+    const file = { name: 'movil.csv', text: async () => 'id,lat,lon,name\n1,40.4,-3.7,Madrid' };
+    const controls = { '[df-file]': { files: [] }, '[df-reader-config]': { value: JSON.stringify({ delimiter: ',', lat_column: 'lat', lon_column: 'lon' }) }, '[df-reader-edited-data]': { value: '' } };
+    const dom = { id: 'node-42', querySelector: (selector) => controls[selector] };
+    const registry = loadReaders({ JETLReaderFileStore: { get: (target) => target === dom ? [file] : [] } });
+    const result = await registry.reader_csv.run('42', [], dom);
+    assert.equal(result.features.length, 1);
+    assert.equal(result.features[0].properties.name, 'Madrid');
+    assert.deepEqual(Array.from(result.features[0].geometry.coordinates), [-3.7, 40.4]);
+});
+
 test('GeoJSON, KML, SHP y Excel usan el motor local adecuado', async () => {
     const formatCalls = [];
     const windowOverrides = {

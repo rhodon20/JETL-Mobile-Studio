@@ -47,6 +47,11 @@ lectura porque reescribirlos exige reempaquetado o backend. Los archivos de más
 de 25 MB omiten la previsualización para no bloquear el navegador móvil, pero
 siguen disponibles para ejecución.
 
+La selección se realiza con un `input[type=file]` nativo y visible dentro del
+modal. No depende de invocar programáticamente un control oculto: los archivos
+se conservan en un almacén temporal asociado al nodo y llegan al runtime aunque
+Safari no permita reasignar su `FileList`.
+
 Hay una limitación web real: Safari no permite conservar rutas ni sobrescribir de
 forma fiable archivos locales como Desktop. Studio conserva una copia editable
 en el proyecto (máximo 5.000 entidades y 2 MB) y nunca presenta esa copia como

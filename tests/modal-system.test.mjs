@@ -91,7 +91,7 @@ test('un modal visible converge tras una sola mutación de clase', () => {
 });
 
 test('los módulos auxiliares tienen versión nueva y sólo carga explícita', () => {
-    assert.match(index, /const JETL_EXTRAS_VERSION = '20260824-25'/);
+    assert.match(index, /const JETL_EXTRAS_VERSION = '20260824-26'/);
     assert.match(index, /const JETL_EXTRA_SCRIPTS = \[\s*'js\/modalSystem\.js',\s*'js\/schemaUI\.js'/);
     assert.match(index, /script\.src = src \+ '\?v=' \+ JETL_EXTRAS_VERSION/);
     assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);
@@ -134,7 +134,10 @@ test('String Formatter usa el contrato modal de Desktop y persiste JSON', () => 
     assert.match(index, /id="reader-editor-modal"[\s\S]+id="reader-editor-preview-table"/);
     assert.match(readers, /reader_csv:[\s\S]+data-schema-action="reader-open-editor"/);
     assert.match(schema, /READER_EDITOR_DEFINITIONS[\s\S]+function openReaderEditor\(nodeId\)/);
-    assert.match(schema, /reader-select-files/);
+    assert.match(index, /id="reader-editor-file-input"[^>]+type="file"/);
+    assert.match(index, /Cargar datos desde el dispositivo/);
+    assert.match(schema, /JETLReaderFileStore/);
+    assert.doesNotMatch(schema, /reader-select-files[^\n]+\.click\(/);
     assert.match(schema, /reader-refresh-preview/);
     assert.match(index, /data-ui-action="reader-add-row"[\s\S]+data-ui-action="reader-apply-edits"[\s\S]+data-ui-action="reader-discard-edits"/);
     assert.match(readers, /df-reader-edited-data/);
