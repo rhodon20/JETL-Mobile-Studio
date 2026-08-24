@@ -5,6 +5,8 @@ import vm from 'node:vm';
 
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const engine = readFileSync(new URL('../js/engine.js', import.meta.url), 'utf8');
+const readers = readFileSync(new URL('../js/nodes/readers.js', import.meta.url), 'utf8');
+const attributes = readFileSync(new URL('../js/nodes/attributes.js', import.meta.url), 'utf8');
 
 test('el gesto del catálogo distingue tap de scroll', () => {
     const start = engine.indexOf('function createTouchIntentTracker');
@@ -48,22 +50,14 @@ test('quicksearch está en la cabecera entre marca y acciones', () => {
 });
 
 test('abrir un editor de nodo carga su módulo diferido en el primer toque', () => {
-    assert.match(engine, /schemaAction === 'calc-open-editor'/);
-    assert.match(engine, /schemaAction === 'formatter-open-editor'/);
-    assert.match(engine, /'list-concat-open-editor'/);
-    assert.match(engine, /'substring-open-editor'/);
-    assert.match(engine, /'splitter-open-editor'/);
-    assert.match(engine, /'list-exploder-open-editor'/);
-    assert.match(engine, /'strrep-open-editor'/);
-    assert.match(engine, /'aggregator-open-editor'/);
-    assert.match(engine, /'attr-manager-open-editor'/);
-    assert.match(engine, /'attr-manager-v2-open-editor'/);
-    assert.match(engine, /'geom-transform-open-editor'/);
-    assert.match(engine, /window\.JETLEnsureExtras\?\.\(\)\.then/);
-    assert.match(engine, /window\.JETLSchemaUI\.openFormatterEditor\(nodeId\)/);
-    assert.match(engine, /window\.JETLSchemaUI\.openAggregatorEditor\(nodeId\)/);
-    assert.match(engine, /window\.JETLSchemaUI\.openAttributeManagerEditor\(nodeId, 'v2'\)/);
-    assert.match(engine, /window\.JETLSchemaUI\.openGeometryTransformEditor\(nodeId\)/);
+    assert.match(engine, /const schemaActionEl = e\.target\.closest\('\[data-schema-action\]'\)/);
+    assert.match(engine, /if \(schemaActionEl && !window\.JETLSchemaUI\)/);
+    assert.match(engine, /window\.JETLEnsureExtras\(\)/);
+    assert.match(engine, /schemaActionEl\.click\(\)/);
+    assert.doesNotMatch(engine, /\['calc-open-editor'[\s\S]+?\.includes\(schemaAction\)/);
+    assert.match(readers, /data-schema-action="reader-open-editor"/);
+    assert.match(attributes, /data-schema-action="keeper-open-editor"/);
+    assert.match(attributes, /data-schema-action="creator-open-editor"/);
 });
 
 test('el historial persiste y limita las ejecuciones registradas', () => {

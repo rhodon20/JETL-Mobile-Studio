@@ -1506,25 +1506,20 @@ function addNode(k, x, y) {
 function initEngineDelegation() {
     document.addEventListener('click', (e) => {
         const schemaActionEl = e.target.closest('[data-schema-action]');
-        const schemaAction = schemaActionEl?.getAttribute('data-schema-action');
-        if (schemaActionEl && !window.JETLSchemaUI &&
-            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor', 'splitter-open-editor', 'list-exploder-open-editor', 'strrep-open-editor', 'aggregator-open-editor', 'attr-manager-open-editor', 'attr-manager-v2-open-editor', 'geom-transform-open-editor'].includes(schemaAction)) {
+        if (schemaActionEl && !window.JETLSchemaUI) {
             e.preventDefault();
-            const nodeId = schemaActionEl.closest('.drawflow-node')?.id.replace('node-', '');
-            window.JETLEnsureExtras?.().then(() => {
-                if (!nodeId || !window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
-                if (schemaAction === 'calc-open-editor') window.JETLSchemaUI.openCalcEditor(nodeId);
-                else if (schemaAction === 'formatter-open-editor') window.JETLSchemaUI.openFormatterEditor(nodeId);
-                else if (schemaAction === 'strrep-open-editor') window.JETLSchemaUI.openStringReplacerEditor(nodeId);
-                else if (schemaAction === 'aggregator-open-editor') window.JETLSchemaUI.openAggregatorEditor(nodeId);
-                else if (schemaAction === 'attr-manager-open-editor') window.JETLSchemaUI.openAttributeManagerEditor(nodeId, 'legacy');
-                else if (schemaAction === 'attr-manager-v2-open-editor') window.JETLSchemaUI.openAttributeManagerEditor(nodeId, 'v2');
-                else if (schemaAction === 'geom-transform-open-editor') window.JETLSchemaUI.openGeometryTransformEditor(nodeId);
-                else {
-                    const kind = { 'substring-open-editor': 'substring', 'splitter-open-editor': 'splitter', 'list-exploder-open-editor': 'exploder' }[schemaAction] || 'list';
-                    window.JETLSchemaUI.openAttributeTextEditor(nodeId, kind);
-                }
+            e.stopPropagation();
+            if (schemaActionEl.dataset.schemaLoading === '1') return;
+            schemaActionEl.dataset.schemaLoading = '1';
+            const extrasReady = typeof window.JETLEnsureExtras === 'function'
+                ? window.JETLEnsureExtras()
+                : Promise.reject(new Error('El cargador de editores no está disponible'));
+            Promise.resolve(extrasReady).then(() => {
+                if (!window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
+                delete schemaActionEl.dataset.schemaLoading;
+                schemaActionEl.click();
             }).catch((error) => {
+                delete schemaActionEl.dataset.schemaLoading;
                 console.error('[JETL] Error abriendo editor de nodo', error);
                 if (typeof showToast === 'function') showToast('No se pudo abrir el editor del nodo', 'error');
             });
