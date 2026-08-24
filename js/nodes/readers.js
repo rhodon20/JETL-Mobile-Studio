@@ -26,6 +26,13 @@ const FEATURE_READER_DEFAULT_CONFIG = {
     max_features_per_initiator: 0,
     csv: { lat_field: '', lon_field: '', delimiter: 'auto', encoding: 'utf-8' }
 };
+const READER_NODE_DEFAULTS = {
+    reader_geojson: { schema_policy: 'union', crs: '' }, reader_kml: { schema_policy: 'union', crs: '' },
+    reader_csv: { schema_policy: 'same_schema', delimiter: 'auto', lat_column: '', lon_column: '', wkt_column: '', crs: '' },
+    reader_excel: { schema_policy: 'same_schema', sheet_name: '', lat_column: '', lon_column: '', wkt_column: '', crs: '' },
+    reader_shp: { schema_policy: 'same_schema', crs: '' }, reader_gpx: { schema_policy: 'same_schema', crs: 'EPSG:4326' },
+    reader_gdb: { schema_policy: 'same_schema', selected_layers: [], crs: '' }
+};
 
 function readerCloneCompat(value) {
     if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(value);
@@ -35,6 +42,12 @@ function readerCloneCompat(value) {
 function readerSelectedFilesCompat(dom) {
     const input = dom?.querySelector?.('[df-file]');
     return input?.files ? Array.from(input.files).filter(Boolean) : [];
+}
+
+function readerConfigCompat(dom, nodeName) {
+    const defaults = READER_NODE_DEFAULTS[nodeName] || {};
+    try { return { ...defaults, ...JSON.parse(dom?.querySelector?.('[df-reader-config]')?.value || '{}') }; }
+    catch (_) { return readerCloneCompat(defaults); }
 }
 
 function readerSourceNameCompat(source, index = 0) {
@@ -172,14 +185,18 @@ function readerParseGpxCompat(text) {
 
 async function readerLocalSourceCompat(source, format, options = {}) {
     const name = readerSourceNameCompat(source).toLowerCase();
-    if (format === 'csv') return readerFeatureCollectionCompat(readerParseCsvCompat(await source.text(), options), { format, source_file: source.name });
-    if (format === 'geojson') return readerFeatureCollectionCompat(JSON.parse(await source.text()), { format, source_file: source.name });
+    if (format === 'csv') return readerFeatureCollectionCompat(readerParseCsvCompat(await source.text(), options), { format, source_file: source.name, ...(options.crs ? { crs: options.crs } : {}) });
+    if (format === 'geojson') return readerFeatureCollectionCompat(JSON.parse(await source.text()), { format, source_file: source.name, ...(options.crs ? { crs: options.crs } : {}) });
     if (format === 'kml' || format === 'shp') {
         if (!window.JETLFormats?.readFile) throw new Error(`Motor local ${format.toUpperCase()} no disponible`);
         if (format === 'shp' && !name.endsWith('.zip')) throw new Error('En Studio, selecciona el conjunto SHP comprimido como ZIP');
-        return readerFeatureCollectionCompat(await window.JETLFormats.readFile(source), { format, source_file: source.name });
+        return readerFeatureCollectionCompat(await window.JETLFormats.readFile(source), { format, source_file: source.name, ...(options.crs ? { crs: options.crs } : {}) });
     }
-    if (format === 'gpx') return readerParseGpxCompat(await source.text());
+    if (format === 'gpx') {
+        const result = readerParseGpxCompat(await source.text());
+        Object.values(result).forEach((collection) => { if (collection?.type === 'FeatureCollection') collection.metadata = { format, source_file: source.name, crs: options.crs || 'EPSG:4326', feature_count: collection.features.length }; });
+        return result;
+    }
     if (format === 'xlsx') {
         if (!window.XLSX) await window.JETLLoadScriptOnce('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'XLSX');
         if (!window.XLSX) throw new Error('Motor Excel no disponible');
@@ -187,7 +204,7 @@ async function readerLocalSourceCompat(source, format, options = {}) {
         const sheetName = options.sheet_name && workbook.Sheets[options.sheet_name] ? options.sheet_name : workbook.SheetNames[0];
         if (!sheetName) return turf.featureCollection([]);
         const rows = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: null, raw: false });
-        return readerFeatureCollectionCompat(turf.featureCollection(readerRowsToFeaturesCompat(rows, options)), { format, source_file: source.name, sheet_name: sheetName });
+        return readerFeatureCollectionCompat(turf.featureCollection(readerRowsToFeaturesCompat(rows, options)), { format, source_file: source.name, sheet_name: sheetName, ...(options.crs ? { crs: options.crs } : {}) });
     }
     throw new Error(`Formato local no soportado: ${format}`);
 }
@@ -242,37 +259,61 @@ function readerMultiOutputCompat(result) {
     return outputs;
 }
 
-function readerFileTemplateCompat(accept, detail = '') {
-    return `<div class="node-editor-summary"><i class="fas fa-file-import"></i><div><strong data-reader-file-summary>Seleccionar archivo</strong><small>${detail}</small></div></div><input type="file" df-file class="node-control" accept="${accept}" multiple>`;
+function readerFileTemplateCompat(accept, detail = '', defaults = {}) {
+    return `<div class="node-editor-summary"><i class="fas fa-file-import"></i><div><strong data-reader-file-summary>Sin fuente</strong><small>${detail}</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="reader-open-editor"><i class="fas fa-pen"></i> Abrir editor</button><div class="node-editor-storage" aria-hidden="true"><input type="file" df-file class="node-control" accept="${accept}" multiple tabindex="-1"><textarea df-reader-config class="node-control" tabindex="-1">${JSON.stringify(defaults)}</textarea></div>`;
 }
+
+async function readerInspectCompat(dom, nodeName, configOverride = null) {
+    const sources = readerSelectedFilesCompat(dom); const config = configOverride || readerConfigCompat(dom, nodeName);
+    if (!sources.length) return { sources: [], fields: [], types: {}, geometry_types: [], feature_count: 0, rows: [], notice: 'Selecciona una fuente para inspeccionarla.' };
+    const source = sources[0];
+    if (Number(source?.size || 0) > 25 * 1024 * 1024) return { sources: sources.map(readerSourceNameCompat), fields: [], types: {}, geometry_types: [], feature_count: null, rows: [], notice: 'La previsualización se omite por encima de 25 MB; el archivo sí podrá ejecutarse.' };
+    const formats = { reader_geojson: 'geojson', reader_kml: 'kml', reader_csv: 'csv', reader_excel: 'xlsx', reader_shp: 'shp', reader_gpx: 'gpx', reader_gdb: 'gdb' };
+    const format = formats[nodeName]; if (!format) throw new Error('Este Reader no dispone de inspección avanzada');
+    let result;
+    if (format === 'gdb') {
+        const owner = typeof window.JETLBackendIntegration?.readFile === 'function' ? window.JETLBackendIntegration : window.JETLBackend;
+        if (typeof owner?.readFile !== 'function') return { sources: sources.map(readerSourceNameCompat), fields: [], types: {}, geometry_types: [], feature_count: null, rows: [], notice: 'La inspección GDB requiere backend.' };
+        result = readerMultiOutputCompat(await owner.readFile(source, 'gdb', { all_layers: true, selected_layers: config.selected_layers || [] }));
+    } else result = await readerSourceCompat(source, format, config);
+    const collections = result?.type === 'FeatureCollection' ? [result] : Object.values(result || {}).filter((value) => value?.type === 'FeatureCollection');
+    const features = collections.flatMap((collection) => collection.features || []); const fields = Array.from(new Set(features.flatMap((feature) => Object.keys(feature.properties || {}))));
+    const types = Object.fromEntries(fields.map((field) => {
+        const value = features.find((feature) => feature.properties?.[field] != null)?.properties?.[field];
+        return [field, Array.isArray(value) ? 'array' : value === null || value === undefined ? 'null' : typeof value];
+    }));
+    return { sources: sources.map(readerSourceNameCompat), fields, types, geometry_types: Array.from(new Set(features.map((feature) => feature.geometry?.type || 'Null'))), feature_count: features.length, rows: features.slice(0, 5).map((feature) => ({ ...(feature.properties || {}) })), notice: sources.length > 1 ? `Vista previa de ${sources[0].name}; se ejecutarán ${sources.length} fuentes.` : '' };
+}
+
+if (typeof window !== 'undefined') window.JETLReaderTools = { inspect: readerInspectCompat, config: readerConfigCompat, defaults: READER_NODE_DEFAULTS };
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_geojson: {
         cat: '1. READERS', label: 'GeoJSON Reader', icon: 'fa-file-code', color: '#e67e22', in: 0, out: 1,
         help: 'Lee uno o varios GeoJSON localmente en Studio.',
-        tpl: () => readerFileTemplateCompat('.geojson,.json', 'GeoJSON · colección'),
+        tpl: () => readerFileTemplateCompat('.geojson,.json', 'GeoJSON · colección', READER_NODE_DEFAULTS.reader_geojson),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios GeoJSON');
-            return await readerCollectionCompat(sources, 'geojson', { schema_policy: 'union' });
+            return await readerCollectionCompat(sources, 'geojson', readerConfigCompat(dom, 'reader_geojson'));
         }
     },
 
     reader_kml: {
         cat: '1. READERS', label: 'KML Reader', icon: 'fa-globe', color: '#e67e22', in: 0, out: 1,
         help: 'Lee uno o varios KML localmente en Studio.',
-        tpl: () => readerFileTemplateCompat('.kml', 'KML · colección'),
+        tpl: () => readerFileTemplateCompat('.kml', 'KML · colección', READER_NODE_DEFAULTS.reader_kml),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios KML');
-            return await readerCollectionCompat(sources, 'kml', { schema_policy: 'union' });
+            return await readerCollectionCompat(sources, 'kml', readerConfigCompat(dom, 'reader_kml'));
         }
     },
 
     reader_csv: {
         cat: '1. READERS', label: 'CSV Reader', icon: 'fa-file-csv', color: '#e67e22', in: 0, out: 1,
         help: 'Lee CSV localmente y detecta coordenadas lat/lon o WKT.',
-        tpl: () => `${readerFileTemplateCompat('.csv', 'CSV · lat/lon o WKT')}<div style="display:flex;gap:8px"><label><small>Lat</small><input type="text" df-lat class="node-control" placeholder="lat"></label><label><small>Lon</small><input type="text" df-lon class="node-control" placeholder="lon"></label></div>`,
+        tpl: () => readerFileTemplateCompat('.csv', 'CSV · lat/lon o WKT', READER_NODE_DEFAULTS.reader_csv),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios CSV');
-            const options = { lat_column: resolveParamTextReader(dom.querySelector('[df-lat]')?.value || ''), lon_column: resolveParamTextReader(dom.querySelector('[df-lon]')?.value || ''), schema_policy: 'same_schema' };
+            const options = readerConfigCompat(dom, 'reader_csv');
             return await readerCollectionCompat(sources, 'csv', options);
         }
     },
@@ -280,10 +321,10 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_excel: {
         cat: '1. READERS', label: 'Excel Reader', icon: 'fa-file-excel', color: '#e67e22', in: 0, out: 1,
         help: 'Lee Excel localmente y detecta coordenadas lat/lon.',
-        tpl: () => `${readerFileTemplateCompat('.xlsx,.xls', 'Excel · primera hoja')}<div style="display:flex;gap:8px"><label><small>Lat</small><input type="text" df-lat class="node-control" placeholder="lat"></label><label><small>Lon</small><input type="text" df-lon class="node-control" placeholder="lon"></label></div>`,
+        tpl: () => readerFileTemplateCompat('.xlsx,.xls', 'Excel · hoja y esquema', READER_NODE_DEFAULTS.reader_excel),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios Excel');
-            const options = { lat_column: resolveParamTextReader(dom.querySelector('[df-lat]')?.value || ''), lon_column: resolveParamTextReader(dom.querySelector('[df-lon]')?.value || ''), schema_policy: 'same_schema' };
+            const options = readerConfigCompat(dom, 'reader_excel');
             return await readerCollectionCompat(sources, 'xlsx', options);
         }
     },
@@ -291,27 +332,29 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_shp: {
         cat: '1. READERS', label: 'SHP Reader', icon: 'fa-map', color: '#e67e22', in: 0, out: 1,
         help: 'Lee SHP comprimido en ZIP localmente; conjuntos sueltos requieren backend.',
-        tpl: () => readerFileTemplateCompat('.zip,.shp,.shx,.dbf,.prj,.cpg', 'ZIP recomendado'),
+        tpl: () => readerFileTemplateCompat('.zip,.shp,.shx,.dbf,.prj,.cpg', 'ZIP recomendado', READER_NODE_DEFAULTS.reader_shp),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona un SHP ZIP o su conjunto de archivos');
-            if (sources.length === 1 && String(sources[0].name || '').toLowerCase().endsWith('.zip')) return await readerSourceCompat(sources[0], 'shp', {});
+            const options = readerConfigCompat(dom, 'reader_shp');
+            if (sources.length === 1 && String(sources[0].name || '').toLowerCase().endsWith('.zip')) return await readerSourceCompat(sources[0], 'shp', options);
             const owner = typeof window.JETLBackendIntegration?.readCollection === 'function' ? window.JETLBackendIntegration : window.JETLBackend;
             const backend = owner?.readCollection;
             if (typeof backend !== 'function') throw new Error('Los SHP sueltos requieren backend; comprime .shp, .shx, .dbf y .prj en un ZIP');
-            return await backend.call(owner, sources, 'shp', { schema_policy: 'same_schema' });
+            return await backend.call(owner, sources, 'shp', options);
         }
     },
 
     reader_gpx: {
         cat: '1. READERS', label: 'GPX Reader', icon: 'fa-route', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
         help: 'Lee GPX y expone tracks, routes y waypoints como capas independientes.',
-        tpl: () => readerFileTemplateCompat('.gpx', '16 salidas por capas'),
+        tpl: () => readerFileTemplateCompat('.gpx', '16 salidas por capas', READER_NODE_DEFAULTS.reader_gpx),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios GPX');
-            if (sources.length === 1) return readerMultiOutputCompat(await readerSourceCompat(sources[0], 'gpx', {}));
+            const options = readerConfigCompat(dom, 'reader_gpx');
+            if (sources.length === 1) return readerMultiOutputCompat(await readerSourceCompat(sources[0], 'gpx', options));
             const tracks = []; const routes = []; const waypoints = [];
             for (const source of sources) {
-                const result = readerMultiOutputCompat(await readerSourceCompat(source, 'gpx', {}));
+                const result = readerMultiOutputCompat(await readerSourceCompat(source, 'gpx', options));
                 tracks.push(...result.output_1.features); routes.push(...result.output_2.features); waypoints.push(...result.output_3.features);
             }
             return readerMultiOutputCompat({ output_1: turf.featureCollection(tracks), output_2: turf.featureCollection(routes), output_3: turf.featureCollection(waypoints) });
@@ -321,16 +364,17 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_gdb: {
         cat: '1. READERS', label: 'GDB Reader', icon: 'fa-folder', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
         help: 'Lee File Geodatabase por capas mediante backend, sin cargar GDAL pesado en móvil.',
-        tpl: () => readerFileTemplateCompat('.zip,.gdb', 'Requiere backend · 16 salidas'),
+        tpl: () => readerFileTemplateCompat('.zip,.gdb', 'Requiere backend · 16 salidas', READER_NODE_DEFAULTS.reader_gdb),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona un GDB comprimido en ZIP');
             const collectionOwner = typeof window.JETLBackendIntegration?.readCollection === 'function' ? window.JETLBackendIntegration : window.JETLBackend;
             const fileOwner = typeof window.JETLBackendIntegration?.readFile === 'function' ? window.JETLBackendIntegration : window.JETLBackend;
             const collectionBackend = collectionOwner?.readCollection; const fileBackend = fileOwner?.readFile;
+            const options = { ...readerConfigCompat(dom, 'reader_gdb'), all_layers: true };
             let result;
-            if (sources.length > 1 && typeof collectionBackend === 'function') result = await collectionBackend.call(collectionOwner, sources, 'gdb', { all_layers: true });
-            else if (typeof fileBackend === 'function') result = await fileBackend.call(fileOwner, sources[0], 'gdb', { all_layers: true });
-            else if (typeof collectionBackend === 'function') result = await collectionBackend.call(collectionOwner, sources, 'gdb', { all_layers: true });
+            if (sources.length > 1 && typeof collectionBackend === 'function') result = await collectionBackend.call(collectionOwner, sources, 'gdb', options);
+            else if (typeof fileBackend === 'function') result = await fileBackend.call(fileOwner, sources[0], 'gdb', options);
+            else if (typeof collectionBackend === 'function') result = await collectionBackend.call(collectionOwner, sources, 'gdb', options);
             else throw new Error('GDB Reader requiere backend; GDAL no se carga en Studio móvil');
             return readerMultiOutputCompat(result);
         }

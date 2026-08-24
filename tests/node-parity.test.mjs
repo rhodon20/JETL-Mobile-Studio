@@ -149,6 +149,7 @@ function loadReaders(windowOverrides = {}, contextOverrides = {}) {
         ...contextOverrides
     };
     vm.runInNewContext(readersSource, context, { filename: 'readers.js' });
+    windowOverrides.__window = window;
     return window.TOOL_REGISTRY;
 }
 
@@ -389,6 +390,21 @@ test('GeoJSON, KML, SHP y Excel usan el motor local adecuado', async () => {
     assert.equal(kml.features[0].properties.source, 'data.kml');
     assert.equal(shp.features[0].properties.source, 'data.zip');
     assert.deepEqual(Array.from(excel.features[0].geometry.coordinates), [-3.7, 40.4]);
+});
+
+test('el editor de Readers inspecciona esquema, tipos, geometría y muestra CSV', async () => {
+    const overrides = {}; loadReaders(overrides);
+    const file = { name: 'data.csv', size: 64, text: async () => 'id;lat;lon;name\n1;40.4;-3.7;Madrid\n2;41.3;2.1;Barcelona' };
+    const controls = { '[df-file]': { files: [file] }, '[df-reader-config]': { value: JSON.stringify({ delimiter: ';', lat_column: 'lat', lon_column: 'lon' }) } };
+    const result = await overrides.__window.JETLReaderTools.inspect({ querySelector: (selector) => controls[selector] }, 'reader_csv');
+    assert.equal(result.feature_count, 2); assert.equal(result.types.id, 'number'); assert.equal(result.geometry_types[0], 'Point'); assert.equal(result.rows[0].name, 'Madrid');
+});
+
+test('la configuración guardada por el editor gobierna la ejecución del CSV Reader', async () => {
+    const registry = loadReaders(); const file = { name: 'data.csv', text: async () => 'x|y|label\n-3.7|40.4|Madrid' };
+    const controls = { '[df-file]': { files: [file] }, '[df-reader-config]': { value: JSON.stringify({ delimiter: '|', lat_column: 'y', lon_column: 'x', schema_policy: 'same_schema' }) } };
+    const result = await registry.reader_csv.run('1', [], { querySelector: (selector) => controls[selector] });
+    assert.equal(JSON.stringify(result.features[0].geometry.coordinates), JSON.stringify([-3.7, 40.4])); assert.equal(result.features[0].properties.label, 'Madrid');
 });
 
 test('GPX conserva capas y completa las 16 salidas Desktop', async () => {

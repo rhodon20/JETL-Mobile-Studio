@@ -35,14 +35,13 @@ runtime Python ni de acceso seguro al sistema operativo. Por tanto, el catálogo
 objetivo verificable es de **115 nodos**. Studio registra ahora 119: los **115
 nodos del alcance están compartidos** y no quedan ausencias objetivo.
 
-## Editor avanzado de Readers: valoración
+## Editor avanzado de Readers
 
-El modo de edición de Readers de Desktop es valioso y debe portarse, pero no como
-una copia literal del selector nativo de escritorio. En Studio debe convertirse
-en un modal centrado y táctil que agrupe fuente, capa/hoja, esquema, CRS, vista
-previa y opciones específicas del formato. La prioridad es alta después de cerrar
-los Writers porque reduce errores antes de ejecutar y evita sobrecargar las
-tarjetas del canvas.
+La primera versión está implementada para GeoJSON, KML, CSV, Excel, SHP, GPX y
+GDB como modal centrado y táctil. Agrupa selección de fuentes, opciones específicas
+del formato, política de esquema, CRS, tipos, geometrías y una muestra de cinco
+filas antes de ejecutar. Los archivos de más de 25 MB omiten la previsualización
+para no bloquear el navegador móvil, pero siguen disponibles para ejecución.
 
 Hay una limitación web real: Safari no permite conservar rutas locales como
 Desktop. El editor deberá trabajar con archivos seleccionados, handles cuando el

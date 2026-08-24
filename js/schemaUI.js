@@ -1257,6 +1257,31 @@
         }
     };
 
+    const READER_EDITOR_DEFINITIONS = {
+        reader_geojson: { title: 'GeoJSON Reader', subtitle: 'Fuente, esquema y CRS', fields: [
+            { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'union', options: [['union','Unión de campos'],['same_schema','Mismo esquema']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
+        ] },
+        reader_kml: { title: 'KML Reader', subtitle: 'Fuente y esquema', fields: [
+            { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'union', options: [['union','Unión de campos'],['same_schema','Mismo esquema']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
+        ] },
+        reader_csv: { title: 'CSV Reader', subtitle: 'Delimitador, geometría y esquema', fields: [
+            { key: 'delimiter', label: 'Delimitador', type: 'select', value: 'auto', options: [['auto','Detección automática'],[',','Coma'],[';','Punto y coma'],['\t','Tabulador']] },
+            { key: 'lat_column', label: 'Campo latitud / Y', type: 'text', value: '' }, { key: 'lon_column', label: 'Campo longitud / X', type: 'text', value: '' }, { key: 'wkt_column', label: 'Campo WKT', type: 'text', value: '' },
+            { key: 'schema_policy', label: 'Política multiarchivo', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
+        ] },
+        reader_excel: { title: 'Excel Reader', subtitle: 'Hoja, geometría y esquema', fields: [
+            { key: 'sheet_name', label: 'Hoja (vacío = primera)', type: 'text', value: '' }, { key: 'lat_column', label: 'Campo latitud / Y', type: 'text', value: '' }, { key: 'lon_column', label: 'Campo longitud / X', type: 'text', value: '' }, { key: 'wkt_column', label: 'Campo WKT', type: 'text', value: '' },
+            { key: 'schema_policy', label: 'Política multiarchivo', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
+        ] },
+        reader_shp: { title: 'SHP Reader', subtitle: 'Conjunto Shapefile y CRS', fields: [
+            { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS de reemplazo (opcional)', type: 'text', value: '' }
+        ] },
+        reader_gpx: { title: 'GPX Reader', subtitle: 'Tracks, rutas y waypoints', fields: [ { key: 'crs', label: 'CRS', type: 'text', value: 'EPSG:4326' } ] },
+        reader_gdb: { title: 'GDB Reader', subtitle: 'Capas mediante backend', fields: [
+            { key: 'selected_layers', label: 'Capas seleccionadas (JSON)', type: 'json', value: [] }, { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'same_schema', options: [['same_schema','Mismo esquema'],['union','Unión de campos']] }, { key: 'crs', label: 'CRS de reemplazo (opcional)', type: 'text', value: '' }
+        ] }
+    };
+
     let currentGeometryTransformEditor = null;
 
     function _geometryTransformGet(config, path) {
@@ -1317,6 +1342,82 @@
         const text = document.createElement('span'); text.textContent = field.label;
         if (field.type === 'checkbox') label.append(control, text); else label.append(text, control);
         return label;
+    }
+
+    let currentReaderEditor = null;
+
+    function _readerEditorDefinition(name) { return READER_EDITOR_DEFINITIONS[name] || null; }
+
+    function _readerEditorConfig(nodeEl, definition) {
+        const defaults = {}; definition.fields.forEach((field) => _geometryTransformSet(defaults, field.key, field.value));
+        try { return { ...defaults, ...JSON.parse(nodeEl?.querySelector('[df-reader-config]')?.value || '{}') }; }
+        catch (_) { return defaults; }
+    }
+
+    function _readerEditorFormConfig(definition) {
+        const config = {};
+        definition.fields.forEach((field) => {
+            const control = document.querySelector(`#reader-editor-fields [data-geometry-transform-field="${field.key}"]`); if (!control) return;
+            let value = field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value;
+            if (field.type === 'json') { try { value = JSON.parse(control.value || '[]'); } catch (_) { value = field.value; } }
+            _geometryTransformSet(config, field.key, value);
+        });
+        return config;
+    }
+
+    function _readerEditorSources(nodeEl) {
+        return Array.from(nodeEl?.querySelector('[df-file]')?.files || []);
+    }
+
+    function _renderReaderEditorSources(nodeEl) {
+        const target = document.getElementById('reader-editor-source-list'); if (!target) return;
+        const files = _readerEditorSources(nodeEl);
+        target.textContent = files.length ? files.map((file) => `${file.name}${file.size ? ` · ${(file.size / 1048576).toFixed(2)} MB` : ''}`).join(' · ') : 'Sin archivos seleccionados';
+    }
+
+    function _readerCell(value) {
+        if (value == null) return '—'; if (typeof value === 'object') return JSON.stringify(value); return String(value);
+    }
+
+    function _renderReaderPreview(result) {
+        const status = document.getElementById('reader-editor-preview-status'); const schema = document.getElementById('reader-editor-schema'); const table = document.getElementById('reader-editor-preview-table');
+        if (!status || !schema || !table) return;
+        status.textContent = `${result.feature_count == null ? 'Recuento no disponible' : `${result.feature_count} entidades`} · ${(result.geometry_types || []).join(', ') || 'sin geometría'}${result.notice ? ` · ${result.notice}` : ''}`;
+        schema.innerHTML = ''; (result.fields || []).forEach((field) => { const chip = document.createElement('span'); chip.textContent = `${field}: ${result.types?.[field] || 'null'}`; schema.appendChild(chip); });
+        table.innerHTML = ''; const fields = result.fields || []; if (!fields.length || !(result.rows || []).length) return;
+        const head = document.createElement('thead'); const headRow = document.createElement('tr'); fields.forEach((field) => { const th = document.createElement('th'); th.textContent = field; headRow.appendChild(th); }); head.appendChild(headRow); table.appendChild(head);
+        const body = document.createElement('tbody'); result.rows.forEach((row) => { const tr = document.createElement('tr'); fields.forEach((field) => { const td = document.createElement('td'); td.textContent = _readerCell(row[field]); td.title = td.textContent; tr.appendChild(td); }); body.appendChild(tr); }); table.appendChild(body);
+    }
+
+    async function refreshReaderEditorPreview() {
+        if (!currentReaderEditor) return false;
+        const { nodeId, name } = currentReaderEditor; const nodeEl = document.getElementById('node-' + nodeId); const definition = _readerEditorDefinition(name); const status = document.getElementById('reader-editor-preview-status');
+        if (!nodeEl || !definition || !window.JETLReaderTools?.inspect) return false;
+        if (status) status.textContent = 'Inspeccionando fuente…';
+        try { _renderReaderPreview(await window.JETLReaderTools.inspect(nodeEl, name, _readerEditorFormConfig(definition))); return true; }
+        catch (error) { if (status) status.textContent = `No se pudo inspeccionar: ${error.message}`; return false; }
+    }
+
+    function openReaderEditor(nodeId) {
+        const node = _safeGetNode(nodeId).node; const definition = _readerEditorDefinition(node?.name); const nodeEl = document.getElementById('node-' + nodeId); const modal = document.getElementById('reader-editor-modal');
+        if (!definition || !nodeEl || !modal) return false;
+        currentReaderEditor = { nodeId: String(nodeId), name: node.name };
+        document.getElementById('reader-editor-title').textContent = definition.title; document.getElementById('reader-editor-subtitle').textContent = definition.subtitle;
+        const fields = document.getElementById('reader-editor-fields'); fields.innerHTML = ''; const config = _readerEditorConfig(nodeEl, definition);
+        definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, _geometryTransformGet(config, field.key))));
+        _renderReaderEditorSources(nodeEl); modal.style.display = 'flex'; refreshReaderEditorPreview(); return true;
+    }
+
+    function closeReaderEditor(save) {
+        const modal = document.getElementById('reader-editor-modal'); if (!modal) return;
+        if (save && currentReaderEditor) {
+            const { nodeId, name } = currentReaderEditor; const nodeEl = document.getElementById('node-' + nodeId); const definition = _readerEditorDefinition(name);
+            if (nodeEl && definition) {
+                const config = _readerEditorFormConfig(definition); _commitNodeControl(nodeEl.querySelector('[df-reader-config]'), JSON.stringify(config));
+                const files = _readerEditorSources(nodeEl); const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary) summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Sin fuente';
+            }
+        }
+        modal.style.display = 'none'; currentReaderEditor = null;
     }
 
     function updateGeometryTransformNode(nodeId) {
@@ -1439,6 +1540,9 @@
             } else if (action === 'geom-transform-open-editor') {
                 evt.stopPropagation();
                 openGeometryTransformEditor(nodeId);
+            } else if (action === 'reader-open-editor') {
+                evt.stopPropagation();
+                openReaderEditor(nodeId);
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -1496,6 +1600,10 @@
             else if (action === 'attribute-manager-remove-rule') evt.target.closest('.attr-manager-editor-rule')?.remove();
             else if (action === 'close-geometry-transform-editor') closeGeometryTransformEditor(false);
             else if (action === 'save-geometry-transform-editor') closeGeometryTransformEditor(true);
+            else if (action === 'close-reader-editor') closeReaderEditor(false);
+            else if (action === 'save-reader-editor') closeReaderEditor(true);
+            else if (action === 'reader-refresh-preview') refreshReaderEditorPreview();
+            else if (action === 'reader-select-files' && currentReaderEditor) document.getElementById('node-' + currentReaderEditor.nodeId)?.querySelector('[df-file]')?.click();
         });
 
         document.addEventListener('dblclick', (evt) => {
@@ -1510,6 +1618,7 @@
             else if (nodeEl?.classList.contains('attr_aggregator')) openAggregatorEditor(nodeEl.id.replace('node-', ''));
             else if (nodeEl?.classList.contains('attr_manager_v2')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'v2');
             else if (nodeEl?.classList.contains('attr_manager')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'legacy');
+            else if (Object.keys(READER_EDITOR_DEFINITIONS).some((name) => nodeEl?.classList.contains(name))) openReaderEditor(nodeEl.id.replace('node-', ''));
             else if (Object.keys(GEOMETRY_TRANSFORM_EDITORS).some((name) => nodeEl?.classList.contains(name))) openGeometryTransformEditor(nodeEl.id.replace('node-', ''));
         });
 
@@ -1522,6 +1631,10 @@
             if (!summary) return;
             const files = Array.from(input.files || []);
             summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Seleccionar archivo';
+            if (currentReaderEditor && input.closest('.drawflow-node')?.id === 'node-' + currentReaderEditor.nodeId) {
+                _renderReaderEditorSources(input.closest('.drawflow-node'));
+                refreshReaderEditorPreview();
+            }
         });
 
         document.addEventListener('change', (evt) => {
@@ -1677,6 +1790,8 @@
         openStringReplacerEditor,
         openAggregatorEditor,
         openAttributeManagerEditor,
-        openGeometryTransformEditor
+        openGeometryTransformEditor,
+        openReaderEditor,
+        refreshReaderEditorPreview
     };
 })();

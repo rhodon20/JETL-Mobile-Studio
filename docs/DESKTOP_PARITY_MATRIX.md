@@ -24,7 +24,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial, FeatureReader y Utils comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Readers y Writers avanzados |
+| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial, Readers, FeatureReader y Utils comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Writers avanzados |
 
 ## Ejecución y diagnóstico
 
@@ -55,7 +55,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | --- | --- | --- |
 | Importar/exportar proyecto | Implementado | Compatibilidad bidireccional de versión y validación |
 | Autoguardado y recuperación | Parcial | Versionado, conflicto y restauración explícitos |
-| Editor de fuentes | Valorado; prioridad posterior al cierre de catálogo | Modal táctil con fuente, capa/hoja, esquema, CRS y previsualización |
+| Editor de Readers | Implementado v1 para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB | Selección táctil, configuración, esquema, tipos, geometrías, muestra y aviso de permisos web |
 | Transformers, paquetes y plantillas | Pendiente | Catálogo compatible con el runtime web |
 | Ajustes, apariencia e idioma | Parcial | Completar preferencias reproducibles por proyecto/dispositivo |
 | Backend y sistema de archivos local | Adaptación explícita: Readers locales cuando es viable; GDB/FeatureReader requieren servicio | Sustituir solo cuando exista una Web API segura |
