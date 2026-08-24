@@ -37,7 +37,9 @@ function loadSpatial() {
         cleanCoords: (value) => value,
         multiPolygon: (coordinates) => ({ type: 'Feature', geometry: { type: 'MultiPolygon', coordinates }, properties: {} }),
         booleanIntersects: (feature) => !!feature.properties?.intersects,
-        intersect: (feature) => ({ ...feature, properties: { ...feature.properties, part: 'inside' } }),
+        intersect: (feature, overlay) => feature.properties?.intersects === false || overlay?.properties?.intersects === false
+            ? null
+            : ({ ...feature, geometry: JSON.parse(JSON.stringify(feature.geometry)), properties: { ...feature.properties, part: 'inside' } }),
         difference: (feature) => feature.properties?.partial
             ? { ...feature, properties: { ...feature.properties, part: 'outside' } }
             : null,
@@ -45,7 +47,17 @@ function loadSpatial() {
         coordEach: (collection, callback) => collection.features.forEach((feature) => callback(feature.geometry.coordinates)),
         point: (coordinates) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties: {} }),
         nearestPoint: () => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }),
-        distance: () => 0
+        distance: () => 0,
+        booleanPointOnLine: (point, line) => line.properties?.hit === true,
+        booleanPointInPolygon: (point, area) => area.properties?.hit === true,
+        booleanEqual: () => false,
+        booleanOverlap: () => false,
+        booleanWithin: () => false,
+        booleanContains: () => false,
+        polygonToLine: (area) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: area.geometry.coordinates?.[0] || [] }, properties: {} }),
+        lineSplit: (line) => featureCollection([{ ...line, geometry: JSON.parse(JSON.stringify(line.geometry)), properties: { ...line.properties } }]),
+        length: () => 1,
+        along: () => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [0.5, 0] }, properties: {} })
     };
     const context = {
         window,
@@ -53,6 +65,7 @@ function loadSpatial() {
         console,
         turf,
         JETLClone: (value) => JSON.parse(JSON.stringify(value)),
+        resolveParamText: (value) => String(value ?? ''),
         normalizeResult: (value) => value
     };
     vm.runInNewContext(spatialSource, context, { filename: 'spatial.js' });
@@ -138,6 +151,65 @@ test('Clipper separa geometría interior y exterior en dos puertos', async () =>
     assert.equal(result.output_2.features.length, 2);
 });
 
+test('Point overlayers replican coincidencias, prefijan atributos y separan unmatched', async () => {
+    const registry = loadSpatial();
+    const dom = { querySelector: () => ({ value: 'ol_' }) };
+    const points = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 1 } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [9, 9] }, properties: { id: 2 } }
+    ]);
+    const pointOverlay = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'a' } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'b' } }
+    ]);
+    const pointResult = await registry.sp_point_point_overlayer.run('1', [points, pointOverlay], dom);
+    assert.equal(pointResult.output_1.features.length, 2);
+    assert.equal(pointResult.output_2.features.length, 1);
+    assert.equal(pointResult.output_1.features[1].properties.ol_name, 'b');
+    assert.equal(pointResult.output_1.features[0].properties._overlayer_match_count, 2);
+
+    for (const id of ['sp_point_line_overlayer', 'sp_point_area_overlayer']) {
+        const overlay = featureCollection([{ type: 'Feature', geometry: { type: id.includes('line') ? 'LineString' : 'Polygon', coordinates: id.includes('line') ? [[0, 0], [1, 0]] : [[[0, 0], [1, 0], [0, 0]]] }, properties: { hit: true, zone: id } }]);
+        const result = await registry[id].run('1', [points, overlay], dom);
+        assert.equal(registry[id].out, 2);
+        assert.equal(result.output_1.features.length, 2);
+        assert.equal(result.output_1.features[0].properties.ol_zone, id);
+    }
+});
+
+test('AreaOnArea genera intersecciones y conserva fuentes no coincidentes', async () => {
+    const tool = loadSpatial().sp_area_area_overlayer;
+    const source = featureCollection([
+        { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: { id: 1 } },
+        { type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: { id: 2, intersects: false } }
+    ]);
+    const overlay = featureCollection([{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [] }, properties: { class: 'A' } }]);
+    const result = await tool.run('1', [source, overlay], { querySelector: () => ({ value: 'area_' }) });
+    assert.equal(result.output_1.features.length, 1);
+    assert.equal(result.output_1.features[0].properties.area_class, 'A');
+    assert.equal(result.output_2.features[0].properties.id, 2);
+});
+
+test('Line overlayers mantienen el contrato matched/unmatched de Desktop', async () => {
+    const registry = loadSpatial();
+    const dom = { querySelector: () => ({ value: 'join_' }) };
+    const lines = featureCollection([
+        { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0]] }, properties: { id: 1, intersects: true } },
+        { type: 'Feature', geometry: { type: 'LineString', coordinates: [[5, 0], [6, 0]] }, properties: { id: 2, intersects: false } }
+    ]);
+    const lineOverlay = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [0, 1]] }, properties: { road: 'R1' } }]);
+    const lineResult = await registry.sp_line_line_overlayer.run('1', [lines, lineOverlay], dom);
+    assert.equal(lineResult.output_1.features.length, 1);
+    assert.equal(lineResult.output_2.features.length, 1);
+    assert.equal(lineResult.output_1.features[0].properties.join_road, 'R1');
+
+    const areas = featureCollection([{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [0, 0]]] }, properties: { hit: true, zone: 'Z1' } }]);
+    const areaResult = await registry.sp_line_area_overlayer.run('1', [featureCollection([lines.features[0]]), areas], dom);
+    assert.equal(areaResult.output_1.features.length, 1);
+    assert.equal(areaResult.output_2.features.length, 0);
+    assert.equal(areaResult.output_1.features[0].properties.join_zone, 'Z1');
+});
+
 test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilidad heredada', () => {
     const auditUrl = new URL('../scripts/audit-node-parity.mjs', import.meta.url);
     const manifestUrl = new URL('../docs/desktop-node-manifest.json', import.meta.url);
@@ -147,9 +219,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 93);
-    assert.equal(report.targetSharedIdCount, 89);
-    assert.equal(report.targetMissingInStudio.length, 28);
+    assert.equal(report.studioCount, 99);
+    assert.equal(report.targetSharedIdCount, 95);
+    assert.equal(report.targetMissingInStudio.length, 22);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));

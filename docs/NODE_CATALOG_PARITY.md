@@ -30,20 +30,20 @@ es paridad.
 A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**.
 El alcance Studio excluye 17 (14 Raster y tres lectores/escritores Raster/LiDAR),
 por lo que el catálogo objetivo verificable es de **117 nodos**. Studio registra
-ahora 93: 89 compartidos dentro de alcance y 28 ausencias objetivo.
+ahora 99: 95 compartidos dentro de alcance y 22 ausencias objetivo.
 `reader_file` es una abstracción exclusiva de Studio.
 
 | Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
 | --- | ---: | ---: | ---: | ---: |
 | Attributes | 22 | 22 | 0 | 100 % |
 | Readers | 19 | 10 | 9 | 52,6 % |
-| Spatial | 18 | 9 | 9 | 50,0 % |
+| Spatial | 18 | 15 | 3 | 83,3 % |
 | Geometry | 37 | 37 | 0 | 100 % |
 | Raster | 14 | 2 | 12 | Fuera de alcance |
 | Utils | 14 | 6 | 8 | 42,9 % |
 | Writers | 10 | 6 | 4 | 60,0 % |
 
-De los 42 ausentes totales, 28 están dentro del alcance objetivo. El manifiesto
+De los 36 ausentes totales, 22 están dentro del alcance objetivo. El manifiesto
 trazable está en `desktop-node-manifest.json` y conserva el estado de runtime de
 cada nodo; el informe separa `missingByRuntime` de `targetMissingByRuntime` para
 que una dependencia excluida no altere la priorización.
@@ -80,6 +80,10 @@ hacen fallar el gate ni se contabilizan como deuda.
    Generalizer, Geometry Coercer, Line Builder, MultiBufferer y Offsetter se
    ejecutan en navegador. Centerline Replacer conserva sus dos salidas y exige
    explícitamente el backend Python, sin simular un resultado local incorrecto.
+   **Spatial en curso (15/18):** los seis Overlayers Point/Line/Area conservan
+   dos entradas, salidas matched/unmatched, multiplicidad de coincidencias y
+   prefijos de atributos. Anchored Snapper, Neighbor Finder y Spatial Relator
+   forman el siguiente bloque configurable.
 4. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
    nodos complejos y garantizar importación/exportación sin pérdida.
 5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
