@@ -128,7 +128,160 @@ function spatialLineAreaOverlayerCompat(source, overlay, prefix) {
     return spatialOverlayerResultCompat(matched, unmatched);
 }
 
+function spatialReadConfigCompat(dom, defaults) {
+    try { return { ...defaults, ...JSON.parse(dom.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+    catch (error) { return { ...defaults }; }
+}
+
+function spatialRelationCompat(requestor, supplier, mode) {
+    try {
+        if (mode === 'contains') return turf.booleanContains(requestor, supplier);
+        if (mode === 'within') return turf.booleanWithin(requestor, supplier);
+        if (mode === 'crosses') return turf.booleanCrosses(requestor, supplier);
+        if (mode === 'touches') return turf.booleanTouches(requestor, supplier);
+        if (mode === 'equal' || mode === 'equals') return turf.booleanEqual(requestor, supplier);
+        if (mode === 'disjoint') return turf.booleanDisjoint(requestor, supplier);
+        if (mode === 'overlap' || mode === 'overlaps') return turf.booleanOverlap(requestor, supplier);
+        return turf.booleanIntersects(requestor, supplier);
+    } catch (error) { return false; }
+}
+
+function spatialFieldsCompat(raw) {
+    if (Array.isArray(raw)) return raw.map(String).map((field) => field.trim()).filter(Boolean);
+    try { const parsed = JSON.parse(String(raw || '[]')); if (Array.isArray(parsed)) return parsed.map(String).map((field) => field.trim()).filter(Boolean); }
+    catch (error) { /* comma-separated fallback */ }
+    return String(raw || '').split(',').map((field) => field.trim()).filter(Boolean);
+}
+
+function spatialSupplierIdCompat(feature, fallback) {
+    for (const key of ['OBJECTID', 'FID', 'fid', 'id', 'ID']) {
+        const value = feature?.properties?.[key];
+        if (value !== undefined && value !== null && value !== '') return value;
+    }
+    return feature?.id ?? fallback;
+}
+
+function spatialMergeSupplierCompat(properties, supplier, config, index) {
+    if (!config.merge_attrs) return;
+    Object.entries(supplier?.properties || {}).forEach(([key, value]) => {
+        if (['OBJECTID', 'FID', 'fid', 'id', 'ID'].includes(key)) return;
+        if (config.merge_mode === 'merge') {
+            if (properties[key] === undefined || properties[key] === null || properties[key] === '') properties[key] = value;
+            else properties[`${key}_${index + 1}`] = value;
+        } else properties[`${config.prefix || 'supplier_'}${key}`] = value;
+    });
+}
+
+function spatialRelatorCompat(source, suppliers, config) {
+    const countAttr = String(config.count_attr || 'related_suppliers').trim() || 'related_suppliers';
+    const listName = String(config.list_name || '_relations').trim() || '_relations';
+    const groupFields = spatialFieldsCompat(config.group_by);
+    const output = (source.features || []).map((requestor) => {
+        const item = spatialCloneCompat(requestor);
+        const requestorProperties = item.properties || {};
+        const matches = (suppliers.features || []).map((supplier, index) => ({ supplier, index })).filter(({ supplier }) => (
+            groupFields.every((field) => Object.prototype.hasOwnProperty.call(requestorProperties, field) && Object.prototype.hasOwnProperty.call(supplier.properties || {}, field) && String(requestorProperties[field]) === String(supplier.properties[field]))
+            && spatialRelationCompat(requestor, supplier, config.mode || 'intersects')
+        ));
+        requestorProperties[countAttr] = matches.length;
+        requestorProperties.Join_Count = matches.length;
+        if (matches.length) {
+            const selected = config.supplier_selection === 'last' ? matches[matches.length - 1] : matches[0];
+            requestorProperties.TARGET_FID = spatialSupplierIdCompat(selected.supplier, selected.index);
+            spatialMergeSupplierCompat(requestorProperties, selected.supplier, config, selected.index);
+        }
+        if (config.generate_list) requestorProperties[listName] = matches.map(({ supplier, index }) => {
+            const entry = { supplier_index: index, supplier_id: spatialSupplierIdCompat(supplier, index), relation: config.mode || 'intersects' };
+            if (config.list_attrs !== false) entry.attributes = { ...(supplier.properties || {}) };
+            return entry;
+        });
+        item.properties = requestorProperties;
+        return item;
+    });
+    return { output_1: turf.featureCollection(output) };
+}
+
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
+    sp_anchored_snapper: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Anchored Snapper', icon: 'fa-anchor', color: '#8e44ad', in: 2, out: 4,
+        help: 'Desplaza candidatos del input 2 hacia anchors del input 1.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-anchor"></i><div><strong data-geom-transform-summary>Segment · 10 m</strong><small>4 salidas Desktop</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"snapping_type":"segment","distance":10,"unit":"meters","group_by":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { snapping_type: 'segment', distance: 10, unit: 'meters', group_by: [] });
+            const distanceLimit = Number(config.distance);
+            if (!Number.isFinite(distanceLimit) || distanceLimit < 0) throw new Error('Distancia inválida');
+            const anchors = inputs[0]; const candidates = inputs[1];
+            if (!anchors?.features) throw new Error('Input 1 vacío');
+            if (!candidates?.features) throw new Error('Input 2 vacío');
+            const anchorPoints = turf.explode(anchors);
+            const snapped = []; const untouched = [];
+            const thresholdKm = config.unit === 'meters' ? distanceLimit / 1000 : config.unit === 'miles' ? distanceLimit * 1.60934 : distanceLimit;
+            (candidates.features || []).forEach((feature) => {
+                if (!feature?.geometry || !anchorPoints.features?.length) { untouched.push(feature); return; }
+                const output = spatialCloneCompat(feature); let changed = false;
+                turf.coordEach(output, (coordinate) => {
+                    const current = turf.point(coordinate);
+                    const nearest = turf.nearestPoint(current, anchorPoints);
+                    if (nearest && turf.distance(current, nearest, { units: 'kilometers' }) <= thresholdKm) {
+                        const [x, y] = nearest.geometry.coordinates;
+                        if (coordinate[0] !== x || coordinate[1] !== y) { coordinate[0] = x; coordinate[1] = y; changed = true; }
+                    }
+                });
+                if (changed) snapped.push(output); else untouched.push(feature);
+            });
+            return { output_1: turf.featureCollection(snapped), output_2: turf.featureCollection(untouched), output_3: turf.featureCollection([]), output_4: turf.featureCollection((anchors.features || []).slice()) };
+        }
+    },
+
+    sp_neighbor_finder: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Neighbor Finder', icon: 'fa-crosshairs', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca el candidato más próximo para cada feature fuente.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-crosshairs"></i><div><strong data-geom-transform-summary>Sin límite</strong><small>Vecino más próximo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"max_distance":"","distance_factor":"","merge_attrs":false}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { max_distance: '', distance_factor: '', merge_attrs: false });
+            const source = inputs[0]; const candidates = inputs[1];
+            if (!source?.features?.length) throw new Error('Input 1 vacío');
+            if (!candidates?.features?.length) throw new Error('Input 2 vacío');
+            const maxDistance = String(config.max_distance ?? '').trim() ? Number(config.max_distance) : null;
+            const matched = []; const unmatched = [];
+            (source.features || []).forEach((feature) => {
+                let best = null; let bestDistance = Infinity;
+                (candidates.features || []).forEach((candidate) => {
+                    try {
+                        const distance = turf.distance(turf.centroid(feature), turf.centroid(candidate), { units: 'meters' });
+                        if (distance < bestDistance) { best = candidate; bestDistance = distance; }
+                    } catch (error) { /* invalid candidate */ }
+                });
+                if (!best || (Number.isFinite(maxDistance) && bestDistance > maxDistance)) { unmatched.push(feature); return; }
+                const output = spatialCloneCompat(feature); output.properties = { ...(output.properties || {}), _distance: bestDistance };
+                if (config.merge_attrs) Object.entries(best.properties || {}).forEach(([key, value]) => { if (!(key in output.properties)) output.properties[key] = value; });
+                matched.push(output);
+            });
+            return spatialOverlayerResultCompat(matched, unmatched);
+        }
+    },
+
+    sp_spatial_relator: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Spatial Relator', icon: 'fa-project-diagram', color: '#8e44ad', in: 2, out: 1,
+        help: 'Cuenta y describe Suppliers relacionados para cada Requestor.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-project-diagram"></i><div><strong data-geom-transform-summary>Intersects · related_suppliers</strong><small>Requestors + Suppliers</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"intersects","count_attr":"related_suppliers","merge_attrs":false,"merge_mode":"prefix","supplier_selection":"first","prefix":"supplier_","generate_list":false,"list_name":"_relations","list_attrs":true,"group_by":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { mode: 'intersects', count_attr: 'related_suppliers', merge_attrs: false, merge_mode: 'prefix', supplier_selection: 'first', prefix: 'supplier_', generate_list: false, list_name: '_relations', list_attrs: true, group_by: [] });
+            const source = inputs[0]; const suppliers = inputs[1];
+            if (source?.features?.length === 0) return { output_1: turf.featureCollection([]) };
+            if (!source?.features) throw new Error('Input 1 vacío');
+            if (!suppliers?.features) throw new Error('Input 2 vacío');
+            if (source.features.length + suppliers.features.length >= 15000) {
+                if (typeof window !== 'undefined' && typeof window.JETLBackend?.spatial === 'function') {
+                    const result = await window.JETLBackend.spatial('spatial_relator', { source, join: suppliers }, config);
+                    if (result) return result;
+                }
+                throw new Error('Spatial Relator grande requiere backend Python para no bloquear la interfaz');
+            }
+            return spatialRelatorCompat(source, suppliers, config);
+        }
+    },
+
     sp_point_point_overlayer: {
         cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnPoint Overlayer', icon: 'fa-bullseye', color: '#8e44ad', in: 2, out: 2,
         help: 'Replica puntos coincidentes y añade atributos del overlay.',

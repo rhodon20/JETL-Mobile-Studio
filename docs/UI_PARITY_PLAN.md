@@ -82,6 +82,11 @@ Offsetter reutilizan un editor modal Geometry único. Cada nodo define sus campo
 y resumen, mientras la apertura, cancelación, persistencia JSON y doble clic
 permanecen comunes.
 
+Anchored Snapper, Neighbor Finder y Spatial Relator reutilizan el mismo contrato
+modal adaptable. Conservan los parámetros Desktop en JSON, resumen compacto en
+canvas y configuración completa sin recurrir a un inspector lateral o una hoja
+inferior en móvil.
+
 ### Fase 3 — Navegación del flujo
 
 - Buscador global de nodos y atributos. Implementado v1.

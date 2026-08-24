@@ -27,8 +27,15 @@ function loadAttributes() {
     return window.TOOL_REGISTRY;
 }
 
-function loadSpatial() {
-    const window = { TOOL_REGISTRY: {} };
+function loadSpatial(windowOverrides = {}) {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)), ...windowOverrides };
+    const point = (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties });
+    const coordinatesOf = (value) => value?.geometry?.coordinates || [0, 0];
+    const visitCoordinates = (coordinates, callback) => {
+        if (!Array.isArray(coordinates)) return;
+        if (typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number') return callback(coordinates);
+        coordinates.forEach((child) => visitCoordinates(child, callback));
+    };
     const turf = {
         featureCollection,
         flatten: (value) => value,
@@ -36,24 +43,42 @@ function loadSpatial() {
         simplify: (value) => value,
         cleanCoords: (value) => value,
         multiPolygon: (coordinates) => ({ type: 'Feature', geometry: { type: 'MultiPolygon', coordinates }, properties: {} }),
-        booleanIntersects: (feature) => !!feature.properties?.intersects,
+        booleanIntersects: (feature, supplier) => feature.properties?.intersects ?? supplier?.properties?.intersects ?? supplier?.properties?.relation === 'intersects',
         intersect: (feature, overlay) => feature.properties?.intersects === false || overlay?.properties?.intersects === false
             ? null
             : ({ ...feature, geometry: JSON.parse(JSON.stringify(feature.geometry)), properties: { ...feature.properties, part: 'inside' } }),
         difference: (feature) => feature.properties?.partial
             ? { ...feature, properties: { ...feature.properties, part: 'outside' } }
             : null,
-        explode: () => featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }]),
-        coordEach: (collection, callback) => collection.features.forEach((feature) => callback(feature.geometry.coordinates)),
-        point: (coordinates) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties: {} }),
-        nearestPoint: () => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }),
-        distance: () => 0,
+        explode: (collection) => {
+            const points = [];
+            (collection.features || []).forEach((feature) => visitCoordinates(feature.geometry?.coordinates, (coordinates) => points.push(point(coordinates.slice()))));
+            return featureCollection(points);
+        },
+        coordEach: (value, callback) => {
+            const features = value.type === 'FeatureCollection' ? value.features : [value];
+            features.forEach((feature) => visitCoordinates(feature.geometry?.coordinates, callback));
+        },
+        point,
+        nearestPoint: (sourcePoint, collection) => (collection.features || []).reduce((best, candidate) => {
+            const [sx, sy] = coordinatesOf(sourcePoint); const [cx, cy] = coordinatesOf(candidate);
+            const candidateDistance = Math.hypot(cx - sx, cy - sy);
+            return !best || candidateDistance < best.distance ? { feature: candidate, distance: candidateDistance } : best;
+        }, null)?.feature || null,
+        distance: (a, b) => {
+            const [ax, ay] = coordinatesOf(a); const [bx, by] = coordinatesOf(b);
+            return Math.hypot(bx - ax, by - ay);
+        },
+        centroid: (feature) => point(coordinatesOf(feature).slice()),
         booleanPointOnLine: (point, line) => line.properties?.hit === true,
         booleanPointInPolygon: (point, area) => area.properties?.hit === true,
-        booleanEqual: () => false,
-        booleanOverlap: () => false,
-        booleanWithin: () => false,
-        booleanContains: () => false,
+        booleanEqual: (requestor, supplier) => supplier?.properties?.relation === 'equals',
+        booleanOverlap: (requestor, supplier) => supplier?.properties?.relation === 'overlaps',
+        booleanWithin: (requestor, supplier) => supplier?.properties?.relation === 'within',
+        booleanContains: (requestor, supplier) => supplier?.properties?.relation === 'contains',
+        booleanCrosses: (requestor, supplier) => supplier?.properties?.relation === 'crosses',
+        booleanTouches: (requestor, supplier) => supplier?.properties?.relation === 'touches',
+        booleanDisjoint: (requestor, supplier) => supplier?.properties?.relation === 'disjoint',
         polygonToLine: (area) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: area.geometry.coordinates?.[0] || [] }, properties: {} }),
         lineSplit: (line) => featureCollection([{ ...line, geometry: JSON.parse(JSON.stringify(line.geometry)), properties: { ...line.properties } }]),
         length: () => 1,
@@ -135,6 +160,84 @@ test('Snapper expone los tres resultados del contrato Desktop', async () => {
     const anchor = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }]);
     const result = await tool.run('1', [source, anchor], dom);
     assert.deepEqual(Object.keys(result), ['output_1', 'output_2', 'output_3']);
+});
+
+test('Anchored Snapper conserva sus cuatro salidas y no muta candidatos', async () => {
+    const tool = loadSpatial().sp_anchored_snapper;
+    assert.equal(tool.in, 2);
+    assert.equal(tool.out, 4);
+    const config = { snapping_type: 'vertex', distance: 1000, unit: 'meters', group_by: [] };
+    const dom = { querySelector: () => ({ value: JSON.stringify(config) }) };
+    const anchors = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { anchor: true } }]);
+    const candidates = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1.2, 1.2] }, properties: { id: 1 } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [9, 9] }, properties: { id: 2 } }
+    ]);
+    const result = await tool.run('1', [anchors, candidates], dom);
+    assert.deepEqual(Object.keys(result), ['output_1', 'output_2', 'output_3', 'output_4']);
+    assert.equal(result.output_1.features.length, 1);
+    assert.deepEqual(Array.from(result.output_1.features[0].geometry.coordinates), [1, 1]);
+    assert.equal(result.output_2.features.length, 1);
+    assert.equal(result.output_3.features.length, 0);
+    assert.equal(result.output_4.features.length, 1);
+    assert.deepEqual(candidates.features[0].geometry.coordinates, [1.2, 1.2]);
+});
+
+test('Neighbor Finder separa matched/unmatched y combina atributos opcionalmente', async () => {
+    const tool = loadSpatial().sp_neighbor_finder;
+    assert.equal(tool.in, 2);
+    assert.equal(tool.out, 2);
+    const dom = { querySelector: () => ({ value: JSON.stringify({ max_distance: 2, distance_factor: '', merge_attrs: true }) }) };
+    const source = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 1 } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [10, 10] }, properties: { id: 2 } }
+    ]);
+    const candidates = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 0] }, properties: { name: 'nearest' } }]);
+    const result = await tool.run('1', [source, candidates], dom);
+    assert.equal(result.output_1.features.length, 1);
+    assert.equal(result.output_2.features.length, 1);
+    assert.equal(result.output_1.features[0].properties._distance, 1);
+    assert.equal(result.output_1.features[0].properties.name, 'nearest');
+    assert.equal(source.features[0].properties.name, undefined);
+});
+
+test('Spatial Relator aplica relación, agrupación, atributos y lista como Desktop', async () => {
+    const tool = loadSpatial().sp_spatial_relator;
+    assert.equal(tool.in, 2);
+    assert.equal(tool.out, 1);
+    const config = { mode: 'intersects', count_attr: 'related', group_by: ['group'], merge_attrs: true, merge_mode: 'prefix', supplier_selection: 'first', prefix: 'supplier_', generate_list: true, list_name: '_relations', list_attrs: true };
+    const dom = { querySelector: () => ({ value: JSON.stringify(config) }) };
+    const source = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 1, group: 'A', intersects: true } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { id: 2, group: 'B', intersects: true } }
+    ]);
+    const suppliers = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { OBJECTID: 7, group: 'A', name: 'supplier' } }]);
+    const result = await tool.run('1', [source, suppliers], dom);
+    assert.equal(result.output_1.features[0].properties.related, 1);
+    assert.equal(result.output_1.features[0].properties.Join_Count, 1);
+    assert.equal(result.output_1.features[0].properties.TARGET_FID, 7);
+    assert.equal(result.output_1.features[0].properties.supplier_name, 'supplier');
+    assert.equal(result.output_1.features[0].properties._relations.length, 1);
+    assert.equal(result.output_1.features[1].properties.related, 0);
+    assert.equal(source.features[0].properties.related, undefined);
+
+    const empty = await tool.run('1', [source, featureCollection([])], dom);
+    assert.equal(empty.output_1.features[0].properties.related, 0);
+});
+
+test('Spatial Relator delega cargas grandes al backend y falla de forma accionable si falta', async () => {
+    const source = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} }]);
+    const supplier = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} };
+    const suppliers = featureCollection(Array(14999).fill(supplier));
+    const dom = { querySelector: () => ({ value: '{}' }) };
+    await assert.rejects(() => loadSpatial().sp_spatial_relator.run('1', [source, suppliers], dom), /requiere backend Python/);
+
+    let backendOperation = '';
+    const expected = { output_1: featureCollection([{ ...supplier, properties: { backend: true } }]) };
+    const registry = loadSpatial({ JETLBackend: { spatial: async (operation) => { backendOperation = operation; return expected; } } });
+    const result = await registry.sp_spatial_relator.run('1', [source, suppliers], dom);
+    assert.equal(backendOperation, 'spatial_relator');
+    assert.equal(result.output_1.features[0].properties.backend, true);
 });
 
 test('Clipper separa geometría interior y exterior en dos puertos', async () => {
@@ -219,9 +322,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 99);
-    assert.equal(report.targetSharedIdCount, 95);
-    assert.equal(report.targetMissingInStudio.length, 22);
+    assert.equal(report.studioCount, 102);
+    assert.equal(report.targetSharedIdCount, 98);
+    assert.equal(report.targetMissingInStudio.length, 19);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));

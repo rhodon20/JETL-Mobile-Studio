@@ -1154,6 +1154,41 @@
                 { key: 'on_error', label: 'Si falla', type: 'select', value: 'reject', options: [['reject', 'Enviar a salida 2'], ['null', 'Conservar con diagnóstico']] }
             ],
             summary: (config) => `X ${config.x_mode === 'field' ? config.x_field || 'attr' : config.x_value} · Y ${config.y_mode === 'field' ? config.y_field || 'attr' : config.y_value}`
+        },
+        sp_anchored_snapper: {
+            title: 'Anchored Snapper', subtitle: 'Ajusta candidatos contra una red de anchors',
+            fields: [
+                { key: 'snapping_type', label: 'Tipo de ajuste', type: 'select', value: 'segment', options: [['segment', 'Segmento'], ['vertex', 'Vértice']] },
+                { key: 'distance', label: 'Distancia máxima', type: 'number', value: 10, min: 0 },
+                { key: 'unit', label: 'Unidad', type: 'select', value: 'meters', options: [['meters', 'Metros'], ['kilometers', 'Kilómetros'], ['miles', 'Millas']] },
+                { key: 'group_by', label: 'Agrupar por (separado por comas)', type: 'text', value: '' }
+            ],
+            summary: (config) => `${config.snapping_type === 'vertex' ? 'Vértice' : 'Segmento'} · ${config.distance ?? 10} ${{ meters: 'm', kilometers: 'km', miles: 'mi' }[config.unit] || config.unit}`
+        },
+        sp_neighbor_finder: {
+            title: 'Neighbor Finder', subtitle: 'Encuentra el candidato más próximo',
+            fields: [
+                { key: 'max_distance', label: 'Distancia máxima (metros)', type: 'text', value: '', placeholder: 'Sin límite' },
+                { key: 'distance_factor', label: 'Factor de distancia', type: 'text', value: '', placeholder: 'Opcional' },
+                { key: 'merge_attrs', label: 'Incorporar atributos del vecino', type: 'checkbox', value: false }
+            ],
+            summary: (config) => String(config.max_distance ?? '').trim() ? `Máx. ${config.max_distance} m` : 'Sin límite'
+        },
+        sp_spatial_relator: {
+            title: 'Spatial Relator', subtitle: 'Relaciona Requestors con Suppliers',
+            fields: [
+                { key: 'mode', label: 'Relación espacial', type: 'select', value: 'intersects', options: [['intersects', 'Intersects'], ['contains', 'Contains'], ['within', 'Within'], ['crosses', 'Crosses'], ['touches', 'Touches'], ['overlaps', 'Overlaps'], ['equals', 'Equals'], ['disjoint', 'Disjoint']] },
+                { key: 'count_attr', label: 'Atributo de recuento', type: 'text', value: 'related_suppliers' },
+                { key: 'group_by', label: 'Agrupar por (separado por comas)', type: 'text', value: '' },
+                { key: 'merge_attrs', label: 'Incorporar atributos del Supplier', type: 'checkbox', value: false },
+                { key: 'merge_mode', label: 'Modo de atributos', type: 'select', value: 'prefix', options: [['prefix', 'Añadir prefijo'], ['merge', 'Combinar']] },
+                { key: 'supplier_selection', label: 'Supplier representativo', type: 'select', value: 'first', options: [['first', 'Primero'], ['last', 'Último']] },
+                { key: 'prefix', label: 'Prefijo de atributos', type: 'text', value: 'supplier_' },
+                { key: 'generate_list', label: 'Generar lista de relaciones', type: 'checkbox', value: false },
+                { key: 'list_name', label: 'Nombre de la lista', type: 'text', value: '_relations' },
+                { key: 'list_attrs', label: 'Incluir atributos en la lista', type: 'checkbox', value: true }
+            ],
+            summary: (config) => `${config.mode || 'intersects'} · ${config.count_attr || 'related_suppliers'}`
         }
     };
 
