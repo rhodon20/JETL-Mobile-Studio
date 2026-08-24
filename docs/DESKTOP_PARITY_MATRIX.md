@@ -1,6 +1,6 @@
 # Matriz viva de paridad Desktop → Studio
 
-Referencia auditada: `rhodon20/JETL-Desktop`, rama `main`, 14 de agosto de 2026.
+Referencia auditada: `rhodon20/JETL-Desktop`, rama `main`, 24 de agosto de 2026.
 La paridad significa conservar la capacidad y adaptar la interacción a móvil;
 no copiar literalmente paneles de escritorio ni dependencias de Python o del
 sistema de archivos.
@@ -15,7 +15,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
 | Catálogo objetivo de nodos | 115 Desktop en alcance / 115 IDs compartidos | Catálogo objetivo cerrado; mantener contratos y compatibilidad bidireccional |
-| Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
+| Contratos de puertos compartidos | 115/115 alineados; Keeper y Attribute Creator recuperan el puerto único Desktop | Mantener el gate sin discrepancias y proteger proyectos antiguos con salida dinámica de rechazados |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
 | Pan, zoom, selección y centrado | Implementado | Regresión táctil en Safari y Chromium móvil |
@@ -24,7 +24,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial, Readers, FeatureReader y Utils comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Writers avanzados |
+| Nodo compacto + editor modal estilo Desktop | Attributes —incluidos Keeper y Creator multirregla—, Geometry, Spatial, Readers, FeatureReader y Utils comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Writers avanzados |
 
 ## Ejecución y diagnóstico
 

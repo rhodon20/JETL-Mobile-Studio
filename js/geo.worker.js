@@ -660,65 +660,21 @@ self.onmessage = async function(e) {
     else if(msg.task === 'attr_test') { try { const fc=msg.features; const conditions=Array.isArray(msg.conditions)&&msg.conditions.length?msg.conditions:[{field:msg.field,op:msg.op,value:msg.value,join:'AND'}]; if(!fc||!fc.features) throw new Error('Sin datos'); const evalCond=(props,c)=>{ const left=props?props[c.field]:undefined; const op=String((c&&c.op)||'=='); const raw=(c&&c.value)!==undefined?c.value:''; const txt=String(raw).trim(); let right=txt; if(typeof left==='number'){ const n=Number(txt); right=isNaN(n)?txt:n; } else if(typeof left==='boolean'){ right=txt.toLowerCase()==='true'; } if(op==='like') return String(left??'').toLowerCase().includes(String(raw??'').toLowerCase()); if(op==='starts') return String(left??'').toLowerCase().startsWith(String(raw??'').toLowerCase()); if(op==='ends') return String(left??'').toLowerCase().endsWith(String(raw??'').toLowerCase()); if(op==='in'){ const list=String(raw??'').split(',').map(s=>s.trim()).filter(Boolean); return list.includes(String(left??'')); } if(op==='>') return left>Number(right); if(op==='>=') return left>=Number(right); if(op==='<') return left<Number(right); if(op==='<=') return left<=Number(right); if(op==='!=') return left!=right; return left==right; }; const evalGroup=(props,arr)=>{ if(!arr.length) return true; let acc=evalCond(props,arr[0]); for(let i=1;i<arr.length;i++){ const join=String(arr[i].join||'AND').toUpperCase(); const cur=evalCond(props,arr[i]); acc=(join==='OR')?(acc||cur):(acc&&cur); } return acc; }; const p=[]; const f=[]; for(let i=0;i<fc.features.length;i++){ const feat=fc.features[i]; const props=(feat&&feat.properties)||{}; const pass=evalGroup(props,conditions); if(pass) p.push(feat); else f.push(feat); if(i%1200===0) await new Promise(x=>setTimeout(x,0)); } self.postMessage({taskId:msg.taskId,status:'ok',data:{output_1:turf.featureCollection(p),output_2:turf.featureCollection(f)}}); } catch(err){ self.postMessage({taskId:msg.taskId,status:'err',message:err&&err.message?err.message:String(err)}); } }
     else if(msg.task === 'attr_creator') { try {
         const fc = msg.features;
-        const field = String(msg.field || '').trim();
-        const exprRaw = String(msg.exprRaw || '');
         const onError = msg.onError === 'reject' ? 'reject' : 'null';
-        const isFormula = !!msg.isFormula;
+        const creations = Array.isArray(msg.creations) && msg.creations.length ? msg.creations : [{ enabled: true, outputAttr: msg.field, expression: msg.exprRaw, defaultValue: null, valueType: 'string' }];
         if (!fc || !fc.features) throw new Error('Sin datos');
-        if (!field) throw new Error('Campo destino vacio');
-        let formulaFn = null;
-        let compileErr = null;
-        if (isFormula) {
-            try { formulaFn = compileSafeExpression(exprRaw.substring(1), ['f']); }
-            catch (e) { compileErr = e; }
-        }
+        if (!creations.some((row) => row && row.enabled !== false && String(row.outputAttr || '').trim())) throw new Error('Define al menos una creacion de atributo');
+        const castValue = (value, type) => { const kind=String(type||'string').toLowerCase(); if(value==null)return null; if(kind==='string')return String(value); if(kind==='number'){const n=Number(value);if(!Number.isFinite(n))throw new Error('Valor no numerico');return n;} if(kind==='integer'){const n=Number(value);if(!Number.isFinite(n))throw new Error('Valor no entero');return Math.trunc(n);} if(kind==='boolean'){if(typeof value==='boolean')return value;const text=String(value).trim().toLowerCase();if(['true','1','yes','si'].includes(text))return true;if(['false','0','no',''].includes(text))return false;throw new Error('Valor no booleano');} return value; };
+        const evaluate = (row, f) => { const expr=String(row.expression??'').trim(); const props=f.properties||{}; let value; if(!expr)value=row.defaultValue??null; else if(expr.startsWith('=')){const fn=compileSafeExpression(expr.slice(1),['f','props']);value=fn(f,props,Math,turf,undefined,undefined,undefined,undefined,undefined,undefined,undefined);} else {const direct=expr.match(/^@Value\(([^)]+)\)$/);const math=expr.match(/^@(round|floor|ceil)\(([^)]+)\)$/);const text=expr.match(/^@(upper|lower|trim)\(([^)]+)\)$/);if(direct)value=props[direct[1]]??row.defaultValue??null;else if(math)value=Math[math[1]](Number(props[math[2]]??math[2]));else if(text){const raw=String(props[text[2]]??'');value=text[1]==='upper'?raw.toUpperCase():text[1]==='lower'?raw.toLowerCase():raw.trim();}else if(expr.startsWith('@concat(')&&expr.endsWith(')'))value=expr.slice(8,-1).split(',').map(part=>{const token=part.trim();const match=token.match(/^@Value\(([^)]+)\)$/);return match?(props[match[1]]??''):token.replace(/^["']|["']$/g,'');}).join('');else value=expr.replace(/^["']|["']$/g,'');} return castValue(value,row.valueType); };
         const passed = [];
         const rejected = [];
         for (let i = 0; i < fc.features.length; i++) {
             const src = fc.features[i];
             const f = cloneFast(src);
             if (!f.properties) f.properties = {};
-            if (isFormula && !formulaFn) {
-                if (onError === 'reject') {
-                    f.properties[field] = null;
-                    f.properties._creator_error = compileErr && compileErr.message ? compileErr.message : 'Formula invalida';
-                    rejected.push(f);
-                } else {
-                    f.properties[field] = null;
-                    passed.push(f);
-                }
-                if (i % 1200 === 0) await new Promise(r => setTimeout(r, 0));
-                continue;
-            }
-            if (isFormula && formulaFn) {
-                try {
-                    f.properties[field] = formulaFn(
-                        f,
-                        Math,
-                        turf,
-                        undefined,
-                        undefined,
-                        undefined,
-                        undefined,
-                        undefined,
-                        undefined,
-                        undefined
-                    );
-                    passed.push(f);
-                } catch (e) {
-                    if (onError === 'reject') {
-                        f.properties[field] = null;
-                        f.properties._creator_error = e && e.message ? e.message : String(e);
-                        rejected.push(f);
-                    } else {
-                        f.properties[field] = null;
-                        passed.push(f);
-                    }
-                }
-            } else {
-                f.properties[field] = exprRaw;
-                passed.push(f);
-            }
+            let failed = null;
+            for (const row of creations) { if (!row || row.enabled === false || !String(row.outputAttr || '').trim()) continue; try { f.properties[String(row.outputAttr).trim()] = evaluate(row, f); } catch (e) { f.properties[String(row.outputAttr).trim()] = row.defaultValue ?? null; failed = e; break; } }
+            if (failed && onError === 'reject') { f.properties._creator_error = failed.message || String(failed); rejected.push(f); } else passed.push(f);
             if (i % 1200 === 0) await new Promise(r => setTimeout(r, 0));
         }
         if (onError === 'reject') self.postMessage({ taskId: msg.taskId, status: 'ok', data: { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) } });

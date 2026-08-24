@@ -86,14 +86,18 @@ hacen fallar el gate ni se contabilizan como deuda.
    **Completado:** manifiesto de 134 nodos y gate automático.
 2. **P0 — Contratos compartidos:** corregir primero puertos y resultados de los
    nodos que ya existen en ambos productos. FeatureJoiner, Snapper y Clipper ya
-   recuperan sus salidas Desktop; las salidas de rechazo adicionales de Keeper y
-   Attr Creator requieren una decisión explícita de compatibilidad.
+   recuperan sus salidas Desktop. **Completado:** Keeper y Attribute Creator
+   muestran el único puerto de Desktop y disponen de editores modales equivalentes;
+   los proyectos antiguos que guardaron una segunda salida de rechazados siguen
+   importándose y ejecutándose mediante compatibilidad dinámica. El gate registra
+   cero discrepancias de contrato en los 115 nodos objetivo.
 3. **P1 — Nodos de flujo habitual:** portar primero lectores, transformaciones,
    operaciones espaciales y escritores que puedan ejecutarse enteramente en web.
    **Attributes completada (22/22):** List Concatenator, Substring Extractor,
    Attribute Splitter, List Exploder, String Replacer, Aggregator y las dos
-   generaciones de Attribute Manager conservan contrato, configuración y
-   semántica Desktop con editor modal adaptado. El manager legado permanece
+   generaciones de Attribute Manager, Keeper y Attribute Creator multirregla
+   conservan contrato, configuración y semántica Desktop con editor modal adaptado.
+   El manager legado permanece
    oculto para importar proyectos antiguos y conserva su salida de rechazados.
    **Geometry completada en catálogo (37/37):** las transformaciones locales
    conservan contratos y configuración Desktop. Area Builder, Extruder,

@@ -183,6 +183,60 @@ test('FeatureJoiner conserva los tres puertos y separa el secundario no usado', 
     assert.equal(result.output_3.features[0].properties.id, 3);
 });
 
+test('AttributeKeeper alinea el puerto Desktop, conserva JSON y no muta la entrada', async () => {
+    const tool = loadAttributes().attr_keeper;
+    assert.equal(tool.out, 1);
+    const values = { '[df-ak-fields]': JSON.stringify(['id', 'name']), '[df-keep]': '', '[df-on-error]': 'null' };
+    const dom = { querySelector: (selector) => ({ value: values[selector] ?? '' }) };
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1, name: 'Madrid', drop: true } }]);
+    const result = await tool.run('1', [input], dom);
+    assert.deepEqual({ ...result.features[0].properties }, { id: 1, name: 'Madrid' });
+    assert.equal(input.features[0].properties.drop, true);
+});
+
+test('AttributeKeeper mantiene proyectos legados con salida dinámica de rechazados', async () => {
+    const tool = loadAttributes().attr_keeper;
+    const values = { '[df-ak-fields]': '[]', '[df-keep]': 'wanted', '[df-on-error]': 'reject' };
+    const dom = { querySelector: (selector) => ({ value: values[selector] ?? '' }) };
+    const input = featureCollection([
+        { type: 'Feature', geometry: null, properties: { wanted: 1 } },
+        { type: 'Feature', geometry: null, properties: { other: 2 } }
+    ]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.output_1.features.length, 1);
+    assert.equal(result.output_2.features.length, 1);
+    assert.match(result.output_2.features[0].properties._keeper_error, /objetivo/i);
+});
+
+test('AttributeCreator ejecuta creaciones ordenadas y expresiones compatibles con Desktop', async () => {
+    const tool = loadAttributes().attr_creator;
+    assert.equal(tool.out, 1);
+    const creations = [
+        { enabled: true, outputAttr: 'double', expression: '=props.amount * 2', valueType: 'number' },
+        { enabled: true, outputAttr: 'label', expression: '@concat(@Value(name), -, @Value(double))', valueType: 'string' },
+        { enabled: true, outputAttr: 'upper', expression: '@upper(name)', valueType: 'string' }
+    ];
+    const values = { '[df-ac-creations]': JSON.stringify(creations), '[df-on-error]': 'null' };
+    const dom = { querySelector: (selector) => ({ value: values[selector] ?? '' }) };
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { amount: 3, name: 'madrid' } }]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.features[0].properties.double, 6);
+    assert.equal(result.features[0].properties.label, 'madrid-6');
+    assert.equal(result.features[0].properties.upper, 'MADRID');
+    assert.equal(input.features[0].properties.double, undefined);
+});
+
+test('AttributeCreator sigue ejecutando controles legados y conserva rechazo dinámico', async () => {
+    const tool = loadAttributes().attr_creator;
+    const values = { '[df-ac-creations]': '[]', '[df-name]': 'copy', '[df-val]': '=props.missing.value', '[df-default]': '', '[df-on-error]': 'reject' };
+    const dom = { querySelector: (selector) => ({ value: values[selector] ?? '' }) };
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1 } }]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.output_1.features.length, 0);
+    assert.equal(result.output_2.features.length, 1);
+    assert.match(result.output_2.features[0].properties._creator_error, /missing|undefined/i);
+});
+
 test('Snapper expone los tres resultados del contrato Desktop', async () => {
     const registry = loadSpatial();
     const tool = registry.geo_snap;

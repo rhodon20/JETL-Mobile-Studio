@@ -80,7 +80,7 @@ test('el inventario Studio es reproducible y la paridad de catálogo queda fijad
     assert.match(parity, /requiere\s+backend/);
 });
 
-test('el manifiesto Desktop expone la brecha y los contratos de puertos', () => {
+test('el manifiesto Desktop expone la brecha fuera de alcance y contratos alineados', () => {
     const run = spawnSync(process.execPath, [
         'scripts/audit-node-parity.mjs',
         'docs/desktop-node-manifest.json'
@@ -95,6 +95,6 @@ test('el manifiesto Desktop expone la brecha y los contratos de puertos', () => 
     assert.equal(report.sharedIdCount, 118);
     assert.equal(report.missingInStudio.length, 16);
     assert.deepEqual(report.studioOnly, ['reader_file']);
-    assert.ok(report.contractMismatches.length > 0);
+    assert.equal(report.contractMismatches.length, 0);
     assert.equal(report.categoryCoverage.raster.missing, 12);
 });

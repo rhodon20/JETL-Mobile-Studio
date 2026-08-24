@@ -154,6 +154,50 @@ function castAttributeManagerValue(value, castType) {
     return value;
 }
 
+function readKeeperFieldsCompat(dom) {
+    let fields = [];
+    try { fields = JSON.parse(dom?.querySelector?.('[df-ak-fields]')?.value || '[]'); } catch (_) { fields = []; }
+    if (!Array.isArray(fields) || !fields.length) fields = parseCsvFields(dom?.querySelector?.('[df-keep]')?.value || '');
+    return Array.from(new Set((fields || []).map((field) => resolveParamText(field).trim()).filter(Boolean)));
+}
+
+function readCreatorCreationsCompat(dom) {
+    let creations = [];
+    try { creations = JSON.parse(dom?.querySelector?.('[df-ac-creations]')?.value || '[]'); } catch (_) { creations = []; }
+    if (!Array.isArray(creations) || !creations.length) {
+        const outputAttr = resolveParamText(dom?.querySelector?.('[df-name]')?.value || '').trim();
+        const expression = resolveParamText(dom?.querySelector?.('[df-val]')?.value || '');
+        if (outputAttr || expression) creations = [{ enabled: true, outputAttr, expression, defaultValue: dom?.querySelector?.('[df-default]')?.value ?? null, valueType: 'string' }];
+    }
+    return creations.filter((row) => row && row.enabled !== false && String(row.outputAttr || '').trim()).map((row) => ({
+        enabled: row.enabled !== false,
+        outputAttr: resolveParamText(row.outputAttr).trim(),
+        expression: resolveParamText(row.expression ?? ''),
+        defaultValue: row.defaultValue ?? null,
+        valueType: String(row.valueType || 'string').toLowerCase()
+    }));
+}
+
+function evaluateCreatorExpressionCompat(creation, feature) {
+    const expression = String(creation.expression ?? '').trim();
+    if (!expression) return creation.defaultValue ?? null;
+    const properties = feature.properties || {};
+    let value;
+    if (expression.startsWith('=')) {
+        const fn = compileSafeExpression(expression.slice(1), ['f', 'props']);
+        value = fn(feature, properties, Math, turf, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+    } else if (/^@Value\(([^)]+)\)$/.test(expression)) {
+        value = properties[expression.match(/^@Value\(([^)]+)\)$/)[1]] ?? creation.defaultValue ?? null;
+    } else if (/^@(round|floor|ceil)\(([^)]+)\)$/.test(expression)) {
+        const match = expression.match(/^@(round|floor|ceil)\(([^)]+)\)$/); const raw = properties[match[2]] ?? match[2]; value = Math[match[1]](Number(raw));
+    } else if (/^@(upper|lower|trim)\(([^)]+)\)$/.test(expression)) {
+        const match = expression.match(/^@(upper|lower|trim)\(([^)]+)\)$/); const text = String(properties[match[2]] ?? ''); value = match[1] === 'upper' ? text.toUpperCase() : match[1] === 'lower' ? text.toLowerCase() : text.trim();
+    } else if (expression.startsWith('@concat(') && expression.endsWith(')')) {
+        value = expression.slice(8, -1).split(',').map((part) => { const token = part.trim(); const match = token.match(/^@Value\(([^)]+)\)$/); return match ? properties[match[1]] ?? '' : token.replace(/^["']|["']$/g, ''); }).join('');
+    } else value = expression.replace(/^["']|["']$/g, '');
+    return castAttributeManagerValue(value, creation.valueType);
+}
+
 function runAttributeManagerExpression(source, props, feature, originalProps) {
     const fn = compileSafeExpression(source, ['props', 'feat', 'originalProps']);
     return fn(props, feature, originalProps, Math, turf, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
@@ -569,25 +613,16 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_keeper: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Mantiene únicamente los atributos seleccionados. La configuración completa se abre en un modal.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campos a mantener</span>
-                <input type="text" df-keep class="node-control" placeholder="id, name, type">
-                <div style="font-size:0.6em;color:#666;font-style:italic">El resto serÃ¡ borrado</div>
-            </div>
-            <div df-keeper-fields style="max-height:110px; overflow:auto; border:1px solid #333; border-radius:4px; padding:6px; background:#151515; margin-bottom:6px"></div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Compat (continuar)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>`,
+            <div class="node-editor-summary"><i class="fas fa-check-square"></i><div><strong data-ak-count>0 campos</strong><small>Conservar atributos</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="keeper-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-ak-fields class="node-control" tabindex="-1">[]</textarea><input df-on-error value="null" tabindex="-1"></div>`,
         run: async (id, inputs, dom) => {
-            const keepStr = resolveParamText(dom.querySelector('[df-keep]').value);
+            const source = inputs[0]; if (!source?.features) throw new Error('Sin datos');
             const onError = dom.querySelector('[df-on-error]')?.value || 'null';
-            const toKeep = new Set(keepStr.split(',').map(s => s.trim()));
+            const toKeep = new Set(readKeeperFieldsCompat(dom));
             if (!toKeep.size) throw new Error("Define al menos un campo a mantener");
 
             if (typeof postWorkerTask === 'function') {
@@ -595,7 +630,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
                         task: 'attr_keeper',
-                        features: inputs[0],
+                        features: source,
                         keepList: Array.from(toKeep),
                         onError
                     }, 45000);
@@ -608,8 +643,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             const passed = [];
             const rejected = [];
-            inputs[0].features.forEach(f => {
-                if (!f.properties) f.properties = {};
+            source.features.forEach((feature) => {
+                const f = cloneFeatureForAttributeTool(feature); if (!f.properties) f.properties = {};
                 try {
                     let found = 0;
                     const newProps = {};
@@ -644,38 +679,24 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_creator: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Crea varios atributos con valores, referencias o expresiones en orden.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Nuevo Campo</span>
-                <input type="text" df-name class="node-control" value="new_field">
-            </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Valor o FÃ³rmula (=)</span>
-                <input type="text" df-val class="node-control" placeholder="Texto o =f.properties.id*2">
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Asignar null (compat)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>`,
+            <div class="node-editor-summary"><i class="fas fa-plus-square"></i><div><strong data-ac-count>0 atributos</strong><small>Creaciones ordenadas</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="creator-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-ac-creations class="node-control" tabindex="-1">[]</textarea><input df-on-error value="null" tabindex="-1"></div>`,
         run: async (id, inputs, dom) => {
-            const field = resolveParamText(dom.querySelector('[df-name]').value);
-            const exprRaw = resolveParamText(dom.querySelector('[df-val]').value);
-            const onError = dom.querySelector('[df-on-error]')?.value || 'null';
-            const isFormula = exprRaw.startsWith('=');
+            const source = inputs[0]; if (!source?.features) throw new Error('Sin datos');
+            const creations = readCreatorCreationsCompat(dom); const onError = dom.querySelector('[df-on-error]')?.value || 'null';
+            if (!creations.length) throw new Error('Define al menos una creación de atributo');
 
             if (typeof postWorkerTask === 'function') {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
                         task: 'attr_creator',
-                        features: inputs[0],
-                        field,
-                        exprRaw,
-                        isFormula,
+                        features: source,
+                        creations,
                         onError
                     }, 45000);
                     if (wres && wres.status === 'ok') return wres.data;
@@ -685,67 +706,18 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
-            let formulaFn = null;
-            let compileErr = null;
-            if (isFormula) {
-                try {
-                    formulaFn = compileSafeExpression(exprRaw.substring(1), ['f']);
-                } catch (e) {
-                    compileErr = e;
-                    console.warn("Error en fÃ³rmula Creator", e);
-                }
-            }
-
             const passed = [];
             const rejected = [];
-            inputs[0].features.forEach((f) => {
-                if (!f.properties) f.properties = {};
-
-                if (isFormula && !formulaFn) {
-                    if (onError === 'reject') {
-                        const rf = (typeof window.JETLClone === 'function') ? window.JETLClone(f) : f;
-                        if (!rf.properties) rf.properties = {};
-                        rf.properties[field] = null;
-                        rf.properties._creator_error = compileErr && compileErr.message ? compileErr.message : 'Formula invalida';
-                        rejected.push(rf);
-                    } else {
-                        f.properties[field] = null;
-                        passed.push(f);
-                    }
-                    return;
-                }
-
-                if (isFormula && formulaFn) {
-                    try {
-                        f.properties[field] = formulaFn(
-                            f,
-                            Math,
-                            turf,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined
-                        );
-                        passed.push(f);
-                    } catch (e) {
-                        if (onError === 'reject') {
-                            const rf = (typeof window.JETLClone === 'function') ? window.JETLClone(f) : f;
-                            if (!rf.properties) rf.properties = {};
-                            rf.properties[field] = null;
-                            rf.properties._creator_error = e && e.message ? e.message : String(e);
-                            rejected.push(rf);
-                        } else {
-                            f.properties[field] = null;
-                            passed.push(f);
-                        }
-                    }
-                } else {
-                    f.properties[field] = exprRaw;
-                    passed.push(f);
-                }
+            source.features.forEach((feature) => {
+                const f = cloneFeatureForAttributeTool(feature); if (!f.properties) f.properties = {};
+                let failed = null;
+                creations.forEach((creation) => {
+                    if (failed) return;
+                    try { f.properties[creation.outputAttr] = evaluateCreatorExpressionCompat(creation, f); }
+                    catch (error) { f.properties[creation.outputAttr] = creation.defaultValue ?? null; failed = error; }
+                });
+                if (failed && onError === 'reject') { f.properties._creator_error = failed.message || String(failed); rejected.push(f); }
+                else passed.push(f);
             });
             if (onError === 'reject') {
                 return {

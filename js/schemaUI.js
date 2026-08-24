@@ -245,6 +245,188 @@
         const p1 = _getParentNodeId(node, 'input_1');
         const fields = _schemaFromNodeData(p1);
         _renderKeeperFieldList(dom, fields);
+        _syncKeeperSummary(dom, _readKeeperFields(dom));
+    }
+
+    function _parseFieldList(value) {
+        return Array.from(new Set(String(value || '').split(/[,;\n]/).map((field) => field.trim()).filter(Boolean)));
+    }
+
+    function _readKeeperFields(nodeEl) {
+        let fields = [];
+        try { fields = JSON.parse(nodeEl?.querySelector('[df-ak-fields]')?.value || '[]'); } catch (e) { fields = []; }
+        if (!Array.isArray(fields) || !fields.length) fields = _parseFieldList(nodeEl?.querySelector('[df-keep]')?.value || '');
+        return Array.from(new Set(fields.map((field) => String(field || '').trim()).filter(Boolean)));
+    }
+
+    function _syncKeeperSummary(nodeEl, fields) {
+        const count = Array.isArray(fields) ? fields.length : 0;
+        const summary = nodeEl?.querySelector('[data-ak-count]');
+        if (summary) summary.textContent = `${count} ${count === 1 ? 'campo' : 'campos'}`;
+    }
+
+    let currentKeeperEditor = null;
+
+    function _keeperModalFields() {
+        return Array.from(document.querySelectorAll('#keeper-editor-fields [data-keeper-editor-field]:checked')).map((input) => input.value);
+    }
+
+    function _syncKeeperEditorCount() {
+        const fields = new Set([..._keeperModalFields(), ..._parseFieldList(document.getElementById('keeper-editor-manual')?.value)]);
+        const count = fields.size;
+        const label = document.getElementById('keeper-editor-count');
+        if (label) label.textContent = `${count} ${count === 1 ? 'seleccionado' : 'seleccionados'}`;
+    }
+
+    function openKeeperEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('keeper-editor-modal');
+        const node = _safeGetNode(nodeId).node;
+        if (!nodeEl || !modal || node?.name !== 'attr_keeper') return false;
+        const selected = _readKeeperFields(nodeEl);
+        const detected = _schemaFromNodeData(_getParentNodeId(node, 'input_1'));
+        const detectedSet = new Set(detected);
+        const fieldsBox = document.getElementById('keeper-editor-fields');
+        fieldsBox.innerHTML = '';
+        if (!detected.length) fieldsBox.innerHTML = '<div class="reader-editor-empty">Ejecuta el nodo anterior para detectar campos. También puedes escribirlos manualmente.</div>';
+        detected.forEach((field) => {
+            const row = document.createElement('label');
+            row.className = 'node-editor-check';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.value = field;
+            input.checked = selected.includes(field);
+            input.setAttribute('data-keeper-editor-field', '');
+            const text = document.createElement('span');
+            text.textContent = field;
+            row.append(input, text);
+            fieldsBox.appendChild(row);
+        });
+        document.getElementById('keeper-editor-manual').value = selected.filter((field) => !detectedSet.has(field)).join(', ');
+        currentKeeperEditor = String(nodeId);
+        _syncKeeperEditorCount();
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeKeeperEditor(save) {
+        const modal = document.getElementById('keeper-editor-modal');
+        if (!modal) return;
+        if (save && currentKeeperEditor) {
+            const nodeEl = document.getElementById('node-' + currentKeeperEditor);
+            if (nodeEl) {
+                const fields = Array.from(new Set([..._keeperModalFields(), ..._parseFieldList(document.getElementById('keeper-editor-manual')?.value)]));
+                _commitNodeControl(nodeEl.querySelector('[df-ak-fields]'), JSON.stringify(fields));
+                const legacy = nodeEl.querySelector('[df-keep]');
+                if (legacy) _commitNodeControl(legacy, fields.join(','));
+                _syncKeeperSummary(nodeEl, fields);
+            }
+        }
+        modal.style.display = 'none';
+        currentKeeperEditor = null;
+    }
+
+    function _readCreatorConfig(nodeEl) {
+        let rows = [];
+        try { rows = JSON.parse(nodeEl?.querySelector('[df-ac-creations]')?.value || '[]'); } catch (e) { rows = []; }
+        if (!Array.isArray(rows) || !rows.length) {
+            const outputAttr = nodeEl?.querySelector('[df-name]')?.value || '';
+            const expression = nodeEl?.querySelector('[df-val]')?.value || '';
+            if (outputAttr || expression) rows = [{ enabled: true, outputAttr, expression, defaultValue: nodeEl?.querySelector('[df-default]')?.value || '', valueType: 'string' }];
+        }
+        return rows.map((row) => ({ enabled: row?.enabled !== false, outputAttr: String(row?.outputAttr || ''), expression: String(row?.expression ?? ''), defaultValue: row?.defaultValue ?? '', valueType: String(row?.valueType || 'string') }));
+    }
+
+    function _syncCreatorSummary(nodeEl, rows) {
+        const count = (rows || []).filter((row) => row.enabled !== false && String(row.outputAttr || '').trim()).length;
+        const summary = nodeEl?.querySelector('[data-ac-count]');
+        if (summary) summary.textContent = `${count} ${count === 1 ? 'atributo' : 'atributos'}`;
+    }
+
+    function updateCreatorNode(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        if (node?.name !== 'attr_creator') return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        if (nodeEl) _syncCreatorSummary(nodeEl, _readCreatorConfig(nodeEl));
+    }
+
+    let currentCreatorEditor = null;
+
+    function _creatorEditorRuleRow(rule = {}) {
+        const row = document.createElement('div');
+        row.className = 'creator-editor-rule';
+        row.innerHTML = `<input data-creator-enabled type="checkbox" aria-label="Activar atributo" ${rule.enabled === false ? '' : 'checked'}>
+            <label class="form-field"><span>Atributo</span><input data-creator-output class="node-control" placeholder="nuevo_atributo"></label>
+            <label class="form-field"><span>Valor o expresión</span><input data-creator-expression class="node-control" placeholder="@Value(campo) o =props.a + 1"></label>
+            <label class="form-field"><span>Valor por defecto</span><input data-creator-default class="node-control" placeholder="Opcional"></label>
+            <label class="form-field"><span>Tipo</span><select data-creator-type class="node-control"><option value="string">Texto</option><option value="number">Número</option><option value="integer">Entero</option><option value="boolean">Booleano</option></select></label>
+            <button type="button" class="node-btn-mini" data-creator-remove-rule aria-label="Eliminar atributo"><i class="fas fa-times"></i></button>`;
+        row.querySelector('[data-creator-output]').value = rule.outputAttr || '';
+        row.querySelector('[data-creator-expression]').value = rule.expression ?? '';
+        row.querySelector('[data-creator-default]').value = rule.defaultValue ?? '';
+        row.querySelector('[data-creator-type]').value = ['string', 'number', 'integer', 'boolean'].includes(rule.valueType) ? rule.valueType : 'string';
+        return row;
+    }
+
+    function _collectCreatorRules() {
+        return Array.from(document.querySelectorAll('#creator-editor-rules .creator-editor-rule')).map((row) => ({
+            enabled: row.querySelector('[data-creator-enabled]').checked,
+            outputAttr: row.querySelector('[data-creator-output]').value.trim(),
+            expression: row.querySelector('[data-creator-expression]').value,
+            defaultValue: row.querySelector('[data-creator-default]').value,
+            valueType: row.querySelector('[data-creator-type]').value
+        })).filter((row) => row.outputAttr || row.expression || row.defaultValue);
+    }
+
+    function _syncCreatorEditorCount() {
+        const count = _collectCreatorRules().filter((row) => row.enabled && row.outputAttr).length;
+        const label = document.getElementById('creator-editor-count');
+        if (label) label.textContent = `${count} ${count === 1 ? 'atributo' : 'atributos'}`;
+    }
+
+    function openCreatorEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('creator-editor-modal');
+        if (!nodeEl || !modal || _safeGetNode(nodeId).node?.name !== 'attr_creator') return false;
+        const rulesBox = document.getElementById('creator-editor-rules');
+        rulesBox.innerHTML = '';
+        const rows = _readCreatorConfig(nodeEl);
+        (rows.length ? rows : [{}]).forEach((row) => rulesBox.appendChild(_creatorEditorRuleRow(row)));
+        currentCreatorEditor = String(nodeId);
+        _syncCreatorEditorCount();
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeCreatorEditor(save) {
+        const modal = document.getElementById('creator-editor-modal');
+        if (!modal) return;
+        if (save && currentCreatorEditor) {
+            const nodeEl = document.getElementById('node-' + currentCreatorEditor);
+            if (nodeEl) {
+                const rows = _collectCreatorRules();
+                _commitNodeControl(nodeEl.querySelector('[df-ac-creations]'), JSON.stringify(rows));
+                const first = rows.find((row) => row.enabled !== false) || rows[0];
+                if (first) {
+                    if (nodeEl.querySelector('[df-name]')) _commitNodeControl(nodeEl.querySelector('[df-name]'), first.outputAttr);
+                    if (nodeEl.querySelector('[df-val]')) _commitNodeControl(nodeEl.querySelector('[df-val]'), first.expression);
+                    if (nodeEl.querySelector('[df-default]')) _commitNodeControl(nodeEl.querySelector('[df-default]'), first.defaultValue);
+                }
+                _syncCreatorSummary(nodeEl, rows);
+            }
+        }
+        modal.style.display = 'none';
+        currentCreatorEditor = null;
+    }
+
+    function importCreatorFields() {
+        if (!currentCreatorEditor) return;
+        const node = _safeGetNode(currentCreatorEditor).node;
+        const fields = _schemaFromNodeData(_getParentNodeId(node, 'input_1'));
+        const rulesBox = document.getElementById('creator-editor-rules');
+        const existing = new Set(_collectCreatorRules().map((row) => row.outputAttr));
+        fields.filter((field) => !existing.has(field)).forEach((field) => rulesBox.appendChild(_creatorEditorRuleRow({ outputAttr: `${field}_new`, expression: `@Value(${field})`, valueType: 'string' })));
+        _syncCreatorEditorCount();
     }
 
     const FORMATTER_OPERATION_LABELS = {
@@ -1565,6 +1747,7 @@
         updateSorterNode(nodeId);
         updateRenamerNode(nodeId);
         updateKeeperNode(nodeId);
+        updateCreatorNode(nodeId);
         updateStringFormatterNode(nodeId);
         updateMatcherNode(nodeId);
         updateStatsNode(nodeId);
@@ -1626,6 +1809,12 @@
             } else if (action === 'attr-manager-v2-open-editor') {
                 evt.stopPropagation();
                 openAttributeManagerEditor(nodeId, 'v2');
+            } else if (action === 'keeper-open-editor') {
+                evt.stopPropagation();
+                openKeeperEditor(nodeId);
+            } else if (action === 'creator-open-editor') {
+                evt.stopPropagation();
+                openCreatorEditor(nodeId);
             } else if (action === 'geom-transform-open-editor') {
                 evt.stopPropagation();
                 openGeometryTransformEditor(nodeId);
@@ -1687,6 +1876,15 @@
             else if (action === 'save-attribute-manager-editor') closeAttributeManagerEditor(true);
             else if (action === 'attribute-manager-add-rule' && currentAttributeManagerEditor) document.getElementById('attribute-manager-editor-rules')?.appendChild(_attributeManagerRuleRow({}, currentAttributeManagerEditor.version));
             else if (action === 'attribute-manager-remove-rule') evt.target.closest('.attr-manager-editor-rule')?.remove();
+            else if (action === 'close-keeper-editor') closeKeeperEditor(false);
+            else if (action === 'save-keeper-editor') closeKeeperEditor(true);
+            else if (action === 'keeper-select-all') { document.querySelectorAll('#keeper-editor-fields [data-keeper-editor-field]').forEach((input) => { input.checked = true; }); _syncKeeperEditorCount(); }
+            else if (action === 'keeper-select-none') { document.querySelectorAll('#keeper-editor-fields [data-keeper-editor-field]').forEach((input) => { input.checked = false; }); document.getElementById('keeper-editor-manual').value = ''; _syncKeeperEditorCount(); }
+            else if (action === 'close-creator-editor') closeCreatorEditor(false);
+            else if (action === 'save-creator-editor') closeCreatorEditor(true);
+            else if (action === 'creator-add-rule') { document.getElementById('creator-editor-rules')?.appendChild(_creatorEditorRuleRow()); _syncCreatorEditorCount(); }
+            else if (action === 'creator-import-fields') importCreatorFields();
+            else if (evt.target.closest('[data-creator-remove-rule]')) { evt.target.closest('.creator-editor-rule')?.remove(); _syncCreatorEditorCount(); }
             else if (action === 'close-geometry-transform-editor') closeGeometryTransformEditor(false);
             else if (action === 'save-geometry-transform-editor') closeGeometryTransformEditor(true);
             else if (action === 'close-reader-editor') closeReaderEditor(false);
@@ -1716,6 +1914,8 @@
             else if (nodeEl?.classList.contains('attr_aggregator')) openAggregatorEditor(nodeEl.id.replace('node-', ''));
             else if (nodeEl?.classList.contains('attr_manager_v2')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'v2');
             else if (nodeEl?.classList.contains('attr_manager')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'legacy');
+            else if (nodeEl?.classList.contains('attr_keeper')) openKeeperEditor(nodeEl.id.replace('node-', ''));
+            else if (nodeEl?.classList.contains('attr_creator')) openCreatorEditor(nodeEl.id.replace('node-', ''));
             else if (Object.keys(READER_EDITOR_DEFINITIONS).some((name) => nodeEl?.classList.contains(name))) openReaderEditor(nodeEl.id.replace('node-', ''));
             else if (Object.keys(GEOMETRY_TRANSFORM_EDITORS).some((name) => nodeEl?.classList.contains(name))) openGeometryTransformEditor(nodeEl.id.replace('node-', ''));
         });
@@ -1737,6 +1937,8 @@
         });
 
         document.addEventListener('input', (evt) => {
+            if (evt.target.id === 'keeper-editor-manual') _syncKeeperEditorCount();
+            if (evt.target.matches('#creator-editor-rules input, #creator-editor-rules select')) _syncCreatorEditorCount();
             if (evt.target.id === 'reader-editor-search' && currentReaderEditor) { currentReaderEditor.search = evt.target.value; currentReaderEditor.page = 1; _renderReaderDataTable(); return; }
             const cell = evt.target.closest('[data-reader-row-index][data-reader-field]');
             if (!cell || !currentReaderEditor?.editable) return;
@@ -1759,6 +1961,11 @@
         });
 
         document.getElementById('formatter-editor-fields')?.addEventListener('input', _syncFormatterModalChecks);
+
+        document.addEventListener('change', (evt) => {
+            if (evt.target.matches('#keeper-editor-fields [data-keeper-editor-field]')) _syncKeeperEditorCount();
+            if (evt.target.matches('#creator-editor-rules input, #creator-editor-rules select')) _syncCreatorEditorCount();
+        });
 
         document.addEventListener('change', (evt) => {
             const cb = evt.target.closest('input[type="checkbox"][data-matcher-field]');
@@ -1897,6 +2104,8 @@
         openStringReplacerEditor,
         openAggregatorEditor,
         openAttributeManagerEditor,
+        openKeeperEditor,
+        openCreatorEditor,
         openGeometryTransformEditor,
         openReaderEditor,
         refreshReaderEditorPreview,
