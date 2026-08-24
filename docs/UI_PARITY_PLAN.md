@@ -76,10 +76,11 @@ Desktop: Coordinate Extractor y Hull Creator no introducen un modal innecesario;
 CRS Extractor, Deaggregator y Junction Splitter son acciones directas sin estado
 editable.
 
-Coordinate System Setter, Horizontal Angle Calculator, Rotator, Densifier y
-MeasureExtractor reutilizan un editor modal Geometry único. Cada nodo define sus
-campos y resumen, mientras la apertura, cancelación, persistencia JSON y doble
-clic permanecen comunes.
+Coordinate System Setter, Horizontal Angle Calculator, Rotator, Densifier,
+MeasureExtractor, Centerline Replacer, Extruder, Line Builder, MultiBufferer y
+Offsetter reutilizan un editor modal Geometry único. Cada nodo define sus campos
+y resumen, mientras la apertura, cancelación, persistencia JSON y doble clic
+permanecen comunes.
 
 ### Fase 3 — Navegación del flujo
 

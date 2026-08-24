@@ -59,8 +59,8 @@ function loadSpatial() {
     return window.TOOL_REGISTRY;
 }
 
-function loadGeometry() {
-    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)) };
+function loadGeometry(windowOverrides = {}) {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)), ...windowOverrides };
     const turf = {
         featureCollection,
         point: (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties }),
@@ -71,10 +71,16 @@ function loadGeometry() {
             const [x1, y1] = start.geometry.coordinates; const [x2, y2] = end.geometry.coordinates;
             return Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
         },
+        polygonToLine: (feature) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: feature.geometry.coordinates[0] }, properties: { ...feature.properties } }),
+        polygonize: (collection) => featureCollection(collection.features.length ? [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: {} }] : []),
+        buffer: (feature, distance) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [distance, 0], [distance, distance], [0, 0]]] }, properties: { ...feature.properties } }),
+        difference: (outer) => ({ ...outer, geometry: JSON.parse(JSON.stringify(outer.geometry)), properties: { ...outer.properties } }),
         convex: (collection) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [2, 0], [2, 2], [0, 0]]] }, properties: { count: collection.features.length } }),
         concave: (collection, options) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { maxEdge: options.maxEdge, count: collection.features.length } })
     };
-    vm.runInNewContext(geometrySource, { window, globalThis: window, console, turf }, { filename: 'geometry.js' });
+    const proj4 = (source, target, coordinate) => coordinate.slice();
+    proj4.defs = () => undefined;
+    vm.runInNewContext(geometrySource, { window, globalThis: window, console, turf, proj4 }, { filename: 'geometry.js' });
     return window.TOOL_REGISTRY;
 }
 
@@ -141,9 +147,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 85);
-    assert.equal(report.targetSharedIdCount, 81);
-    assert.equal(report.targetMissingInStudio.length, 36);
+    assert.equal(report.studioCount, 93);
+    assert.equal(report.targetSharedIdCount, 89);
+    assert.equal(report.targetMissingInStudio.length, 28);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
@@ -397,4 +403,85 @@ test('MeasureExtractor conserva nulls para vértices sin tercera coordenada', as
     const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
     assert.deepEqual(Array.from(result.features[0].properties.m), [4, null, 8]);
     assert.equal(input.features[0].properties.m, undefined);
+});
+
+test('Area Builder polygoniza linework y conserva atributos de origen', async () => {
+    const tool = loadGeometry().geo_area_builder;
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0], [1, 1], [0, 0]] }, properties: { source: 'a' } }]);
+    const result = await tool.run('1', [input]);
+    assert.equal(result.features.length, 1);
+    assert.equal(result.features[0].properties.source, 'a');
+});
+
+test('Centerline Replacer conserva dos puertos y diagnostica la ausencia de backend', async () => {
+    const tool = loadGeometry().geo_centerline_replacer;
+    assert.equal(tool.out, 2);
+    await assert.rejects(() => tool.run('1', [featureCollection([])], { querySelector: () => ({ value: '{}' }) }), /backend Python/);
+    const expected = { output_1: featureCollection([]), output_2: featureCollection([]) };
+    const backendTool = loadGeometry({ JETLBackend: { geometry: async () => expected } }).geo_centerline_replacer;
+    assert.equal(await backendTool.run('1', [featureCollection([])], { querySelector: () => ({ value: '{}' }) }), expected);
+});
+
+test('Extruder crea coordenadas 3D y separa rechazos', async () => {
+    const tool = loadGeometry().geo_extruder;
+    const config = { height_mode: 'fixed', height_value: 7, base_mode: 'value', base_value: 2, on_error: 'reject' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] }, properties: {} }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.output_1.features[0].geometry.coordinates, (coordinate) => Array.from(coordinate)), [[1, 2, 2], [1, 2, 9]]);
+    assert.equal(result.output_2.features.length, 0);
+});
+
+test('Generalizer delega exactamente en Topo Simplify', async () => {
+    const registry = loadGeometry();
+    const expected = featureCollection([{ type: 'Feature', geometry: null, properties: { delegated: true } }]);
+    registry.geo_topo_simplify.run = async () => expected;
+    assert.equal(await registry.geo_generalizer.run('1', [featureCollection([])], {}), expected);
+});
+
+test('Geometry Coercer convierte polígonos en líneas', async () => {
+    const tool = loadGeometry().geo_geometry_coercer;
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [0, 0]]] }, properties: { id: 4 } }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: 'line' }) });
+    assert.equal(result.features[0].geometry.type, 'LineString');
+    assert.equal(result.features[0].properties.id, 4);
+});
+
+test('Line Builder agrupa, ordena y elimina puntos duplicados', async () => {
+    const tool = loadGeometry().geo_line_builder;
+    const input = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 0] }, properties: { Job: 'A', img: '2' } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 0] }, properties: { Job: 'A', img: '1' } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 0] }, properties: { Job: 'A', img: '3' } }
+    ]);
+    const config = { group_by: 'Job', sort_by: 'img', remove_duplicates: true };
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.features[0].geometry.coordinates, (coordinate) => Array.from(coordinate)), [[1, 0], [2, 0]]);
+});
+
+test('MultiBufferer crea bandas ordenadas y mantiene dos salidas', async () => {
+    const tool = loadGeometry().geo_multi_bufferer;
+    const config = { output_mode: 'polygons', distances: '20,10', unit: 'meters' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { id: 1 } }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.output_1.features, (feature) => feature.properties._multibuffer_distance), [10, 20]);
+    assert.equal(result.output_2.features.length, 0);
+});
+
+test('MultiBufferer conserva el modo Desktop de líneas paralelas proyectadas', async () => {
+    const tool = loadGeometry().geo_multi_bufferer;
+    const config = { output_mode: 'offset_lines', distances: '2', side: 'both', projected_crs: 'EPSG:25830' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [4, 0]] }, properties: { _crs: 'EPSG:4326' } }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(result.output_1.features.length, 2);
+    assert.deepEqual(Array.from(result.output_1.features[0].geometry.coordinates[0]), [0, 2]);
+    assert.deepEqual(Array.from(result.output_1.features[1].geometry.coordinates[0]), [0, -2]);
+});
+
+test('Offsetter desplaza XYZ sin mutar la entrada', async () => {
+    const tool = loadGeometry().geo_offsetter;
+    const config = { x_mode: 'fixed', x_value: 2, y_mode: 'fixed', y_value: -1, z_mode: 'fixed', z_value: 3, on_error: 'reject' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [4, 5, 6] }, properties: {} }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.output_1.features[0].geometry.coordinates), [6, 4, 9]);
+    assert.deepEqual(input.features[0].geometry.coordinates, [4, 5, 6]);
 });

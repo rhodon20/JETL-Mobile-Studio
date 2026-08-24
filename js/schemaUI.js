@@ -1094,6 +1094,66 @@
                 { key: 'list_attr', label: 'Atributo de lista', type: 'text', value: 'measures' }
             ],
             summary: (config) => ({ whole: `Lista ${config.list_attr || 'measures'}`, point: config.point_attr || 'measure', vertex: `Vértice ${config.index ?? 0}`, endpoints: 'Inicio + fin' }[config.measure_type] || 'Medidas')
+        },
+        geo_centerline_replacer: {
+            title: 'Centerline Replacer', subtitle: 'Línea central mediante backend Geometry',
+            fields: [
+                { key: 'densify_distance', label: 'Distancia de densificación', type: 'text', value: 'auto' },
+                { key: 'min_branch_length', label: 'Longitud mínima de rama', type: 'text', value: 'auto' },
+                { key: 'simplify_tolerance', label: 'Tolerancia de simplificación', type: 'text', value: 'auto' },
+                { key: 'extend', label: 'Extender extremos', type: 'checkbox', value: false },
+                { key: 'timeout_seconds', label: 'Timeout (segundos)', type: 'number', value: 30, min: 1 }
+            ],
+            summary: (config) => `Centerline · ${config.densify_distance || 'auto'}`
+        },
+        geo_extruder: {
+            title: 'Extruder', subtitle: 'Convierte geometría 2D en GeoJSON 3D',
+            fields: [
+                { key: 'height_mode', label: 'Origen de altura', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'height_value', label: 'Altura', type: 'number', value: 10 },
+                { key: 'height_field', label: 'Atributo de altura', type: 'text', value: '' },
+                { key: 'base_mode', label: 'Base Z', type: 'select', value: 'zero', options: [['zero', 'Cero'], ['value', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'base_value', label: 'Valor de base', type: 'number', value: 0 },
+                { key: 'base_field', label: 'Atributo de base', type: 'text', value: '' },
+                { key: 'on_error', label: 'Si falla', type: 'select', value: 'reject', options: [['reject', 'Enviar a salida 2'], ['null', 'Conservar con diagnóstico']] }
+            ],
+            summary: (config) => `Altura ${config.height_mode === 'field' ? config.height_field || 'atributo' : config.height_value}`
+        },
+        geo_line_builder: {
+            title: 'Line Builder', subtitle: 'Agrupa y ordena puntos para construir líneas',
+            fields: [
+                { key: 'group_by', label: 'Agrupar por (separado por comas)', type: 'text', value: 'Job' },
+                { key: 'sort_by', label: 'Ordenar por', type: 'text', value: 'img' },
+                { key: 'remove_duplicates', label: 'Eliminar coordenadas duplicadas', type: 'checkbox', value: false }
+            ],
+            summary: (config) => `${config.group_by || 'sin grupo'} · ${config.sort_by || 'sin orden'}`
+        },
+        geo_multi_bufferer: {
+            title: 'MultiBufferer', subtitle: 'Bandas de buffer o líneas paralelas',
+            fields: [
+                { key: 'output_mode', label: 'Salida', type: 'select', value: 'polygons', options: [['polygons', 'Bandas poligonales'], ['offset_lines', 'Líneas paralelas']] },
+                { key: 'distances', label: 'Distancias', type: 'text', value: '10,20', placeholder: '10,20,50' },
+                { key: 'unit', label: 'Unidad', type: 'select', value: 'meters', options: [['meters', 'Metros'], ['kilometers', 'Kilómetros'], ['miles', 'Millas'], ['degrees', 'Grados']] },
+                { key: 'side', label: 'Lado de línea', type: 'select', value: 'both', options: [['both', 'Ambos'], ['left', 'Izquierda'], ['right', 'Derecha']] },
+                { key: 'projected_crs', label: 'CRS de trabajo', type: 'text', value: 'EPSG:25830' }
+            ],
+            summary: (config) => `${config.output_mode === 'offset_lines' ? 'Paralelas' : 'Buffers'} ${config.distances || ''}`
+        },
+        geo_offsetter: {
+            title: 'Offsetter', subtitle: 'Desplaza coordenadas X, Y y Z',
+            fields: [
+                { key: 'x_mode', label: 'Origen X', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'x_value', label: 'Offset X', type: 'number', value: 0 },
+                { key: 'x_field', label: 'Atributo X', type: 'text', value: '' },
+                { key: 'y_mode', label: 'Origen Y', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'y_value', label: 'Offset Y', type: 'number', value: 0 },
+                { key: 'y_field', label: 'Atributo Y', type: 'text', value: '' },
+                { key: 'z_mode', label: 'Origen Z', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'z_value', label: 'Offset Z', type: 'number', value: 0 },
+                { key: 'z_field', label: 'Atributo Z', type: 'text', value: '' },
+                { key: 'on_error', label: 'Si falla', type: 'select', value: 'reject', options: [['reject', 'Enviar a salida 2'], ['null', 'Conservar con diagnóstico']] }
+            ],
+            summary: (config) => `X ${config.x_mode === 'field' ? config.x_field || 'attr' : config.x_value} · Y ${config.y_mode === 'field' ? config.y_field || 'attr' : config.y_value}`
         }
     };
 
