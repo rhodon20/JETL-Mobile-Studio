@@ -1189,14 +1189,59 @@
                 { key: 'list_attrs', label: 'Incluir atributos en la lista', type: 'checkbox', value: true }
             ],
             summary: (config) => `${config.mode || 'intersects'} · ${config.count_attr || 'related_suppliers'}`
+        },
+        reader_feature_reader: {
+            title: 'FeatureReader', subtitle: 'Lectura dinámica compatible con Desktop', storage: '[df-fr-config]',
+            fields: [
+                { key: 'format', label: 'Formato', type: 'select', value: 'csv', options: [['csv', 'CSV'], ['xlsx', 'Excel'], ['geojson', 'GeoJSON'], ['kml', 'KML'], ['gpx', 'GPX'], ['shp', 'SHP'], ['gdb', 'GDB'], ['gpkg', 'GeoPackage'], ['parquet', 'Parquet']] },
+                { key: 'path_mode', label: 'Origen de ruta', type: 'select', value: 'attribute', options: [['attribute', 'Atributo iniciador'], ['static', 'Ruta fija'], ['template', 'Plantilla']] },
+                { key: 'path_value', label: 'Atributo o ruta', type: 'text', value: '' },
+                { key: 'path_expression', label: 'Plantilla de ruta', type: 'text', value: '' },
+                { key: 'layer_mode', label: 'Origen de capa', type: 'select', value: 'none', options: [['none', 'Sin capa'], ['attribute', 'Atributo'], ['static', 'Valor fijo'], ['template', 'Plantilla']] },
+                { key: 'layer_value', label: 'Atributo o capa', type: 'text', value: '' },
+                { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'union', options: [['union', 'Unión'], ['same_schema', 'Mismo esquema']] },
+                { key: 'merge_initiator', label: 'Incorporar atributos iniciadores', type: 'checkbox', value: true },
+                { key: 'initiator_prefix', label: 'Prefijo iniciador', type: 'text', value: 'init_' },
+                { key: 'reader_prefix', label: 'Prefijo leído', type: 'text', value: '' },
+                { key: 'cache_policy', label: 'Caché', type: 'select', value: 'per_dataset_layer', options: [['per_dataset_layer', 'Dataset + capa'], ['per_dataset', 'Dataset'], ['none', 'Sin caché']] },
+                { key: 'missing_file_policy', label: 'Archivo ausente', type: 'select', value: 'reject', options: [['reject', 'Salida 2'], ['skip', 'Omitir'], ['error', 'Detener']] },
+                { key: 'empty_read_policy', label: 'Lectura vacía', type: 'select', value: 'pass_empty_summary', options: [['pass_empty_summary', 'Resumen en salida 3'], ['reject', 'Salida 2'], ['skip', 'Omitir']] },
+                { key: 'max_features_per_initiator', label: 'Máximo por iniciador (0 = ilimitado)', type: 'number', value: 0, min: 0 },
+                { key: 'csv.lat_field', label: 'CSV · campo latitud', type: 'text', value: '' },
+                { key: 'csv.lon_field', label: 'CSV · campo longitud', type: 'text', value: '' },
+                { key: 'csv.delimiter', label: 'CSV · delimitador', type: 'text', value: 'auto' },
+                { key: 'csv.encoding', label: 'CSV · codificación', type: 'text', value: 'utf-8' }
+            ],
+            summary: (config) => `${String(config.format || 'csv').toUpperCase()} · ${{ attribute: 'atributo', static: 'ruta fija', template: 'plantilla' }[config.path_mode] || config.path_mode}`
         }
     };
 
     let currentGeometryTransformEditor = null;
 
+    function _geometryTransformGet(config, path) {
+        return String(path).split('.').reduce((value, key) => value?.[key], config);
+    }
+
+    function _geometryTransformSet(config, path, value) {
+        const keys = String(path).split('.'); let target = config;
+        keys.slice(0, -1).forEach((key) => {
+            if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+            target = target[key];
+        });
+        target[keys[keys.length - 1]] = value;
+    }
+
+    function _geometryTransformStorage(nodeEl, definition) {
+        return nodeEl.querySelector(definition.storage || '[df-geom-transform-config]');
+    }
+
     function _readGeometryTransformConfig(nodeEl, definition) {
-        const defaults = Object.fromEntries(definition.fields.map((field) => [field.key, field.value]));
-        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+        const defaults = {};
+        definition.fields.forEach((field) => _geometryTransformSet(defaults, field.key, field.value));
+        try {
+            const saved = JSON.parse(_geometryTransformStorage(nodeEl, definition)?.value || '{}');
+            return { ...defaults, ...saved, ...(defaults.csv || saved.csv ? { csv: { ...(defaults.csv || {}), ...(saved.csv || {}) } } : {}) };
+        }
         catch (error) { return defaults; }
     }
 
@@ -1250,7 +1295,7 @@
         document.getElementById('geometry-transform-editor-subtitle').textContent = definition.subtitle;
         const fields = document.getElementById('geometry-transform-editor-fields');
         fields.innerHTML = '';
-        definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, config[field.key])));
+        definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, _geometryTransformGet(config, field.key))));
         modal.style.display = 'flex';
         return true;
     }
@@ -1268,9 +1313,9 @@
                 const config = _readGeometryTransformConfig(nodeEl, definition);
                 definition.fields.forEach((field) => {
                     const control = document.querySelector(`[data-geometry-transform-field="${field.key}"]`);
-                    config[field.key] = field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value;
+                    _geometryTransformSet(config, field.key, field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value);
                 });
-                _commitNodeControl(nodeEl.querySelector('[df-geom-transform-config]'), JSON.stringify(config));
+                _commitNodeControl(_geometryTransformStorage(nodeEl, definition), JSON.stringify(config));
                 _syncGeometryTransformSummary(nodeEl, definition, config);
             }
         }
@@ -1423,6 +1468,15 @@
         });
 
         document.getElementById('strrep-editor-no-match')?.addEventListener('change', _syncStringReplacerNoMatch);
+
+        document.addEventListener('change', (evt) => {
+            const input = evt.target.closest('input[type="file"][df-file]');
+            if (!input) return;
+            const summary = input.closest('.drawflow-node')?.querySelector('[data-reader-file-summary]');
+            if (!summary) return;
+            const files = Array.from(input.files || []);
+            summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Seleccionar archivo';
+        });
 
         document.addEventListener('change', (evt) => {
             const checkbox = evt.target.closest('[data-formatter-modal-field]');

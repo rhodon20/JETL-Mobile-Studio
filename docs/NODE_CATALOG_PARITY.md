@@ -30,20 +30,20 @@ es paridad.
 A 24 de agosto de 2026, el Code Graph canónico de Desktop registra **134 nodos**.
 El alcance Studio excluye 17 (14 Raster y tres lectores/escritores Raster/LiDAR),
 por lo que el catálogo objetivo verificable es de **117 nodos**. Studio registra
-ahora 102: 98 compartidos dentro de alcance y 19 ausencias objetivo.
+ahora 110: 106 compartidos dentro de alcance y 11 ausencias objetivo.
 `reader_file` es una abstracción exclusiva de Studio.
 
 | Familia | Desktop | Compartidos | Faltan | Cobertura IDs |
 | --- | ---: | ---: | ---: | ---: |
 | Attributes | 22 | 22 | 0 | 100 % |
-| Readers | 19 | 10 | 9 | 52,6 % |
+| Readers | 19 | 18 | 1 | 94,7 % (100 % del alcance) |
 | Spatial | 18 | 18 | 0 | 100 % |
 | Geometry | 37 | 37 | 0 | 100 % |
 | Raster | 14 | 2 | 12 | Fuera de alcance |
 | Utils | 14 | 6 | 8 | 42,9 % |
 | Writers | 10 | 6 | 4 | 60,0 % |
 
-De los 33 ausentes totales, 19 están dentro del alcance objetivo. El manifiesto
+De los 25 ausentes totales, 11 están dentro del alcance objetivo. El manifiesto
 trazable está en `desktop-node-manifest.json` y conserva el estado de runtime de
 cada nodo; el informe separa `missingByRuntime` de `targetMissingByRuntime` para
 que una dependencia excluida no altere la priorización.
@@ -85,6 +85,12 @@ hacen fallar el gate ni se contabilizan como deuda.
    prefijos de atributos. Anchored Snapper conserva sus cuatro salidas Desktop;
    Neighbor Finder separa matched/unmatched; Spatial Relator mantiene relaciones,
    agrupación, recuentos, atributos y listas, con límite explícito para backend.
+   **Readers completada dentro del alcance (17/17):** CSV, Excel, GeoJSON, KML,
+   GPX y SHP ZIP disponen de lectura local; GPX conserva 16 salidas por capas.
+   GDB conserva sus 16 salidas y FeatureReader sus tres, con dependencia de
+   backend explícita porque el sandbox móvil no admite rutas dinámicas ni GDAL
+   pesado. GeoTIFF y LiDAR quedan fuera del objetivo; GeoTIFF se mantiene como
+   compatibilidad heredada.
 4. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
    nodos complejos y garantizar importación/exportación sin pérdida.
 5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato

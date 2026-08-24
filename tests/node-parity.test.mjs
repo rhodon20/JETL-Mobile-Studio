@@ -8,6 +8,7 @@ const attributesSource = readFileSync(new URL('../js/nodes/attributes.js', impor
 const spatialSource = readFileSync(new URL('../js/nodes/spatial.js', import.meta.url), 'utf8');
 const geometrySource = readFileSync(new URL('../js/nodes/geometry.js', import.meta.url), 'utf8');
 const utilsSource = readFileSync(new URL('../js/nodes/utils.js', import.meta.url), 'utf8');
+const readersSource = readFileSync(new URL('../js/nodes/readers.js', import.meta.url), 'utf8');
 
 function featureCollection(features) {
     return { type: 'FeatureCollection', features };
@@ -126,6 +127,27 @@ function loadUtils() {
     const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)) };
     const turf = { featureCollection, getType: (feature) => feature.geometry?.type || '' };
     vm.runInNewContext(utilsSource, { window, globalThis: window, console, turf }, { filename: 'utils.js' });
+    return window.TOOL_REGISTRY;
+}
+
+function loadReaders(windowOverrides = {}, contextOverrides = {}) {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)), ...windowOverrides };
+    const turf = {
+        featureCollection,
+        feature: (geometry, properties = {}) => ({ type: 'Feature', geometry, properties }),
+        point: (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties }),
+        lineString: (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates }, properties }),
+        bboxPolygon: (coordinates) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coordinates] }, properties: {} }),
+        hexGrid: () => featureCollection([]), squareGrid: () => featureCollection([]), randomPoint: () => featureCollection([])
+    };
+    const context = {
+        window, globalThis: window, console, turf,
+        fetch: async () => ({ ok: true, json: async () => ({}) }),
+        osmtogeojson: () => featureCollection([]),
+        wellknown: { parse: (value) => String(value).startsWith('POINT') ? { type: 'Point', coordinates: [3, 4] } : null },
+        ...contextOverrides
+    };
+    vm.runInNewContext(readersSource, context, { filename: 'readers.js' });
     return window.TOOL_REGISTRY;
 }
 
@@ -313,6 +335,90 @@ test('Line overlayers mantienen el contrato matched/unmatched de Desktop', async
     assert.equal(areaResult.output_1.features[0].properties.join_zone, 'Z1');
 });
 
+test('Readers incorpora los ocho IDs Desktop objetivo con sus contratos', () => {
+    const registry = loadReaders();
+    for (const id of ['reader_csv', 'reader_excel', 'reader_feature_reader', 'reader_gdb', 'reader_geojson', 'reader_gpx', 'reader_kml', 'reader_shp']) assert.ok(registry[id], `${id} debe estar registrado`);
+    assert.equal(registry.reader_feature_reader.in, 1);
+    assert.equal(registry.reader_feature_reader.out, 3);
+    assert.equal(registry.reader_gpx.out, 16);
+    assert.equal(registry.reader_gdb.out, 16);
+});
+
+test('CSV Reader detecta lat/lon, tipa valores y concatena archivos sin mutación', async () => {
+    const registry = loadReaders();
+    const files = [
+        { name: 'a.csv', text: async () => 'id,lat,lon,name\n1,40.4,-3.7,"Madrid\nCentro"' },
+        { name: 'b.csv', text: async () => 'id,lat,lon,name\n2,41.3,2.1,Barcelona' }
+    ];
+    const values = { '[df-file]': { files }, '[df-lat]': { value: '' }, '[df-lon]': { value: '' } };
+    const result = await registry.reader_csv.run('1', [], { querySelector: (selector) => values[selector] });
+    assert.equal(result.features.length, 2);
+    assert.deepEqual(Array.from(result.features[0].geometry.coordinates), [-3.7, 40.4]);
+    assert.equal(result.features[0].properties.id, 1);
+    assert.equal(result.features[0].properties.name, 'Madrid\nCentro');
+    assert.equal(result.features[1].properties.jetl_source_file, 'b.csv');
+    assert.equal(result.metadata.source_count, 2);
+});
+
+test('GeoJSON, KML, SHP y Excel usan el motor local adecuado', async () => {
+    const formatCalls = [];
+    const windowOverrides = {
+        JETLFormats: { readFile: async (file) => { formatCalls.push(file.name); return featureCollection([{ type: 'Feature', geometry: null, properties: { source: file.name } }]); } },
+        XLSX: {
+            read: () => ({ SheetNames: ['Data'], Sheets: { Data: {} } }),
+            utils: { sheet_to_json: () => [{ latitude: '40.4', longitude: '-3.7', city: 'Madrid' }] }
+        }
+    };
+    const registry = loadReaders(windowOverrides);
+    const domFor = (files) => ({ querySelector: (selector) => selector === '[df-file]' ? { files } : { value: '' } });
+    const geojson = await registry.reader_geojson.run('1', [], domFor([{ name: 'data.geojson', text: async () => JSON.stringify(featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1 } }])) }]));
+    assert.equal(geojson.features[0].properties.id, 1);
+    const kml = await registry.reader_kml.run('1', [], domFor([{ name: 'data.kml', text: async () => '<kml />' }]));
+    const shp = await registry.reader_shp.run('1', [], domFor([{ name: 'data.zip', arrayBuffer: async () => new ArrayBuffer(0) }]));
+    const excel = await registry.reader_excel.run('1', [], domFor([{ name: 'data.xlsx', arrayBuffer: async () => new ArrayBuffer(0) }]));
+    assert.deepEqual(formatCalls, ['data.kml', 'data.zip']);
+    assert.equal(kml.features[0].properties.source, 'data.kml');
+    assert.equal(shp.features[0].properties.source, 'data.zip');
+    assert.deepEqual(Array.from(excel.features[0].geometry.coordinates), [-3.7, 40.4]);
+});
+
+test('GPX conserva capas y completa las 16 salidas Desktop', async () => {
+    const textNode = (value) => ({ textContent: value });
+    const pointNode = (lon, lat, name) => ({
+        getAttribute: (key) => key === 'lon' ? String(lon) : String(lat),
+        getElementsByTagName: (tag) => tag === 'name' ? [textNode(name)] : []
+    });
+    const segment = { getElementsByTagName: (tag) => tag === 'trkpt' ? [pointNode(0, 0, ''), pointNode(1, 1, '')] : [] };
+    const track = { getElementsByTagName: (tag) => tag === 'trkseg' ? [segment] : tag === 'name' ? [textNode('Track')] : [] };
+    class DOMParser { parseFromString() { return { getElementsByTagName: (tag) => ({ parsererror: [], wpt: [pointNode(2, 3, 'Waypoint')], rte: [], trk: [track] }[tag] || []) }; } }
+    const registry = loadReaders({}, { DOMParser });
+    const result = await registry.reader_gpx.run('1', [], { querySelector: () => ({ files: [{ name: 'route.gpx', text: async () => '<gpx />' }] }) });
+    assert.equal(Object.keys(result).length, 16);
+    assert.equal(result.output_1.features.length, 1);
+    assert.equal(result.output_3.features.length, 1);
+    assert.equal(result.output_16.features.length, 0);
+});
+
+test('GDB y FeatureReader explican el backend y conservan la respuesta Desktop', async () => {
+    const fileDom = { querySelector: () => ({ files: [{ name: 'data.gdb.zip' }] }) };
+    await assert.rejects(() => loadReaders().reader_gdb.run('1', [], fileDom), /requiere backend/);
+    const gdbRegistry = loadReaders({ JETLBackend: { readFile: async () => ({ output_1: featureCollection([{ type: 'Feature', geometry: null, properties: { layer: 1 } }]) }) } });
+    const gdb = await gdbRegistry.reader_gdb.run('1', [], fileDom);
+    assert.equal(gdb.output_1.features[0].properties.layer, 1);
+    assert.equal(Object.keys(gdb).length, 16);
+
+    const initiators = featureCollection([{ type: 'Feature', geometry: null, properties: { path: 'a.csv' } }]);
+    const config = { path_mode: 'attribute', path_value: 'path', format: 'csv' };
+    const featureDom = { querySelector: () => ({ value: JSON.stringify(config) }) };
+    await assert.rejects(() => loadReaders().reader_feature_reader.run('7', [initiators], featureDom), /requiere backend/);
+    let backendNode = '';
+    const expected = { output_1: featureCollection([]), output_2: featureCollection([]), output_3: featureCollection([]) };
+    const registry = loadReaders({ JETLBackend: { featureReader: async (payload, options, meta) => { backendNode = meta.node_id; return expected; } } });
+    const result = await registry.reader_feature_reader.run('7', [initiators], featureDom);
+    assert.equal(backendNode, '7');
+    assert.equal(result, expected);
+});
+
 test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilidad heredada', () => {
     const auditUrl = new URL('../scripts/audit-node-parity.mjs', import.meta.url);
     const manifestUrl = new URL('../docs/desktop-node-manifest.json', import.meta.url);
@@ -322,9 +428,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 102);
-    assert.equal(report.targetSharedIdCount, 98);
-    assert.equal(report.targetMissingInStudio.length, 19);
+    assert.equal(report.studioCount, 110);
+    assert.equal(report.targetSharedIdCount, 106);
+    assert.equal(report.targetMissingInStudio.length, 11);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));

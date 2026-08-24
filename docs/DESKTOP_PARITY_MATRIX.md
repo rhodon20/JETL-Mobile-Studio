@@ -14,7 +14,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Catálogo objetivo de nodos | 117 Desktop en alcance / 98 IDs compartidos | Cerrar 19 ausencias vectoriales/tabulares y resolver extensiones incompatibles |
+| Catálogo objetivo de nodos | 117 Desktop en alcance / 106 IDs compartidos | Cerrar 11 ausencias vectoriales/tabulares y resolver extensiones incompatibles |
 | Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
@@ -24,7 +24,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Multiselección y operaciones en lote | Pendiente | Mover, duplicar y eliminar el conjunto |
 | Marcadores y anotaciones de canvas | Pendiente | Crear, editar, localizar y persistir |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
-| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry y Spatial configurables comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Readers, Utils y Writers |
+| Nodo compacto + editor modal estilo Desktop | Attributes, Geometry, Spatial y FeatureReader comparten resumen + JSON + Guardar/Cancelar | Extender el patrón a Utils y Writers |
 
 ## Ejecución y diagnóstico
 
@@ -58,7 +58,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 | Editor de fuentes | Pendiente | Diseñar alternativa web segura y limitada |
 | Transformers, paquetes y plantillas | Pendiente | Catálogo compatible con el runtime web |
 | Ajustes, apariencia e idioma | Parcial | Completar preferencias reproducibles por proyecto/dispositivo |
-| Backend y sistema de archivos local | No directo | Sustituir solo cuando exista una Web API segura |
+| Backend y sistema de archivos local | Adaptación explícita: Readers locales cuando es viable; GDB/FeatureReader requieren servicio | Sustituir solo cuando exista una Web API segura |
 
 ## Regla de mantenimiento
 

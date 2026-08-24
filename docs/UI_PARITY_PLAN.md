@@ -87,6 +87,11 @@ modal adaptable. Conservan los parámetros Desktop en JSON, resumen compacto en
 canvas y configuración completa sin recurrir a un inspector lateral o una hoja
 inferior en móvil.
 
+FeatureReader también reutiliza este editor modal, con soporte para campos JSON
+anidados y persistencia en `df-fr-config`. Los lectores basados en archivos
+mantienen el selector nativo en el nodo y ofrecen feedback inmediato con el
+nombre o número de archivos seleccionados.
+
 ### Fase 3 — Navegación del flujo
 
 - Buscador global de nodos y atributos. Implementado v1.
