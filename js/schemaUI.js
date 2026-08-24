@@ -867,6 +867,178 @@
         currentStringReplacerNodeId = null;
     }
 
+    let currentAggregatorNodeId = null;
+
+    function _readAggregatorConfig(nodeEl) {
+        const defaults = { group_by: 'MATRICULA', remove_geometry: false, produce_multis: true, preserve_multi_inputs: false };
+        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector('[df-aggregator-config], [df-g2-config]')?.value || '{}') }; }
+        catch (e) { return defaults; }
+    }
+
+    function _syncAggregatorSummary(nodeEl, config) {
+        const summary = nodeEl?.querySelector('[data-aggregator-summary]');
+        const group = Array.isArray(config.group_by) ? config.group_by.join(', ') : String(config.group_by || '').trim();
+        if (summary) summary.textContent = group || 'Todas las features';
+    }
+
+    function updateAggregatorNode(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        if (node?.name !== 'attr_aggregator') return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        if (nodeEl) _syncAggregatorSummary(nodeEl, _readAggregatorConfig(nodeEl));
+    }
+
+    function openAggregatorEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('aggregator-editor-modal');
+        if (!nodeEl || !modal) return false;
+        const config = _readAggregatorConfig(nodeEl);
+        currentAggregatorNodeId = String(nodeId);
+        document.getElementById('aggregator-editor-group').value = Array.isArray(config.group_by) ? config.group_by.join(', ') : config.group_by || '';
+        document.getElementById('aggregator-editor-remove-geometry').checked = !!config.remove_geometry;
+        document.getElementById('aggregator-editor-produce-multis').checked = config.produce_multis !== false;
+        document.getElementById('aggregator-editor-preserve-multis').checked = !!config.preserve_multi_inputs;
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeAggregatorEditor(save) {
+        const modal = document.getElementById('aggregator-editor-modal');
+        if (!modal) return;
+        if (save && currentAggregatorNodeId) {
+            const nodeEl = document.getElementById('node-' + currentAggregatorNodeId);
+            if (nodeEl) {
+                const config = {
+                    group_by: document.getElementById('aggregator-editor-group').value.trim(),
+                    remove_geometry: document.getElementById('aggregator-editor-remove-geometry').checked,
+                    produce_multis: document.getElementById('aggregator-editor-produce-multis').checked,
+                    preserve_multi_inputs: document.getElementById('aggregator-editor-preserve-multis').checked
+                };
+                _commitNodeControl(nodeEl.querySelector('[df-aggregator-config], [df-g2-config]'), JSON.stringify(config));
+                _syncAggregatorSummary(nodeEl, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentAggregatorNodeId = null;
+    }
+
+    let currentAttributeManagerEditor = null;
+
+    const ATTRIBUTE_MANAGER_ACTIONS = {
+        legacy: [['keep', 'Conservar'], ['remove', 'Eliminar'], ['rename', 'Renombrar'], ['copy', 'Copiar'], ['create', 'Crear'], ['formula', 'Fórmula'], ['default', 'Valor por defecto'], ['cast', 'Convertir tipo']],
+        v2: [['do_nothing', 'Sin cambios'], ['remove', 'Eliminar'], ['rename', 'Renombrar'], ['set', 'Asignar'], ['create', 'Crear']]
+    };
+
+    function _readAttributeManagerConfig(nodeEl, version) {
+        const legacy = version === 'legacy';
+        const defaults = legacy ? { rules: [], preserveOthers: true, onError: 'null' } : { rules: [], preserveOthers: true };
+        const selector = legacy ? '[df-attr-manager-config]' : '[df-attr-manager-v2-config]';
+        let config = defaults;
+        try { config = { ...defaults, ...JSON.parse(nodeEl.querySelector(selector)?.value || '{}') }; } catch (e) { config = { ...defaults }; }
+        if (!Array.isArray(config.rules) || !config.rules.length) {
+            const oldRules = nodeEl.querySelector(legacy ? '[df-rules]' : '[df-amv2-rules]')?.value;
+            try { config.rules = JSON.parse(oldRules || '[]'); } catch (e) { config.rules = []; }
+        }
+        const oldPreserve = nodeEl.querySelector(legacy ? '[df-preserve]' : '[data-amv2-preserve]');
+        if (!nodeEl.querySelector(selector) && oldPreserve) config.preserveOthers = !!oldPreserve.checked;
+        if (legacy && !nodeEl.querySelector(selector)) config.onError = nodeEl.querySelector('[df-on-error]')?.value || 'null';
+        return config;
+    }
+
+    function _attributeManagerRuleRow(rule = {}, version = 'legacy') {
+        const row = document.createElement('div');
+        row.className = 'attr-manager-editor-rule';
+        const actions = ATTRIBUTE_MANAGER_ACTIONS[version] || ATTRIBUTE_MANAGER_ACTIONS.legacy;
+        row.innerHTML = `<input data-attr-manager-enabled type="checkbox" aria-label="Activar regla" ${rule.enabled === false ? '' : 'checked'}>
+            <select data-attr-manager-action class="node-control" aria-label="Acción">${actions.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select>
+            <input data-attr-manager-source class="node-control" placeholder="Origen">
+            <input data-attr-manager-target class="node-control" placeholder="Destino">
+            <input data-attr-manager-value class="node-control" placeholder="Valor o expresión">
+            <select data-attr-manager-type class="node-control" aria-label="Tipo"><option value="string">Texto</option><option value="number">Número</option><option value="integer">Entero</option><option value="boolean">Booleano</option><option value="date">Fecha</option><option value="json">JSON</option></select>
+            <input data-attr-manager-condition class="node-control" placeholder="Condición, p. ej. @Value(tipo)==A" ${version === 'legacy' ? 'hidden' : ''}>
+            <button type="button" class="node-btn-mini" data-ui-action="attribute-manager-remove-rule" aria-label="Eliminar regla"><i class="fas fa-times"></i></button>`;
+        row.querySelector('[data-attr-manager-action]').value = String(rule.action || (version === 'v2' ? 'do_nothing' : 'keep'));
+        row.querySelector('[data-attr-manager-source]').value = rule.source || rule.inputAttr || rule.input_attr || '';
+        row.querySelector('[data-attr-manager-target]').value = rule.target || rule.outputAttr || rule.output_attr || rule.name || '';
+        row.querySelector('[data-attr-manager-value]').value = rule.value ?? '';
+        row.querySelector('[data-attr-manager-type]').value = rule.cast || rule.valueType || rule.value_type || 'string';
+        row.querySelector('[data-attr-manager-condition]').value = rule.condition || '';
+        return row;
+    }
+
+    function _syncAttributeManagerSummary(nodeEl, config) {
+        const enabled = (config.rules || []).filter((rule) => rule.enabled !== false).length;
+        const summary = nodeEl?.querySelector('[data-attr-manager-summary]');
+        if (summary) summary.textContent = `${enabled} ${enabled === 1 ? 'regla' : 'reglas'}`;
+    }
+
+    function updateAttributeManagerNode(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        if (!['attr_manager', 'attr_manager_v2'].includes(node?.name)) return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const version = node.name === 'attr_manager_v2' ? 'v2' : 'legacy';
+        if (nodeEl) _syncAttributeManagerSummary(nodeEl, _readAttributeManagerConfig(nodeEl, version));
+    }
+
+    function openAttributeManagerEditor(nodeId, version = 'legacy') {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('attribute-manager-editor-modal');
+        if (!nodeEl || !modal) return false;
+        const resolvedVersion = version === 'v2' ? 'v2' : 'legacy';
+        const config = _readAttributeManagerConfig(nodeEl, resolvedVersion);
+        currentAttributeManagerEditor = { nodeId: String(nodeId), version: resolvedVersion };
+        document.getElementById('attribute-manager-editor-title').textContent = resolvedVersion === 'v2' ? 'Attribute Manager v2' : 'Attribute Manager';
+        document.getElementById('attribute-manager-editor-subtitle').textContent = resolvedVersion === 'v2' ? 'Editor FME actual de una salida' : 'Contrato Desktop legado con salida de rechazados';
+        document.getElementById('attribute-manager-editor-preserve').checked = config.preserveOthers !== false;
+        document.getElementById('attribute-manager-editor-error-field').hidden = resolvedVersion !== 'legacy';
+        document.getElementById('attribute-manager-editor-error').value = config.onError === 'reject' ? 'reject' : 'null';
+        const rules = document.getElementById('attribute-manager-editor-rules');
+        rules.innerHTML = '';
+        (config.rules.length ? config.rules : [{}]).forEach((rule) => rules.appendChild(_attributeManagerRuleRow(rule, resolvedVersion)));
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeAttributeManagerEditor(save) {
+        const modal = document.getElementById('attribute-manager-editor-modal');
+        if (!modal) return;
+        if (save && currentAttributeManagerEditor) {
+            const { nodeId, version } = currentAttributeManagerEditor;
+            const nodeEl = document.getElementById('node-' + nodeId);
+            if (nodeEl) {
+                const rules = Array.from(document.querySelectorAll('#attribute-manager-editor-rules .attr-manager-editor-rule')).map((row) => {
+                    const base = {
+                        enabled: row.querySelector('[data-attr-manager-enabled]').checked,
+                        action: row.querySelector('[data-attr-manager-action]').value,
+                        value: row.querySelector('[data-attr-manager-value]').value
+                    };
+                    const source = row.querySelector('[data-attr-manager-source]').value.trim();
+                    const target = row.querySelector('[data-attr-manager-target]').value.trim();
+                    const type = row.querySelector('[data-attr-manager-type]').value;
+                    if (version === 'v2') return { ...base, inputAttr: source, outputAttr: target, valueType: type, condition: row.querySelector('[data-attr-manager-condition]').value.trim() };
+                    return { ...base, source, target, cast: type };
+                }).filter((rule) => rule.inputAttr || rule.outputAttr || rule.source || rule.target || rule.value);
+                const config = { rules, preserveOthers: document.getElementById('attribute-manager-editor-preserve').checked };
+                if (version === 'legacy') config.onError = document.getElementById('attribute-manager-editor-error').value;
+                const selector = version === 'v2' ? '[df-attr-manager-v2-config]' : '[df-attr-manager-config]';
+                const configControl = nodeEl.querySelector(selector);
+                if (configControl) _commitNodeControl(configControl, JSON.stringify(config));
+                else {
+                    _commitNodeControl(nodeEl.querySelector(version === 'v2' ? '[df-amv2-rules]' : '[df-rules]'), JSON.stringify(rules));
+                    const preserve = nodeEl.querySelector(version === 'v2' ? '[data-amv2-preserve]' : '[df-preserve]');
+                    if (preserve) {
+                        preserve.checked = config.preserveOthers;
+                        preserve.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (version === 'legacy') _commitNodeControl(nodeEl.querySelector('[df-on-error]'), config.onError);
+                }
+                _syncAttributeManagerSummary(nodeEl, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentAttributeManagerEditor = null;
+    }
+
     function updateNode(nodeId) {
         updateJoinNode(nodeId);
         updateCalcNode(nodeId);
@@ -879,6 +1051,8 @@
         updateTesterNode(nodeId);
         updateAttributeTextNode(nodeId);
         updateStringReplacerNode(nodeId);
+        updateAggregatorNode(nodeId);
+        updateAttributeManagerNode(nodeId);
     }
 
     function refreshAll() {
@@ -922,6 +1096,15 @@
             } else if (action === 'strrep-open-editor') {
                 evt.stopPropagation();
                 openStringReplacerEditor(nodeId);
+            } else if (action === 'aggregator-open-editor') {
+                evt.stopPropagation();
+                openAggregatorEditor(nodeId);
+            } else if (action === 'attr-manager-open-editor') {
+                evt.stopPropagation();
+                openAttributeManagerEditor(nodeId, 'legacy');
+            } else if (action === 'attr-manager-v2-open-editor') {
+                evt.stopPropagation();
+                openAttributeManagerEditor(nodeId, 'v2');
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -971,6 +1154,12 @@
             else if (action === 'save-string-replacer-editor') closeStringReplacerEditor(true);
             else if (action === 'strrep-add-rule') document.getElementById('strrep-editor-rules')?.appendChild(_stringReplacerRuleRow());
             else if (action === 'strrep-remove-rule') evt.target.closest('.strrep-editor-rule')?.remove();
+            else if (action === 'close-aggregator-editor') closeAggregatorEditor(false);
+            else if (action === 'save-aggregator-editor') closeAggregatorEditor(true);
+            else if (action === 'close-attribute-manager-editor') closeAttributeManagerEditor(false);
+            else if (action === 'save-attribute-manager-editor') closeAttributeManagerEditor(true);
+            else if (action === 'attribute-manager-add-rule' && currentAttributeManagerEditor) document.getElementById('attribute-manager-editor-rules')?.appendChild(_attributeManagerRuleRow({}, currentAttributeManagerEditor.version));
+            else if (action === 'attribute-manager-remove-rule') evt.target.closest('.attr-manager-editor-rule')?.remove();
         });
 
         document.addEventListener('dblclick', (evt) => {
@@ -982,6 +1171,9 @@
             else if (nodeEl?.classList.contains('attr_splitter')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'splitter');
             else if (nodeEl?.classList.contains('attr_list_exploder')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'exploder');
             else if (nodeEl?.classList.contains('attr_string_replacer')) openStringReplacerEditor(nodeEl.id.replace('node-', ''));
+            else if (nodeEl?.classList.contains('attr_aggregator')) openAggregatorEditor(nodeEl.id.replace('node-', ''));
+            else if (nodeEl?.classList.contains('attr_manager_v2')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'v2');
+            else if (nodeEl?.classList.contains('attr_manager')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'legacy');
         });
 
         document.getElementById('strrep-editor-no-match')?.addEventListener('change', _syncStringReplacerNoMatch);
@@ -1136,6 +1328,8 @@
         openCalcEditor,
         openFormatterEditor,
         openAttributeTextEditor,
-        openStringReplacerEditor
+        openStringReplacerEditor,
+        openAggregatorEditor,
+        openAttributeManagerEditor
     };
 })();

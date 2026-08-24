@@ -107,6 +107,217 @@ function applyStringReplace(text, search, replacement, mode, caseSensitive) {
     return { value, matched };
 }
 
+function normalizeAttributeManagerRules(raw) {
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw || '[]'); } catch (e) { throw new Error('Configuración inválida del Attribute Manager'); }
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((row) => ({
+        enabled: row?.enabled !== false,
+        action: String(row?.action || 'keep').trim().toLowerCase(),
+        source: String(row?.source || row?.inputAttr || row?.input_attr || '').trim(),
+        target: String(row?.target || row?.outputAttr || row?.output_attr || row?.name || '').trim(),
+        value: String(row?.value ?? ''),
+        cast: String(row?.cast || row?.valueType || row?.value_type || 'string').trim().toLowerCase(),
+        condition: String(row?.condition || '')
+    })).filter((row) => row.enabled);
+}
+
+function castAttributeManagerValue(value, castType) {
+    const kind = String(castType || 'string').toLowerCase();
+    if (value == null) return null;
+    if (['string', 'varchar', 'text', 'datetime'].includes(kind)) return String(value);
+    if (['number', 'real', 'double'].includes(kind)) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) throw new Error(`No se puede convertir a number: ${value}`);
+        return number;
+    }
+    if (['integer', 'int'].includes(kind)) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) throw new Error(`No se puede convertir a integer: ${value}`);
+        return Math.trunc(number);
+    }
+    if (['boolean', 'bool'].includes(kind)) {
+        if (typeof value === 'boolean') return value;
+        const text = String(value).trim().toLowerCase();
+        if (['true', '1', 'yes', 'si', 'y'].includes(text)) return true;
+        if (['false', '0', 'no', 'n', ''].includes(text)) return false;
+        throw new Error(`No se puede convertir a boolean: ${value}`);
+    }
+    if (kind === 'json') return typeof value === 'object' ? value : JSON.parse(String(value));
+    if (kind === 'date') {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) throw new Error(`No se puede convertir a date: ${value}`);
+        return date.toISOString();
+    }
+    return value;
+}
+
+function runAttributeManagerExpression(source, props, feature, originalProps) {
+    const fn = compileSafeExpression(source, ['props', 'feat', 'originalProps']);
+    return fn(props, feature, originalProps, Math, turf, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+}
+
+function resolveAttributeManagerValue(row, feature, props, originalProps) {
+    const raw = String(row.value ?? '').trim();
+    const expression = raw.startsWith('=')
+        ? raw.slice(1)
+        : (raw.includes('@Value(') && /[+\-*/%<>!=]/.test(raw.replace(/@Value\([^)]+\)/g, ''))
+            ? raw.replace(/@Value\(([^)]+)\)/g, (_, name) => `props[${JSON.stringify(String(name).trim())}]`)
+            : null);
+    return expression ? runAttributeManagerExpression(expression, props, feature, originalProps) : row.value;
+}
+
+function runAttributeManagerFeature(feature, rules, preserveOthers) {
+    const clone = cloneFeatureForAttributeTool(feature);
+    const original = { ...(feature.properties || {}) };
+    const props = { ...original };
+    const order = [];
+    const remember = (field) => { const index = order.indexOf(field); if (index >= 0) order.splice(index, 1); if (field) order.push(field); };
+    for (let index = 0; index < rules.length; index++) {
+        const row = rules[index];
+        const source = row.source || row.target;
+        const target = row.target || row.source;
+        if (row.action === 'keep') {
+            if (!source || !Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: campo no encontrado ${source}`);
+            remember(source);
+        } else if (row.action === 'remove') {
+            if (!source) throw new Error(`Fila ${index + 1}: campo vacío`);
+            delete props[source];
+            const position = order.indexOf(source); if (position >= 0) order.splice(position, 1);
+        } else if (row.action === 'rename' || row.action === 'copy') {
+            if (!source || !target) throw new Error(`Fila ${index + 1}: ${row.action} requiere source y target`);
+            if (!Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: campo no encontrado ${source}`);
+            props[target] = props[source];
+            if (row.action === 'rename' && target !== source) delete props[source];
+            remember(target);
+        } else if (row.action === 'create') {
+            if (!target) throw new Error(`Fila ${index + 1}: create requiere target`);
+            props[target] = resolveAttributeManagerValue(row, clone, props, original);
+            remember(target);
+        } else if (row.action === 'formula') {
+            if (!target) throw new Error(`Fila ${index + 1}: formula requiere target`);
+            props[target] = runAttributeManagerExpression(String(row.value || ''), props, clone, original);
+            remember(target);
+        } else if (row.action === 'default') {
+            if (!target) throw new Error(`Fila ${index + 1}: default requiere target`);
+            if (props[target] == null || props[target] === '') props[target] = resolveAttributeManagerValue(row, clone, props, original);
+            remember(target);
+        } else if (row.action === 'cast') {
+            if (!source || !target || !Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: cast requiere campo existente`);
+            props[target] = castAttributeManagerValue(props[source], row.cast);
+            remember(target);
+        } else throw new Error(`Fila ${index + 1}: acción no soportada ${row.action}`);
+    }
+    const ordered = {};
+    order.forEach((field) => { if (Object.prototype.hasOwnProperty.call(props, field)) ordered[field] = props[field]; });
+    if (preserveOthers) Object.keys(original).concat(Object.keys(props)).forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(props, field) && !Object.prototype.hasOwnProperty.call(ordered, field)) ordered[field] = props[field];
+    });
+    clone.properties = ordered;
+    return clone;
+}
+
+function splitAttributeFunctionArgs(source) {
+    const args = []; let current = ''; let depth = 0;
+    for (const char of String(source || '')) {
+        if (char === ',' && depth === 0) { args.push(current); current = ''; continue; }
+        if (char === '(') depth++; else if (char === ')') depth--;
+        current += char;
+    }
+    if (current.trim()) args.push(current);
+    return args;
+}
+
+function evaluateAttributeCondition(condition, props) {
+    const operand = (raw) => {
+        const text = String(raw || '').trim();
+        const match = text.match(/^@Value\(([^)]+)\)$/);
+        if (match) return props[match[1].trim()];
+        if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) return text.slice(1, -1);
+        if (/^null$/i.test(text)) return null;
+        if (/^(true|false)$/i.test(text)) return /^true$/i.test(text);
+        if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+        return Object.prototype.hasOwnProperty.call(props, text) ? props[text] : text;
+    };
+    const match = String(condition || '').trim().match(/^(.+?)(==|!=|>=|<=|=|>|<)(.+)$/);
+    if (!match) return Boolean(operand(condition));
+    const left = operand(match[1]); const right = operand(match[3]); const op = match[2];
+    const leftNumber = Number(left); const rightNumber = Number(right);
+    const numeric = left !== '' && right !== '' && Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
+    const a = numeric ? leftNumber : String(left ?? ''); const b = numeric ? rightNumber : String(right ?? '');
+    if (op === '=' || op === '==') return a === b;
+    if (op === '!=') return a !== b;
+    if (op === '>') return a > b; if (op === '>=') return a >= b;
+    if (op === '<') return a < b; return a <= b;
+}
+
+function evaluateAttributeArithmetic(expression, props) {
+    const resolved = String(expression || '').replace(/@Value\(([^)]+)\)/g, (_, name) => {
+        const value = Number(props[String(name).trim()]);
+        return Number.isFinite(value) ? String(value) : '0';
+    });
+    return runAttributeManagerExpression(resolved, props, { properties: props }, props);
+}
+
+function resolveAttributeV2Value(value, props, type) {
+    const source = String(value ?? '').trim();
+    if (/^null$/i.test(source)) return null;
+    const direct = source.match(/^@Value\(([^)]+)\)$/);
+    if (direct) return castAttributeManagerValue(props[direct[1].trim()], type);
+    const math = source.match(/^@(round|floor|ceil)\((.+)\)$/);
+    if (math) return castAttributeManagerValue(Math[math[1]](evaluateAttributeArithmetic(math[2], props)), type);
+    const stringFn = source.match(/^@(upper|lower|trim)\((.+)\)$/);
+    if (stringFn) {
+        const inner = stringFn[2].match(/^@Value\(([^)]+)\)$/);
+        const text = String(inner ? props[inner[1].trim()] ?? '' : stringFn[2]);
+        return stringFn[1] === 'upper' ? text.toUpperCase() : stringFn[1] === 'lower' ? text.toLowerCase() : text.trim();
+    }
+    const concat = source.match(/^@concat\((.+)\)$/);
+    if (concat) return splitAttributeFunctionArgs(concat[1]).map((part) => {
+        const match = part.trim().match(/^@Value\(([^)]+)\)$/);
+        return String(match ? props[match[1].trim()] ?? '' : part.trim());
+    }).join('');
+    const conditional = source.match(/^@if\((.+)\)$/);
+    if (conditional) {
+        const args = splitAttributeFunctionArgs(conditional[1]);
+        if (args.length >= 3) return resolveAttributeV2Value(evaluateAttributeCondition(args[0], props) ? args[1] : args[2], props, type);
+    }
+    if (/[+\-*/%]/.test(source) && source.includes('@Value(')) return castAttributeManagerValue(evaluateAttributeArithmetic(source, props), type);
+    return castAttributeManagerValue(source, type);
+}
+
+function runAttributeManagerV2Feature(feature, rules, preserveOthers) {
+    const clone = cloneFeatureForAttributeTool(feature);
+    const props = { ...(clone.properties || {}) };
+    const managed = [];
+    for (const rule of rules) {
+        if (rule.enabled === false) continue;
+        const action = String(rule.action || 'do_nothing');
+        const source = String(rule.inputAttr || rule.source || '');
+        const target = String(rule.outputAttr || rule.target || '');
+        if (rule.condition && !evaluateAttributeCondition(rule.condition, props)) {
+            if (['set', 'create'].includes(action) && (target || source)) {
+                props[target || source] = null;
+                managed.push(target || source);
+            }
+            continue;
+        }
+        if (action === 'remove') delete props[source];
+        else if (action === 'rename' && source && target && Object.prototype.hasOwnProperty.call(props, source)) { props[target] = props[source]; delete props[source]; managed.push(target); }
+        else if (action === 'set' && (target || source)) { props[target || source] = resolveAttributeV2Value(rule.value, props, rule.valueType); managed.push(target || source); }
+        else if (action === 'create' && target) { props[target] = resolveAttributeV2Value(rule.value, props, rule.valueType); managed.push(target); }
+        else if (action === 'do_nothing' && source) managed.push(source);
+    }
+    if (preserveOthers) clone.properties = props;
+    else {
+        clone.properties = {};
+        managed.forEach((field) => { if (Object.prototype.hasOwnProperty.call(props, field)) clone.properties[field] = props[field]; });
+    }
+    return clone;
+}
+
 function computeBasicStats(values) {
     const nums = values.filter((v) => typeof v === 'number' && !isNaN(v));
     if (!nums.length) return null;
@@ -702,6 +913,120 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 return clone;
             });
             return turf.featureCollection(features);
+        }
+    },
+
+    attr_aggregator: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Aggregator', icon: 'fa-layer-group', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-layer-group"></i><div><strong data-aggregator-summary>MATRICULA</strong><small>Agrupar y producir Multi*</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="aggregator-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-aggregator-config class="node-control" tabindex="-1">{"group_by":"MATRICULA","remove_geometry":false,"produce_multis":true,"preserve_multi_inputs":false}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const defaults = { group_by: 'MATRICULA', remove_geometry: false, produce_multis: true, preserve_multi_inputs: false };
+            let config = defaults;
+            try { config = { ...defaults, ...JSON.parse(dom.querySelector('[df-aggregator-config], [df-g2-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const fields = Array.isArray(config.group_by) ? config.group_by.map(String) : parseCsvFields(config.group_by);
+            const read = (props, field) => {
+                if (Object.prototype.hasOwnProperty.call(props || {}, field)) return props[field];
+                const actual = Object.keys(props || {}).find((key) => key.toLowerCase() === field.toLowerCase());
+                return actual ? props[actual] : '';
+            };
+            const groups = new Map();
+            for (const feature of inputs[0].features) {
+                const key = fields.map((field) => String(read(feature.properties, field) ?? '')).join('\u001f');
+                if (!groups.has(key)) {
+                    const item = cloneFeatureForAttributeTool(feature);
+                    if (config.remove_geometry) item.geometry = null;
+                    groups.set(key, { item, geometries: [] });
+                }
+                const group = groups.get(key);
+                const target = group.item.properties || (group.item.properties = {});
+                Object.entries(feature.properties || {}).forEach(([field, value]) => {
+                    if (value !== null && value !== '' && (target[field] == null || target[field] === '')) target[field] = value;
+                });
+                if (!config.remove_geometry && feature.geometry) group.geometries.push(JSON.parse(JSON.stringify(feature.geometry)));
+            }
+            if (config.produce_multis && !config.remove_geometry) groups.forEach((group) => {
+                const points = []; const lines = []; const polygons = []; const others = [];
+                group.geometries.forEach((geometry) => {
+                    const coordinates = geometry?.coordinates;
+                    if (!coordinates) return;
+                    if (geometry.type === 'Point') points.push(coordinates);
+                    else if (geometry.type === 'MultiPoint') config.preserve_multi_inputs ? others.push(geometry) : points.push(...coordinates);
+                    else if (geometry.type === 'LineString') lines.push(coordinates);
+                    else if (geometry.type === 'MultiLineString') config.preserve_multi_inputs ? others.push(geometry) : lines.push(...coordinates);
+                    else if (geometry.type === 'Polygon') polygons.push(coordinates);
+                    else if (geometry.type === 'MultiPolygon') config.preserve_multi_inputs ? others.push(geometry) : polygons.push(...coordinates);
+                    else others.push(geometry);
+                });
+                const populated = [points.length, lines.length, polygons.length, others.length].filter(Boolean).length;
+                if (populated === 1 && points.length) group.item.geometry = { type: 'MultiPoint', coordinates: points };
+                else if (populated === 1 && lines.length) group.item.geometry = { type: 'MultiLineString', coordinates: lines };
+                else if (populated === 1 && polygons.length) group.item.geometry = { type: 'MultiPolygon', coordinates: polygons };
+                else if (populated) group.item.geometry = { type: 'GeometryCollection', geometries: [
+                    ...(points.length ? [{ type: 'MultiPoint', coordinates: points }] : []),
+                    ...(lines.length ? [{ type: 'MultiLineString', coordinates: lines }] : []),
+                    ...(polygons.length ? [{ type: 'MultiPolygon', coordinates: polygons }] : []), ...others
+                ] };
+                else group.item.geometry = null;
+            });
+            return turf.featureCollection(Array.from(groups.values(), (group) => group.item));
+        }
+    },
+
+    attr_manager: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Manager', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 2, hidden: true,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-table-columns"></i><div><strong data-attr-manager-summary>0 reglas</strong><small>Contrato legado Desktop</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="attr-manager-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-attr-manager-config class="node-control" tabindex="-1">{"rules":[],"preserveOthers":true,"onError":"null"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { rules: [], preserveOthers: true, onError: 'null' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-attr-manager-config]')?.value || '{}') }; } catch (e) { /* legacy fallback */ }
+            if (!config.rules.length) {
+                try { config.rules = JSON.parse(dom.querySelector('[df-rules]')?.value || '[]'); } catch (e) { config.rules = []; }
+            }
+            if (!dom.querySelector('[df-attr-manager-config]')) {
+                const preserve = dom.querySelector('[df-preserve]');
+                if (preserve) config.preserveOthers = !!preserve.checked;
+                config.onError = dom.querySelector('[df-on-error]')?.value || config.onError;
+            }
+            const rules = normalizeAttributeManagerRules(config.rules);
+            if (!rules.length) throw new Error('Define al menos una regla');
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0].features) {
+                try { passed.push(runAttributeManagerFeature(feature, rules, config.preserveOthers !== false)); }
+                catch (error) {
+                    const clone = cloneFeatureForAttributeTool(feature);
+                    clone.properties = { ...(clone.properties || {}), _attr_manager_error: error.message || String(error) };
+                    if (config.onError === 'reject') rejected.push(clone); else passed.push(clone);
+                }
+            }
+            return config.onError === 'reject'
+                ? { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) }
+                : turf.featureCollection(passed);
+        }
+    },
+
+    attr_manager_v2: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Manager v2', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-table-columns"></i><div><strong data-attr-manager-summary>0 reglas</strong><small>Reglas estilo FME</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="attr-manager-v2-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-attr-manager-v2-config class="node-control" tabindex="-1">{"rules":[],"preserveOthers":true}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { rules: [], preserveOthers: true };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-attr-manager-v2-config]')?.value || '{}') }; } catch (e) { /* legacy fallback */ }
+            if (!config.rules.length) {
+                try { config.rules = JSON.parse(dom.querySelector('[df-amv2-rules]')?.value || '[]'); } catch (e) { config.rules = []; }
+            }
+            if (!dom.querySelector('[df-attr-manager-v2-config]')) {
+                const preserve = dom.querySelector('[data-amv2-preserve]');
+                if (preserve) config.preserveOthers = !!preserve.checked;
+            }
+            if (!Array.isArray(config.rules) || !config.rules.length) throw new Error('Define al menos una regla');
+            return turf.featureCollection(inputs[0].features.map((feature) => runAttributeManagerV2Feature(feature, config.rules, config.preserveOthers !== false)));
         }
     },
 

@@ -55,8 +55,13 @@ test('abrir un editor de nodo carga su módulo diferido en el primer toque', () 
     assert.match(engine, /'splitter-open-editor'/);
     assert.match(engine, /'list-exploder-open-editor'/);
     assert.match(engine, /'strrep-open-editor'/);
+    assert.match(engine, /'aggregator-open-editor'/);
+    assert.match(engine, /'attr-manager-open-editor'/);
+    assert.match(engine, /'attr-manager-v2-open-editor'/);
     assert.match(engine, /window\.JETLEnsureExtras\?\.\(\)\.then/);
     assert.match(engine, /window\.JETLSchemaUI\.openFormatterEditor\(nodeId\)/);
+    assert.match(engine, /window\.JETLSchemaUI\.openAggregatorEditor\(nodeId\)/);
+    assert.match(engine, /window\.JETLSchemaUI\.openAttributeManagerEditor\(nodeId, 'v2'\)/);
 });
 
 test('el historial persiste y limita las ejecuciones registradas', () => {

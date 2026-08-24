@@ -64,9 +64,10 @@ La referencia funcional es `JETL-Desktop/docs/guides/MODAL_EDITOR_GUIDE.md`:
   casi toda la superficie disponible, sin convertirse en inspector lateral ni
   en hoja inferior.
 
-Implementado como patrón inicial en **Field Calculator Pro**, **String
-Formatter**, **List Concatenator**, **Substring Extractor**, **Attribute
-Splitter**, **List Exploder** y **String Replacer**. Los editores conservan la configuración en JSON y admiten la apertura
+Implementado como patrón en **Field Calculator Pro**, **String Formatter**,
+**List Concatenator**, **Substring Extractor**, **Attribute Splitter**, **List
+Exploder**, **String Replacer**, **Aggregator** y **Attribute Manager legado/v2**.
+Los editores conservan la configuración en JSON y admiten la apertura
 mediante botón o doble clic, con compatibilidad de lectura y guardado para los
 flujos creados antes de esta migración.
 

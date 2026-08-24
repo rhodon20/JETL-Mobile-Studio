@@ -716,6 +716,20 @@ body.modal-open {
     margin-bottom: 7px;
 }
 
+.attr-manager-editor-rule {
+    display: grid;
+    grid-template-columns: 28px 120px minmax(90px, 1fr) minmax(90px, 1fr) minmax(110px, 1.4fr) 100px minmax(130px, 1.2fr) 36px;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+#strrep-editor-rules,
+#attribute-manager-editor-rules {
+    display: block;
+    max-height: min(42vh, 360px);
+}
+
 @media (max-width: 680px) {
     .strrep-editor-rule {
         grid-template-columns: 28px minmax(0, 1fr) 36px;
@@ -725,6 +739,12 @@ body.modal-open {
     .strrep-editor-rule [data-ui-action="strrep-remove-rule"] { grid-column: 3; grid-row: 1; }
     .strrep-editor-rule [data-strrep-search],
     .strrep-editor-rule [data-strrep-replace] { grid-column: 2 / 4; }
+
+    .attr-manager-editor-rule { grid-template-columns: 28px minmax(0, 1fr) 36px; }
+    .attr-manager-editor-rule [data-attr-manager-enabled] { grid-column: 1; grid-row: 1; }
+    .attr-manager-editor-rule [data-ui-action="attribute-manager-remove-rule"] { grid-column: 3; grid-row: 1; }
+    .attr-manager-editor-rule select,
+    .attr-manager-editor-rule input:not([type="checkbox"]) { grid-column: 2 / 4; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -113,9 +113,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 72);
-    assert.equal(report.targetSharedIdCount, 68);
-    assert.equal(report.targetMissingInStudio.length, 49);
+    assert.equal(report.studioCount, 75);
+    assert.equal(report.targetSharedIdCount, 71);
+    assert.equal(report.targetMissingInStudio.length, 46);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
@@ -174,4 +174,76 @@ test('String Replacer conserva reglas múltiples, regex Desktop y política sin 
     assert.equal(result.features[0].properties.code, '123_AB');
     assert.equal(result.features[1].properties.code, 'missing');
     assert.equal(result.features[0].properties.label, 'North');
+});
+
+test('Aggregator agrupa sin distinguir mayúsculas y construye geometrías MultiPoint', async () => {
+    const tool = loadAttributes().attr_aggregator;
+    assert.equal(tool.in, 1);
+    assert.equal(tool.out, 1);
+    const config = { group_by: 'grupo', remove_geometry: false, produce_multis: true, preserve_multi_inputs: false };
+    const dom = { querySelector: () => ({ value: JSON.stringify(config) }) };
+    const input = featureCollection([
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { GRUPO: 'A', nombre: '', primero: 1 } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { grupo: 'A', nombre: 'relleno', segundo: 2 } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { grupo: 'B', nombre: 'otro' } }
+    ]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.features.length, 2);
+    assert.equal(result.features[0].geometry.type, 'MultiPoint');
+    assert.deepEqual(Array.from(result.features[0].geometry.coordinates, (coordinate) => Array.from(coordinate)), [[0, 0], [1, 1]]);
+    assert.equal(result.features[0].properties.nombre, 'relleno');
+    assert.equal(input.features[0].properties.nombre, '', 'no debe mutar la entrada');
+});
+
+test('Attribute Manager legado conserva dos puertos y separa reglas fallidas', async () => {
+    const tool = loadAttributes().attr_manager;
+    assert.equal(tool.hidden, true);
+    assert.equal(tool.in, 1);
+    assert.equal(tool.out, 2);
+    const config = {
+        preserveOthers: true,
+        onError: 'reject',
+        rules: [
+            { action: 'rename', source: 'name', target: 'label' },
+            { action: 'cast', source: 'amount', target: 'amount_int', cast: 'integer' },
+            { action: 'formula', target: 'double', value: 'props.amount_int * 2' }
+        ]
+    };
+    const dom = { querySelector: (selector) => selector === '[df-attr-manager-config]' ? { value: JSON.stringify(config) } : null };
+    const input = featureCollection([
+        { type: 'Feature', geometry: null, properties: { name: 'válida', amount: '4.8' } },
+        { type: 'Feature', geometry: null, properties: { amount: 'x' } }
+    ]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.output_1.features.length, 1);
+    assert.equal(result.output_2.features.length, 1);
+    assert.equal(result.output_1.features[0].properties.label, 'válida');
+    assert.equal(result.output_1.features[0].properties.amount_int, 4);
+    assert.equal(result.output_1.features[0].properties.double, 8);
+    assert.match(result.output_2.features[0].properties._attr_manager_error, /campo no encontrado|convertir/);
+});
+
+test('Attribute Manager v2 evalúa condiciones, funciones y selección de atributos', async () => {
+    const tool = loadAttributes().attr_manager_v2;
+    assert.equal(tool.in, 1);
+    assert.equal(tool.out, 1);
+    const config = {
+        preserveOthers: false,
+        rules: [
+            { action: 'do_nothing', inputAttr: 'name' },
+            { action: 'set', outputAttr: 'score2', value: '@Value(score)*2', valueType: 'number', condition: '@Value(active)==true' },
+            { action: 'create', outputAttr: 'title', value: '@upper(@Value(name))', valueType: 'string' }
+        ]
+    };
+    const dom = { querySelector: (selector) => selector === '[df-attr-manager-v2-config]' ? { value: JSON.stringify(config) } : null };
+    const input = featureCollection([
+        { type: 'Feature', geometry: null, properties: { name: 'madrid', score: 3, active: true, extra: 'fuera' } },
+        { type: 'Feature', geometry: null, properties: { name: 'toledo', score: 2, active: false, extra: 'fuera' } }
+    ]);
+    const result = await tool.run('1', [input], dom);
+    assert.deepEqual(Object.keys(result.features[0].properties), ['name', 'score2', 'title']);
+    assert.equal(result.features[0].properties.score2, 6);
+    assert.equal(result.features[0].properties.title, 'MADRID');
+    assert.equal(result.features[1].properties.score2, null);
+    assert.equal(result.features[1].properties.extra, undefined);
 });
