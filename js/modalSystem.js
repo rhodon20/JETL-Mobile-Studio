@@ -36,7 +36,10 @@
         if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open');
         if (!modal.classList.contains('is-open')) {
             window.requestAnimationFrame(() => {
-                if (visible(modal) && !modal.classList.contains('is-open')) modal.classList.add('is-open');
+                if (visible(modal) && !modal.classList.contains('is-open')) {
+                    modal.classList.add('is-open');
+                    window.JETLMotion?.modalIn(modal);
+                }
             });
         }
         if (becameActive) {

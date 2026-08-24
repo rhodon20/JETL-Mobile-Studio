@@ -95,5 +95,22 @@ una lista implícita y cada evolución de Studio debe actualizar esa matriz.
 ### Fase 5 — Apariencia y pulido
 
 - Tokens visuales convergentes con Desktop.
-- Preferencia de movimiento normal/reducido.
+- Capa central de movimiento con carga diferida, preferencia normal/reducida y
+  degradación segura a Web Animations.
+- **Anime.js** como motor habitual para entradas breves, listas, feedback y
+  cambios de estado. Ya forma parte del repositorio y se prepara tras el primer
+  render, no al iniciar el motor GIS.
+- **GSAP** reservado para secuencias coordinadas que realmente necesiten una
+  timeline (plan de ejecución, historial y transiciones entre varios paneles).
+  No se cargará para microinteracciones que Anime.js o CSS resuelvan mejor.
+- **Morphicons** para parejas de iconos SVG con estado —abrir/cerrar,
+  reproducir/cancelar, expandir/contraer— conforme se sustituyan los glifos de
+  Font Awesome correspondientes. No se intentará deformar iconos de fuente.
+- Presupuesto: sólo `opacity` y `transform`, sin movimiento infinito decorativo,
+  sin escalados elásticos y sin bloquear interacción o carga en Safari.
 - Auditoría táctil, teclado, lector de pantalla y regresión de escritorio.
+
+La prioridad inmediata es consolidar la capa Anime.js y sus tests. Después se
+aplicará Morphicons a controles con dos estados y GSAP al primer recorrido que
+necesite coordinación temporal real. La paridad funcional del catálogo de nodos
+continúa siendo el criterio principal de planificación.

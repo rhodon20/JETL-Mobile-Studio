@@ -714,6 +714,8 @@ function initQuickSearch() {
             results.appendChild(item);
         });
 
+        window.JETLMotion?.staggerIn(results.querySelectorAll('.qs-item'));
+
         qs.classList.toggle('has-results', matches.length > 0);
     }
 
@@ -1493,7 +1495,8 @@ function addNode(k, x, y) {
 
     // 1. ACTUALIZACIÓN VISUAL (DOM)
     const el = document.getElementById('node-' + id);
-    if (el && typeof anim_NodeEnter === 'function') anim_NodeEnter(el);
+    if (el && window.JETLMotion) window.JETLMotion.enterNode(el);
+    else if (el && typeof anim_NodeEnter === 'function') anim_NodeEnter(el);
     if (window.JETLSchemaUI && typeof JETLSchemaUI.updateNode === 'function') {
         setTimeout(() => JETLSchemaUI.updateNode(id), 0);
     }

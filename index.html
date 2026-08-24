@@ -100,6 +100,11 @@
                 button.classList.toggle('active', active);
                 button.setAttribute('aria-pressed', String(active));
             });
+            if (typeof window.JETLEnsureMotion === 'function') {
+                window.JETLEnsureMotion().then(function (motion) {
+                    if (motion) motion.navigation(view);
+                }).catch(function () { /* el movimiento nunca bloquea la navegación */ });
+            }
         };
         window.JETLNativeAddNode = function (key) {
             window.JETLMarkInteraction('add:' + key);
@@ -3578,7 +3583,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260814-19"
+    <script defer src="js/engine.js?v=20260824-20"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3606,12 +3611,11 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260814-13';
+        const JETL_EXTRAS_VERSION = '20260824-14';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',
             'js/vendor/turf.min.js',
-            'js/vendor/anime.min.js',
             'js/vendor/osmtogeojson.js',
             'js/vendor/proj4.js',
             'js/vendor/wellknown.js'
@@ -3631,7 +3635,26 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             });
         }
 
-        const JETL_RUNTIME_VERSION = '20260814-14';
+        const JETL_RUNTIME_VERSION = '20260824-15';
+        const JETL_MOTION_VERSION = '20260824-1';
+        let jetlMotionPromise = null;
+
+        function loadJETLMotion() {
+            if (window.JETLMotion) return Promise.resolve(window.JETLMotion);
+            if (jetlMotionPromise) return jetlMotionPromise;
+            jetlMotionPromise = window.JETLLoadScriptOnce(
+                'js/vendor/anime.min.js?v=' + JETL_MOTION_VERSION,
+                'anime'
+            ).catch((error) => {
+                console.warn('[JETL] Anime.js no disponible; se usará Web Animations', error);
+                return null;
+            }).then(() => window.JETLLoadScriptOnce(
+                'js/motion.js?v=' + JETL_MOTION_VERSION,
+                'JETLMotion'
+            ));
+            return jetlMotionPromise;
+        }
+        window.JETLEnsureMotion = loadJETLMotion;
 
         function loadJETLScript(src) {
             return new Promise((resolve, reject) => {
@@ -3649,6 +3672,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             jetlRuntimeLoadStarted = true;
             window.__JETL_RUNTIME_STATE = 'loading';
             try {
+                await loadJETLMotion().catch(() => null);
                 await Promise.all(JETL_RUNTIME_SCRIPTS.map(loadJETLScript));
                 await loadJETLScript('js/visualization.js');
                 window.__JETL_RUNTIME_STATE = 'ready';
@@ -3681,6 +3705,14 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             requestAnimationFrame(() => setTimeout(() => {
                 loadJETLDeferredStyles();
             }, 0));
+            const warmMotion = () => loadJETLMotion().catch((error) => {
+                console.warn('[JETL] La capa de movimiento no pudo prepararse', error);
+            });
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(warmMotion, { timeout: 2200 });
+            } else {
+                window.setTimeout(warmMotion, 1200);
+            }
         }, { once: true });
     </script>
 </body>

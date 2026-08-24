@@ -5,10 +5,15 @@ La paridad significa conservar la capacidad y adaptar la interacción a móvil;
 no copiar literalmente paneles de escritorio ni dependencias de Python o del
 sistema de archivos.
 
+**Regla no negociable:** Studio debe converger al mismo catálogo de nodos que
+Desktop. El inventario, los estados de compatibilidad y el control automático se
+mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
+
 ## Flujo y edición
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
+| Catálogo completo de nodos | 67 nodos Studio; brecha exacta pendiente de manifiesto Desktop | Comparación automática por ID y backlog completo por categoría |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
 | Pan, zoom, selección y centrado | Implementado | Regresión táctil en Safari y Chromium móvil |

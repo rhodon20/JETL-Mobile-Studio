@@ -1330,7 +1330,7 @@ function clearCanvas() {
     log("Canvas limpio.", "warn");
 }
 
-function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [0, 1], opacity: [0, 1], duration: 800, easing: 'easeOutElastic(1, .6)' }); }
+function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [.97, 1], translateY: [8, 0], opacity: [0, 1], duration: 220, easing: 'easeOutCubic' }); }
 function anim_NodeError(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, translateX: [-10, 10, -5, 5, 0], duration: 500, easing: 'easeInOutQuad' }); }
 function anim_NodeSuccess(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, scale: [1, 1.1, 1], boxShadow: ['0 0 0 0px rgba(46, 204, 113, 0.7)', '0 0 0 10px rgba(46, 204, 113, 0)'], duration: 600, easing: 'easeOutQuad' }); }
 function anim_CableFlow(nodeId) {
