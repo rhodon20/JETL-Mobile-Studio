@@ -674,13 +674,17 @@
 
     let currentAttributeTextEditor = null;
 
+    const ATTRIBUTE_TEXT_KINDS = {
+        list: { selector: '[df-list-concat-config]', defaults: { list_attr: '_list', target_attr: 'concatenated', delimiter: ',', drop_empty: false } },
+        substring: { selector: '[df-substring-config]', defaults: { source_attr: 'Fecha', target_attr: 'Ano', start: 0, end: 3 } },
+        splitter: { selector: '[df-splitter-config]', defaults: { source_attr: 'image', target_attr: '_list', delimiter: '_' } },
+        exploder: { selector: '[df-list-exploder-config]', defaults: { list_attr: '_list', index_attr: '_element_index' } }
+    };
+
     function _readAttributeTextConfig(nodeEl, kind) {
-        const selector = kind === 'substring' ? '[df-substring-config]' : '[df-list-concat-config]';
-        const defaults = kind === 'substring'
-            ? { source_attr: 'Fecha', target_attr: 'Ano', start: 0, end: 3 }
-            : { list_attr: '_list', target_attr: 'concatenated', delimiter: ',', drop_empty: false };
-        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector(selector)?.value || '{}') }; }
-        catch (e) { return defaults; }
+        const definition = ATTRIBUTE_TEXT_KINDS[kind] || ATTRIBUTE_TEXT_KINDS.list;
+        try { return { ...definition.defaults, ...JSON.parse(nodeEl.querySelector(definition.selector)?.value || '{}') }; }
+        catch (e) { return { ...definition.defaults }; }
     }
 
     function _syncAttributeTextSummary(nodeEl, kind, config) {
@@ -689,6 +693,12 @@
         if (kind === 'substring') {
             if (summary) summary.textContent = `${config.source_attr} → ${config.target_attr}`;
             if (detail) detail.textContent = `Caracteres ${config.start}–${config.end} (inclusivo)`;
+        } else if (kind === 'splitter') {
+            if (summary) summary.textContent = `${config.source_attr} → ${config.target_attr}`;
+            if (detail) detail.textContent = `Separar por “${config.delimiter}”`;
+        } else if (kind === 'exploder') {
+            if (summary) summary.textContent = config.list_attr;
+            if (detail) detail.textContent = `Índice → ${config.index_attr}`;
         } else {
             if (summary) summary.textContent = `${config.list_attr} → ${config.target_attr}`;
             if (detail) detail.textContent = `Unir lista con “${config.delimiter}”${config.drop_empty ? ' · sin vacíos' : ''}`;
@@ -698,9 +708,13 @@
     function updateAttributeTextNode(nodeId) {
         const safe = _safeGetNode(nodeId);
         const node = safe.node;
-        if (!node || (node.name !== 'attr_list_concatenator' && node.name !== 'attr_substring')) return;
+        const kindsByNode = {
+            attr_list_concatenator: 'list', attr_substring: 'substring',
+            attr_splitter: 'splitter', attr_list_exploder: 'exploder'
+        };
+        const kind = kindsByNode[node?.name];
+        if (!kind) return;
         const nodeEl = document.getElementById('node-' + nodeId);
-        const kind = node.name === 'attr_substring' ? 'substring' : 'list';
         if (nodeEl) _syncAttributeTextSummary(nodeEl, kind, _readAttributeTextConfig(nodeEl, kind));
     }
 
@@ -708,27 +722,36 @@
         const nodeEl = document.getElementById('node-' + nodeId);
         const modal = document.getElementById('attribute-text-editor-modal');
         if (!nodeEl || !modal) return false;
-        const resolvedKind = kind === 'substring' ? 'substring' : 'list';
+        const resolvedKind = ATTRIBUTE_TEXT_KINDS[kind] ? kind : 'list';
         const config = _readAttributeTextConfig(nodeEl, resolvedKind);
         currentAttributeTextEditor = { nodeId: String(nodeId), kind: resolvedKind };
 
-        document.getElementById('attribute-text-editor-title').textContent = resolvedKind === 'substring' ? 'Substring Extractor' : 'List Concatenator';
-        document.getElementById('attribute-text-editor-subtitle').textContent = resolvedKind === 'substring'
-            ? 'Extrae un intervalo de caracteres con fin inclusivo'
-            : 'Convierte una lista de atributos en texto';
-        document.getElementById('attribute-text-source-label').textContent = resolvedKind === 'substring' ? 'Campo de origen' : 'Atributo de lista';
-        document.getElementById('attribute-text-source').value = resolvedKind === 'substring' ? config.source_attr : config.list_attr;
-        document.getElementById('attribute-text-target').value = config.target_attr;
-        document.getElementById('attribute-text-list-fields').hidden = resolvedKind === 'substring';
+        const titles = { list: 'List Concatenator', substring: 'Substring Extractor', splitter: 'Attribute Splitter', exploder: 'List Exploder' };
+        const subtitles = {
+            list: 'Convierte una lista de atributos en texto', substring: 'Extrae un intervalo de caracteres con fin inclusivo',
+            splitter: 'Divide texto en una lista', exploder: 'Crea una feature por elemento de la lista'
+        };
+        document.getElementById('attribute-text-editor-title').textContent = titles[resolvedKind];
+        document.getElementById('attribute-text-editor-subtitle').textContent = subtitles[resolvedKind];
+        document.getElementById('attribute-text-source-label').textContent = ['list', 'exploder'].includes(resolvedKind) ? 'Atributo de lista' : 'Campo de origen';
+        document.getElementById('attribute-text-source').value = ['list', 'exploder'].includes(resolvedKind) ? config.list_attr : config.source_attr;
+        document.getElementById('attribute-text-target').value = resolvedKind === 'exploder' ? config.index_attr : config.target_attr;
+        document.getElementById('attribute-text-list-fields').hidden = !['list', 'splitter'].includes(resolvedKind);
+        document.getElementById('attribute-text-drop-empty-field').hidden = resolvedKind !== 'list';
         document.getElementById('attribute-text-substring-fields').hidden = resolvedKind !== 'substring';
         if (resolvedKind === 'substring') {
             document.getElementById('attribute-text-start').value = config.start;
             document.getElementById('attribute-text-end').value = config.end;
             document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> El índice final es inclusivo. Los índices negativos cuentan desde el final, igual que en Desktop.';
-        } else {
+        } else if (resolvedKind === 'list') {
             document.getElementById('attribute-text-delimiter').value = config.delimiter;
             document.getElementById('attribute-text-drop-empty').checked = !!config.drop_empty;
             document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> Admite listas directas y rutas anidadas como <code>items{}.name</code>.';
+        } else if (resolvedKind === 'splitter') {
+            document.getElementById('attribute-text-delimiter').value = config.delimiter;
+            document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> Los fragmentos vacíos se omiten, igual que en Desktop.';
+        } else {
+            document.getElementById('attribute-text-editor-help').innerHTML = '<i class="fas fa-circle-info"></i> Los valores que no sean listas producen una sola feature; null no produce ninguna.';
         }
         modal.style.display = 'flex';
         return true;
@@ -743,16 +766,105 @@
             if (nodeEl) {
                 const source = document.getElementById('attribute-text-source').value.trim();
                 const target = document.getElementById('attribute-text-target').value.trim();
-                const config = kind === 'substring'
-                    ? { source_attr: source || 'Fecha', target_attr: target || 'Ano', start: Number(document.getElementById('attribute-text-start').value), end: Number(document.getElementById('attribute-text-end').value) }
-                    : { list_attr: source || '_list', target_attr: target || 'concatenated', delimiter: document.getElementById('attribute-text-delimiter').value, drop_empty: document.getElementById('attribute-text-drop-empty').checked };
-                const control = nodeEl.querySelector(kind === 'substring' ? '[df-substring-config]' : '[df-list-concat-config]');
+                let config;
+                if (kind === 'substring') config = { source_attr: source || 'Fecha', target_attr: target || 'Ano', start: Number(document.getElementById('attribute-text-start').value), end: Number(document.getElementById('attribute-text-end').value) };
+                else if (kind === 'splitter') config = { source_attr: source || 'image', target_attr: target || '_list', delimiter: document.getElementById('attribute-text-delimiter').value };
+                else if (kind === 'exploder') config = { list_attr: source || '_list', index_attr: target || '_element_index' };
+                else config = { list_attr: source || '_list', target_attr: target || 'concatenated', delimiter: document.getElementById('attribute-text-delimiter').value, drop_empty: document.getElementById('attribute-text-drop-empty').checked };
+                const control = nodeEl.querySelector(ATTRIBUTE_TEXT_KINDS[kind].selector);
                 _commitNodeControl(control, JSON.stringify(config));
                 _syncAttributeTextSummary(nodeEl, kind, config);
             }
         }
         modal.style.display = 'none';
         currentAttributeTextEditor = null;
+    }
+
+    let currentStringReplacerNodeId = null;
+
+    function _readStringReplacerConfig(nodeEl) {
+        const defaults = { mode: 'text', case_sensitive: true, no_match_action: 'none', no_match_value: '', rules: [] };
+        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector('[df-strrep-config]')?.value || '{}') }; }
+        catch (e) { return defaults; }
+    }
+
+    function _stringReplacerRuleRow(rule = {}) {
+        const row = document.createElement('div');
+        row.className = 'strrep-editor-rule';
+        row.innerHTML = `<input data-strrep-enabled type="checkbox" aria-label="Activar regla" ${rule.enabled === false ? '' : 'checked'}>
+            <input data-strrep-attribute class="node-control" placeholder="Atributo">
+            <input data-strrep-search class="node-control" placeholder="Buscar">
+            <input data-strrep-replace class="node-control" placeholder="Reemplazar">
+            <button type="button" class="node-btn-mini" data-ui-action="strrep-remove-rule" aria-label="Eliminar regla"><i class="fas fa-times"></i></button>`;
+        row.querySelector('[data-strrep-attribute]').value = rule.attribute || '';
+        row.querySelector('[data-strrep-search]').value = rule.search || '';
+        row.querySelector('[data-strrep-replace]').value = rule.replace || '';
+        return row;
+    }
+
+    function _syncStringReplacerNoMatch() {
+        const field = document.getElementById('strrep-editor-no-match-value-field');
+        if (field) field.hidden = document.getElementById('strrep-editor-no-match')?.value !== 'set';
+    }
+
+    function _syncStringReplacerSummary(nodeEl, config) {
+        const enabled = (config.rules || []).filter((rule) => rule.enabled !== false && rule.attribute).length;
+        const summary = nodeEl?.querySelector('[data-strrep-summary]');
+        const mode = nodeEl?.querySelector('[data-strrep-mode]');
+        if (summary) summary.textContent = `${enabled} ${enabled === 1 ? 'regla' : 'reglas'}`;
+        if (mode) mode.textContent = config.mode === 'regex' ? 'Expresión regular' : 'Texto literal';
+    }
+
+    function updateStringReplacerNode(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        if (node?.name !== 'attr_string_replacer') return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        if (nodeEl) _syncStringReplacerSummary(nodeEl, _readStringReplacerConfig(nodeEl));
+    }
+
+    function openStringReplacerEditor(nodeId) {
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('string-replacer-editor-modal');
+        if (!nodeEl || !modal) return false;
+        const config = _readStringReplacerConfig(nodeEl);
+        currentStringReplacerNodeId = String(nodeId);
+        document.getElementById('strrep-editor-mode').value = config.mode === 'regex' ? 'regex' : 'text';
+        document.getElementById('strrep-editor-case').checked = config.case_sensitive !== false;
+        document.getElementById('strrep-editor-no-match').value = ['none', 'null', 'set'].includes(config.no_match_action) ? config.no_match_action : 'none';
+        document.getElementById('strrep-editor-no-match-value').value = config.no_match_value || '';
+        const rules = document.getElementById('strrep-editor-rules');
+        rules.innerHTML = '';
+        (config.rules?.length ? config.rules : [{}]).forEach((rule) => rules.appendChild(_stringReplacerRuleRow(rule)));
+        _syncStringReplacerNoMatch();
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeStringReplacerEditor(save) {
+        const modal = document.getElementById('string-replacer-editor-modal');
+        if (!modal) return;
+        if (save && currentStringReplacerNodeId) {
+            const nodeEl = document.getElementById('node-' + currentStringReplacerNodeId);
+            if (nodeEl) {
+                const rules = Array.from(document.querySelectorAll('#strrep-editor-rules .strrep-editor-rule')).map((row) => ({
+                    enabled: row.querySelector('[data-strrep-enabled]').checked,
+                    attribute: row.querySelector('[data-strrep-attribute]').value.trim(),
+                    search: row.querySelector('[data-strrep-search]').value,
+                    replace: row.querySelector('[data-strrep-replace]').value
+                })).filter((rule) => rule.attribute || rule.search || rule.replace);
+                const config = {
+                    mode: document.getElementById('strrep-editor-mode').value,
+                    case_sensitive: document.getElementById('strrep-editor-case').checked,
+                    no_match_action: document.getElementById('strrep-editor-no-match').value,
+                    no_match_value: document.getElementById('strrep-editor-no-match-value').value,
+                    rules
+                };
+                _commitNodeControl(nodeEl.querySelector('[df-strrep-config]'), JSON.stringify(config));
+                _syncStringReplacerSummary(nodeEl, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentStringReplacerNodeId = null;
     }
 
     function updateNode(nodeId) {
@@ -766,6 +878,7 @@
         updateStatsNode(nodeId);
         updateTesterNode(nodeId);
         updateAttributeTextNode(nodeId);
+        updateStringReplacerNode(nodeId);
     }
 
     function refreshAll() {
@@ -800,6 +913,15 @@
             } else if (action === 'substring-open-editor') {
                 evt.stopPropagation();
                 openAttributeTextEditor(nodeId, 'substring');
+            } else if (action === 'splitter-open-editor') {
+                evt.stopPropagation();
+                openAttributeTextEditor(nodeId, 'splitter');
+            } else if (action === 'list-exploder-open-editor') {
+                evt.stopPropagation();
+                openAttributeTextEditor(nodeId, 'exploder');
+            } else if (action === 'strrep-open-editor') {
+                evt.stopPropagation();
+                openStringReplacerEditor(nodeId);
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -845,6 +967,10 @@
             else if (action === 'save-formatter-editor') closeFormatterEditor(true);
             else if (action === 'close-attribute-text-editor') closeAttributeTextEditor(false);
             else if (action === 'save-attribute-text-editor') closeAttributeTextEditor(true);
+            else if (action === 'close-string-replacer-editor') closeStringReplacerEditor(false);
+            else if (action === 'save-string-replacer-editor') closeStringReplacerEditor(true);
+            else if (action === 'strrep-add-rule') document.getElementById('strrep-editor-rules')?.appendChild(_stringReplacerRuleRow());
+            else if (action === 'strrep-remove-rule') evt.target.closest('.strrep-editor-rule')?.remove();
         });
 
         document.addEventListener('dblclick', (evt) => {
@@ -853,7 +979,12 @@
             else if (nodeEl?.classList.contains('attr_string_formatter')) openFormatterEditor(nodeEl.id.replace('node-', ''));
             else if (nodeEl?.classList.contains('attr_list_concatenator')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'list');
             else if (nodeEl?.classList.contains('attr_substring')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'substring');
+            else if (nodeEl?.classList.contains('attr_splitter')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'splitter');
+            else if (nodeEl?.classList.contains('attr_list_exploder')) openAttributeTextEditor(nodeEl.id.replace('node-', ''), 'exploder');
+            else if (nodeEl?.classList.contains('attr_string_replacer')) openStringReplacerEditor(nodeEl.id.replace('node-', ''));
         });
+
+        document.getElementById('strrep-editor-no-match')?.addEventListener('change', _syncStringReplacerNoMatch);
 
         document.addEventListener('change', (evt) => {
             const checkbox = evt.target.closest('[data-formatter-modal-field]');
@@ -1004,6 +1135,7 @@
         insertCalcField,
         openCalcEditor,
         openFormatterEditor,
-        openAttributeTextEditor
+        openAttributeTextEditor,
+        openStringReplacerEditor
     };
 })();

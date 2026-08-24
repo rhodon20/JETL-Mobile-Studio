@@ -82,6 +82,31 @@ function cloneFeatureForAttributeTool(feature) {
     return JSON.parse(JSON.stringify(feature));
 }
 
+function escapeRegExpLiteral(value) {
+    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function fmeRegexReplacementToJs(value) {
+    return String(value ?? '').replace(/\\([0-9]+)/g, '$$$1');
+}
+
+function applyStringReplace(text, search, replacement, mode, caseSensitive) {
+    const source = String(text ?? '');
+    const needle = String(search ?? '');
+    if (!needle) return { value: source, matched: false };
+    const flags = `g${caseSensitive ? '' : 'i'}`;
+    const pattern = mode === 'regex' ? needle : escapeRegExpLiteral(needle);
+    const replacementText = mode === 'regex' ? fmeRegexReplacementToJs(replacement) : String(replacement ?? '');
+    const regex = new RegExp(pattern, flags);
+    let matched = false;
+    const value = source.replace(regex, (...args) => {
+        matched = true;
+        if (mode === 'regex') return replacementText.replace(/\$([0-9]+)/g, (_, index) => args[Number(index)] ?? '');
+        return replacementText;
+    });
+    return { value, matched };
+}
+
 function computeBasicStats(values) {
     const nums = values.filter((v) => typeof v === 'number' && !isNaN(v));
     if (!nums.length) return null;
@@ -674,6 +699,93 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const clone = cloneFeatureForAttributeTool(feature);
                 clone.properties = clone.properties || {};
                 clone.properties[target] = extractFmeSubstring(clone.properties[source], config.start, config.end);
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_splitter: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Splitter', icon: 'fa-cut', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-cut"></i>
+                <div><strong data-attribute-text-summary>image → _list</strong><small>Separar por “_”</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="splitter-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-splitter-config class="node-control" tabindex="-1">{"source_attr":"image","target_attr":"_list","delimiter":"_"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { source_attr: 'image', target_attr: '_list', delimiter: '_' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-splitter-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.source_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de origen y destino');
+            const delimiter = String(config.delimiter ?? '_');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                const value = clone.properties[source];
+                clone.properties[target] = value == null ? [] : String(value).split(delimiter).filter((part) => part !== '');
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_list_exploder: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Exploder', icon: 'fa-list-ol', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-list-ol"></i>
+                <div><strong data-attribute-text-summary>_list</strong><small>Índice → _element_index</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="list-exploder-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-list-exploder-config class="node-control" tabindex="-1">{"list_attr":"_list","index_attr":"_element_index"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { list_attr: '_list', index_attr: '_element_index' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-list-exploder-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const listAttr = resolveParamText(config.list_attr).trim();
+            const indexAttr = resolveParamText(config.index_attr).trim();
+            if (!listAttr || !indexAttr) throw new Error('Define los atributos de lista e índice');
+            const features = [];
+            for (const feature of inputs[0].features) {
+                const raw = feature.properties?.[listAttr];
+                const values = Array.isArray(raw) ? raw : (raw == null ? [] : [raw]);
+                values.forEach((value, index) => {
+                    const clone = cloneFeatureForAttributeTool(feature);
+                    clone.properties = { ...(clone.properties || {}), [listAttr]: value, [indexAttr]: index };
+                    features.push(clone);
+                });
+            }
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_string_replacer: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Replacer', icon: 'fa-exchange-alt', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-exchange-alt"></i>
+                <div><strong data-strrep-summary>0 reglas</strong><small data-strrep-mode>Texto literal</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="strrep-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-strrep-config class="node-control" tabindex="-1">{"mode":"text","case_sensitive":true,"no_match_action":"none","no_match_value":"","rules":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { mode: 'text', case_sensitive: true, no_match_action: 'none', no_match_value: '', rules: [] };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-strrep-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const rules = Array.isArray(config.rules)
+                ? config.rules.filter((rule) => rule && rule.enabled !== false && String(rule.attribute || '').trim())
+                : [];
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                rules.forEach((rule) => {
+                    const attribute = String(rule.attribute).trim();
+                    const replaced = applyStringReplace(clone.properties[attribute], rule.search, rule.replace, config.mode, config.case_sensitive !== false);
+                    if (replaced.matched) clone.properties[attribute] = replaced.value;
+                    else if (config.no_match_action === 'null') clone.properties[attribute] = null;
+                    else if (config.no_match_action === 'set') clone.properties[attribute] = config.no_match_value ?? '';
+                });
                 return clone;
             });
             return turf.featureCollection(features);

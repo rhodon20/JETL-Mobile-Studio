@@ -1734,6 +1734,22 @@ body.modal-open {
     display: none;
 }
 
+.strrep-editor-rule {
+    display: grid;
+    grid-template-columns: 28px minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 36px;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+@media (max-width: 680px) {
+    .strrep-editor-rule { grid-template-columns: 28px minmax(0, 1fr) 36px; }
+    .strrep-editor-rule [data-strrep-attribute] { grid-column: 2; }
+    .strrep-editor-rule [data-ui-action="strrep-remove-rule"] { grid-column: 3; grid-row: 1; }
+    .strrep-editor-rule [data-strrep-search],
+    .strrep-editor-rule [data-strrep-replace] { grid-column: 2 / 4; }
+}
+
 .node-editor-field-list {
     max-height: 180px;
     padding: 8px;
@@ -2696,7 +2712,7 @@ body.modal-open {
                 <label class="form-field"><span>Campo de destino</span><input id="attribute-text-target" class="node-control" autocomplete="off"></label>
                 <div id="attribute-text-list-fields">
                     <label class="form-field"><span>Separador</span><input id="attribute-text-delimiter" class="node-control" autocomplete="off"></label>
-                    <label class="form-field form-inline"><input id="attribute-text-drop-empty" type="checkbox"> <span>Omitir valores vacíos</span></label>
+                    <label id="attribute-text-drop-empty-field" class="form-field form-inline"><input id="attribute-text-drop-empty" type="checkbox"> <span>Omitir valores vacíos</span></label>
                 </div>
                 <div id="attribute-text-substring-fields" class="form-inline" hidden>
                     <label class="form-field"><span>Inicio</span><input id="attribute-text-start" type="number" class="node-control"></label>
@@ -2707,6 +2723,31 @@ body.modal-open {
             <div class="modal-footer">
                 <button class="btn" data-ui-action="close-attribute-text-editor">Cancelar</button>
                 <button class="btn btn-primary" data-ui-action="save-attribute-text-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="string-replacer-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="string-replacer-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-exchange-alt"></i><div><strong id="string-replacer-editor-title">String Replacer</strong><small>Aplica reglas de sustitución en orden</small></div></div>
+                <button class="modal-close" data-ui-action="close-string-replacer-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div class="form-inline">
+                    <label class="form-field"><span>Modo</span><select id="strrep-editor-mode" class="node-control"><option value="text">Texto literal</option><option value="regex">Expresión regular</option></select></label>
+                    <label class="form-field form-inline"><input id="strrep-editor-case" type="checkbox" checked> <span>Distinguir mayúsculas</span></label>
+                </div>
+                <div class="form-inline">
+                    <label class="form-field"><span>Si no coincide</span><select id="strrep-editor-no-match" class="node-control"><option value="none">Conservar valor</option><option value="null">Asignar null</option><option value="set">Asignar otro valor</option></select></label>
+                    <label id="strrep-editor-no-match-value-field" class="form-field" hidden><span>Valor alternativo</span><input id="strrep-editor-no-match-value" class="node-control" autocomplete="off"></label>
+                </div>
+                <div class="form-field"><span>Reglas</span><div id="strrep-editor-rules" class="node-editor-field-list"></div></div>
+                <button type="button" class="btn" data-ui-action="strrep-add-rule"><i class="fas fa-plus"></i> Añadir regla</button>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> En modo regex, las referencias de captura Desktop <code>\1</code> se convierten automáticamente.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-string-replacer-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-string-replacer-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
             </div>
         </div>
     </div>
@@ -3580,7 +3621,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(5, 14, &quot;attributes.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/spatial.js&quot;)"></script>
 
-    <script defer src="js/nodes/attributes.js?v=20260824-9"
+    <script defer src="js/nodes/attributes.js?v=20260824-10"
         onload="window.JETLBootModuleLoaded(6, 14, &quot;raster.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
 
@@ -3608,7 +3649,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260824-21"
+    <script defer src="js/engine.js?v=20260824-22"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3636,7 +3677,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260824-15';
+        const JETL_EXTRAS_VERSION = '20260824-16';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

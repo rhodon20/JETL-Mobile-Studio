@@ -708,6 +708,25 @@ body.modal-open {
     display: none;
 }
 
+.strrep-editor-rule {
+    display: grid;
+    grid-template-columns: 28px minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 36px;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+@media (max-width: 680px) {
+    .strrep-editor-rule {
+        grid-template-columns: 28px minmax(0, 1fr) 36px;
+    }
+
+    .strrep-editor-rule [data-strrep-attribute] { grid-column: 2; }
+    .strrep-editor-rule [data-ui-action="strrep-remove-rule"] { grid-column: 3; grid-row: 1; }
+    .strrep-editor-rule [data-strrep-search],
+    .strrep-editor-rule [data-strrep-replace] { grid-column: 2 / 4; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .modal,
     .modal-content,

@@ -1508,14 +1508,18 @@ function initEngineDelegation() {
         const schemaActionEl = e.target.closest('[data-schema-action]');
         const schemaAction = schemaActionEl?.getAttribute('data-schema-action');
         if (schemaActionEl && !window.JETLSchemaUI &&
-            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor'].includes(schemaAction)) {
+            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor', 'splitter-open-editor', 'list-exploder-open-editor', 'strrep-open-editor'].includes(schemaAction)) {
             e.preventDefault();
             const nodeId = schemaActionEl.closest('.drawflow-node')?.id.replace('node-', '');
             window.JETLEnsureExtras?.().then(() => {
                 if (!nodeId || !window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
                 if (schemaAction === 'calc-open-editor') window.JETLSchemaUI.openCalcEditor(nodeId);
                 else if (schemaAction === 'formatter-open-editor') window.JETLSchemaUI.openFormatterEditor(nodeId);
-                else window.JETLSchemaUI.openAttributeTextEditor(nodeId, schemaAction === 'substring-open-editor' ? 'substring' : 'list');
+                else if (schemaAction === 'strrep-open-editor') window.JETLSchemaUI.openStringReplacerEditor(nodeId);
+                else {
+                    const kind = { 'substring-open-editor': 'substring', 'splitter-open-editor': 'splitter', 'list-exploder-open-editor': 'exploder' }[schemaAction] || 'list';
+                    window.JETLSchemaUI.openAttributeTextEditor(nodeId, kind);
+                }
             }).catch((error) => {
                 console.error('[JETL] Error abriendo editor de nodo', error);
                 if (typeof showToast === 'function') showToast('No se pudo abrir el editor del nodo', 'error');

@@ -113,9 +113,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 69);
-    assert.equal(report.targetSharedIdCount, 65);
-    assert.equal(report.targetMissingInStudio.length, 52);
+    assert.equal(report.studioCount, 72);
+    assert.equal(report.targetSharedIdCount, 68);
+    assert.equal(report.targetMissingInStudio.length, 49);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
@@ -142,4 +142,36 @@ test('Substring Extractor usa fin inclusivo e índices negativos como Desktop', 
     const day = await run({ source_attr: 'date', target_attr: 'part', start: -2, end: -1 });
     assert.equal(year.features[0].properties.part, '2026');
     assert.equal(day.features[0].properties.part, '24');
+});
+
+test('Attribute Splitter y List Exploder completan el recorrido texto a features', async () => {
+    const registry = loadAttributes();
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { code: 'a__b_c' } }]);
+    const splitterConfig = { source_attr: 'code', target_attr: 'parts', delimiter: '_' };
+    const split = await registry.attr_splitter.run('1', [input], { querySelector: () => ({ value: JSON.stringify(splitterConfig) }) });
+    assert.deepEqual(Array.from(split.features[0].properties.parts), ['a', 'b', 'c']);
+    const exploderConfig = { list_attr: 'parts', index_attr: 'position' };
+    const exploded = await registry.attr_list_exploder.run('2', [split], { querySelector: () => ({ value: JSON.stringify(exploderConfig) }) });
+    assert.deepEqual(Array.from(exploded.features, (feature) => feature.properties.parts), ['a', 'b', 'c']);
+    assert.deepEqual(Array.from(exploded.features, (feature) => feature.properties.position), [0, 1, 2]);
+    assert.equal(input.features[0].properties.parts, undefined);
+});
+
+test('String Replacer conserva reglas múltiples, regex Desktop y política sin coincidencia', async () => {
+    const tool = loadAttributes().attr_string_replacer;
+    const input = featureCollection([
+        { type: 'Feature', geometry: null, properties: { code: 'AB-123', label: 'North' } },
+        { type: 'Feature', geometry: null, properties: { code: 'none', label: 'South' } }
+    ]);
+    const config = {
+        mode: 'regex', case_sensitive: false, no_match_action: 'set', no_match_value: 'missing',
+        rules: [
+            { enabled: true, attribute: 'code', search: '^([a-z]+)-([0-9]+)$', replace: '\\2_\\1' },
+            { enabled: false, attribute: 'label', search: 'north', replace: 'N' }
+        ]
+    };
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(result.features[0].properties.code, '123_AB');
+    assert.equal(result.features[1].properties.code, 'missing');
+    assert.equal(result.features[0].properties.label, 'North');
 });
