@@ -1039,6 +1039,150 @@
         currentAttributeManagerEditor = null;
     }
 
+    const GEOMETRY_TRANSFORM_EDITORS = {
+        geo_crs_setter: {
+            title: 'Coordinate System Setter', subtitle: 'Asigna metadatos CRS sin reproyectar',
+            fields: [
+                { key: 'crs', label: 'CRS', type: 'text', value: 'EPSG:4326', placeholder: 'EPSG:4326' },
+                { key: 'overwrite', label: 'Sobrescribir CRS existente', type: 'checkbox', value: true }
+            ],
+            summary: (config) => String(config.crs || 'EPSG:4326')
+        },
+        geo_horizontal_angle_calculator: {
+            title: 'Horizontal Angle Calculator', subtitle: 'Azimut y ángulo horizontal de líneas',
+            fields: [
+                { key: 'unit', label: 'Unidad', type: 'select', value: 'degrees', options: [['degrees', 'Grados'], ['radians', 'Radianes']] },
+                { key: 'azimuth_attr', label: 'Atributo de azimut', type: 'text', value: '_azimuth' },
+                { key: 'angle_attr', label: 'Atributo de ángulo', type: 'text', value: '_angle' }
+            ],
+            summary: (config) => config.unit === 'radians' ? 'Radianes' : 'Grados'
+        },
+        geo_rotator: {
+            title: 'Rotator', subtitle: 'Rotación antihoraria con origen configurable',
+            fields: [
+                { key: 'angle_mode', label: 'Origen del ángulo', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'angle_value', label: 'Ángulo (grados)', type: 'number', value: 0 },
+                { key: 'angle_field', label: 'Atributo de ángulo', type: 'text', value: '' },
+                { key: 'origin_mode', label: 'Centro de rotación', type: 'select', value: 'centroid', options: [['centroid', 'Centroide'], ['bbox_center', 'Centro del bounding box'], ['custom', 'Coordenadas fijas'], ['fields', 'Atributos X/Y']] },
+                { key: 'origin_x', label: 'Origen X', type: 'number', value: 0 },
+                { key: 'origin_y', label: 'Origen Y', type: 'number', value: 0 },
+                { key: 'origin_x_field', label: 'Atributo origen X', type: 'text', value: '' },
+                { key: 'origin_y_field', label: 'Atributo origen Y', type: 'text', value: '' },
+                { key: 'on_error', label: 'Si falla', type: 'select', value: 'reject', options: [['reject', 'Enviar a salida 2'], ['null', 'Conservar con diagnóstico']] }
+            ],
+            summary: (config) => `${config.angle_mode === 'field' ? config.angle_field || 'atributo' : Number(config.angle_value || 0) + '°'} · ${config.origin_mode || 'centroid'}`
+        },
+        geo_densifier: {
+            title: 'Densifier', subtitle: 'Añade vértices a líneas y anillos',
+            fields: [
+                { key: 'mode', label: 'Distribución', type: 'select', value: 'uniform', options: [['uniform', 'Uniforme'], ['exact', 'Intervalo exacto']] },
+                { key: 'interval_mode', label: 'Origen del intervalo', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
+                { key: 'interval_value', label: 'Intervalo', type: 'number', value: 1, min: 0.000001 },
+                { key: 'interval_field', label: 'Atributo de intervalo', type: 'text', value: '' },
+                { key: 'on_error', label: 'Si falla', type: 'select', value: 'reject', options: [['reject', 'Enviar a salida 2'], ['null', 'Conservar con diagnóstico']] }
+            ],
+            summary: (config) => `${config.mode === 'exact' ? 'Exacto' : 'Uniforme'} · ${config.interval_mode === 'field' ? config.interval_field || 'atributo' : config.interval_value}`
+        },
+        geo_measure_extractor: {
+            title: 'MeasureExtractor', subtitle: 'Lee la tercera coordenada como medida',
+            fields: [
+                { key: 'measure_type', label: 'Modo', type: 'select', value: 'whole', options: [['whole', 'Lista completa'], ['point', 'Primer punto'], ['vertex', 'Vértice por índice'], ['endpoints', 'Inicio y fin']] },
+                { key: 'index', label: 'Índice de vértice', type: 'number', value: 0 },
+                { key: 'point_attr', label: 'Atributo de medida', type: 'text', value: 'measure' },
+                { key: 'start_attr', label: 'Atributo inicial', type: 'text', value: 'measure_start' },
+                { key: 'end_attr', label: 'Atributo final', type: 'text', value: 'measure_end' },
+                { key: 'list_attr', label: 'Atributo de lista', type: 'text', value: 'measures' }
+            ],
+            summary: (config) => ({ whole: `Lista ${config.list_attr || 'measures'}`, point: config.point_attr || 'measure', vertex: `Vértice ${config.index ?? 0}`, endpoints: 'Inicio + fin' }[config.measure_type] || 'Medidas')
+        }
+    };
+
+    let currentGeometryTransformEditor = null;
+
+    function _readGeometryTransformConfig(nodeEl, definition) {
+        const defaults = Object.fromEntries(definition.fields.map((field) => [field.key, field.value]));
+        try { return { ...defaults, ...JSON.parse(nodeEl.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+        catch (error) { return defaults; }
+    }
+
+    function _syncGeometryTransformSummary(nodeEl, definition, config) {
+        const summary = nodeEl?.querySelector('[data-geom-transform-summary]');
+        if (summary) summary.textContent = definition.summary(config);
+    }
+
+    function _geometryTransformField(field, value) {
+        const label = document.createElement('label');
+        label.className = field.type === 'checkbox' ? 'form-field form-inline' : 'form-field';
+        let control;
+        if (field.type === 'select') {
+            control = document.createElement('select');
+            (field.options || []).forEach(([optionValue, optionLabel]) => {
+                const option = document.createElement('option'); option.value = optionValue; option.textContent = optionLabel; control.appendChild(option);
+            });
+            control.value = String(value ?? field.value ?? '');
+        } else {
+            control = document.createElement('input');
+            control.type = field.type === 'checkbox' ? 'checkbox' : field.type;
+            if (field.type === 'checkbox') control.checked = value !== false;
+            else control.value = value ?? field.value ?? '';
+            if (field.placeholder) control.placeholder = field.placeholder;
+            if (field.min != null) control.min = String(field.min);
+        }
+        control.classList.add('node-control');
+        control.dataset.geometryTransformField = field.key;
+        const text = document.createElement('span'); text.textContent = field.label;
+        if (field.type === 'checkbox') label.append(control, text); else label.append(text, control);
+        return label;
+    }
+
+    function updateGeometryTransformNode(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        const definition = GEOMETRY_TRANSFORM_EDITORS[node?.name];
+        if (!definition) return;
+        const nodeEl = document.getElementById('node-' + nodeId);
+        if (nodeEl) _syncGeometryTransformSummary(nodeEl, definition, _readGeometryTransformConfig(nodeEl, definition));
+    }
+
+    function openGeometryTransformEditor(nodeId) {
+        const node = _safeGetNode(nodeId).node;
+        const definition = GEOMETRY_TRANSFORM_EDITORS[node?.name];
+        const nodeEl = document.getElementById('node-' + nodeId);
+        const modal = document.getElementById('geometry-transform-editor-modal');
+        if (!definition || !nodeEl || !modal) return false;
+        const config = _readGeometryTransformConfig(nodeEl, definition);
+        currentGeometryTransformEditor = { nodeId: String(nodeId), name: node.name };
+        document.getElementById('geometry-transform-editor-title').textContent = definition.title;
+        document.getElementById('geometry-transform-editor-subtitle').textContent = definition.subtitle;
+        const fields = document.getElementById('geometry-transform-editor-fields');
+        fields.innerHTML = '';
+        definition.fields.forEach((field) => fields.appendChild(_geometryTransformField(field, config[field.key])));
+        modal.style.display = 'flex';
+        return true;
+    }
+
+    function closeGeometryTransformEditor(save) {
+        const modal = document.getElementById('geometry-transform-editor-modal');
+        if (!modal) return;
+        if (save && currentGeometryTransformEditor) {
+            const { nodeId, name } = currentGeometryTransformEditor;
+            const definition = GEOMETRY_TRANSFORM_EDITORS[name];
+            const nodeEl = document.getElementById('node-' + nodeId);
+            if (definition && nodeEl) {
+                // Preserve Desktop fields that Studio does not need to expose yet.
+                // This keeps imported projects lossless after a mobile edit.
+                const config = _readGeometryTransformConfig(nodeEl, definition);
+                definition.fields.forEach((field) => {
+                    const control = document.querySelector(`[data-geometry-transform-field="${field.key}"]`);
+                    config[field.key] = field.type === 'checkbox' ? control.checked : field.type === 'number' ? Number(control.value) : control.value;
+                });
+                _commitNodeControl(nodeEl.querySelector('[df-geom-transform-config]'), JSON.stringify(config));
+                _syncGeometryTransformSummary(nodeEl, definition, config);
+            }
+        }
+        modal.style.display = 'none';
+        currentGeometryTransformEditor = null;
+    }
+
     function updateNode(nodeId) {
         updateJoinNode(nodeId);
         updateCalcNode(nodeId);
@@ -1053,6 +1197,7 @@
         updateStringReplacerNode(nodeId);
         updateAggregatorNode(nodeId);
         updateAttributeManagerNode(nodeId);
+        updateGeometryTransformNode(nodeId);
     }
 
     function refreshAll() {
@@ -1105,6 +1250,9 @@
             } else if (action === 'attr-manager-v2-open-editor') {
                 evt.stopPropagation();
                 openAttributeManagerEditor(nodeId, 'v2');
+            } else if (action === 'geom-transform-open-editor') {
+                evt.stopPropagation();
+                openGeometryTransformEditor(nodeId);
             } else if (action === 'join-add') {
                 evt.stopPropagation();
                 appendJoinPair(nodeId);
@@ -1160,6 +1308,8 @@
             else if (action === 'save-attribute-manager-editor') closeAttributeManagerEditor(true);
             else if (action === 'attribute-manager-add-rule' && currentAttributeManagerEditor) document.getElementById('attribute-manager-editor-rules')?.appendChild(_attributeManagerRuleRow({}, currentAttributeManagerEditor.version));
             else if (action === 'attribute-manager-remove-rule') evt.target.closest('.attr-manager-editor-rule')?.remove();
+            else if (action === 'close-geometry-transform-editor') closeGeometryTransformEditor(false);
+            else if (action === 'save-geometry-transform-editor') closeGeometryTransformEditor(true);
         });
 
         document.addEventListener('dblclick', (evt) => {
@@ -1174,6 +1324,7 @@
             else if (nodeEl?.classList.contains('attr_aggregator')) openAggregatorEditor(nodeEl.id.replace('node-', ''));
             else if (nodeEl?.classList.contains('attr_manager_v2')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'v2');
             else if (nodeEl?.classList.contains('attr_manager')) openAttributeManagerEditor(nodeEl.id.replace('node-', ''), 'legacy');
+            else if (Object.keys(GEOMETRY_TRANSFORM_EDITORS).some((name) => nodeEl?.classList.contains(name))) openGeometryTransformEditor(nodeEl.id.replace('node-', ''));
         });
 
         document.getElementById('strrep-editor-no-match')?.addEventListener('change', _syncStringReplacerNoMatch);
@@ -1330,6 +1481,7 @@
         openAttributeTextEditor,
         openStringReplacerEditor,
         openAggregatorEditor,
-        openAttributeManagerEditor
+        openAttributeManagerEditor,
+        openGeometryTransformEditor
     };
 })();

@@ -66,6 +66,11 @@ function loadGeometry() {
         point: (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties }),
         bbox: () => [0, 0, 2, 2],
         distance: () => 3,
+        centroid: (feature) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: feature.geometry?.coordinates?.[0] || [0, 0] }, properties: {} }),
+        bearing: (start, end) => {
+            const [x1, y1] = start.geometry.coordinates; const [x2, y2] = end.geometry.coordinates;
+            return Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
+        },
         convex: (collection) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [2, 0], [2, 2], [0, 0]]] }, properties: { count: collection.features.length } }),
         concave: (collection, options) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { maxEdge: options.maxEdge, count: collection.features.length } })
     };
@@ -136,9 +141,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 80);
-    assert.equal(report.targetSharedIdCount, 76);
-    assert.equal(report.targetMissingInStudio.length, 41);
+    assert.equal(report.studioCount, 85);
+    assert.equal(report.targetSharedIdCount, 81);
+    assert.equal(report.targetMissingInStudio.length, 36);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
@@ -333,4 +338,63 @@ test('Junction Splitter produce cuatro colecciones independientes', () => {
     result.output_1.features[0].properties.value = 99;
     assert.equal(result.output_2.features[0].properties.value, 1);
     assert.equal(input.features[0].properties.value, 1);
+});
+
+test('Coordinate System Setter asigna metadatos y respeta overwrite', async () => {
+    const tool = loadGeometry().geo_crs_setter;
+    const config = { crs: 'EPSG:25830', overwrite: false };
+    const input = featureCollection([
+        { type: 'Feature', geometry: null, properties: { _crs: 'EPSG:4326' } },
+        { type: 'Feature', geometry: null, properties: {} }
+    ]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(result.metadata.crs, 'EPSG:25830');
+    assert.equal(result.features[0].properties._crs, 'EPSG:4326');
+    assert.equal(result.features[1].properties._crs, 'EPSG:25830');
+    assert.equal(input.metadata, undefined);
+});
+
+test('Horizontal Angle Calculator conserva líneas y calcula grados/radianes', async () => {
+    const tool = loadGeometry().geo_horizontal_angle_calculator;
+    const input = featureCollection([
+        { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0]] }, properties: { id: 1 } },
+        { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: [[[0, 0], [0, 1]], [[0, 1], [-1, 1]]] }, properties: { id: 2 } }
+    ]);
+    const config = { unit: 'degrees', azimuth_attr: 'az', angle_attr: 'horizontal' };
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.equal(result.features[0].properties.az, 90);
+    assert.equal(result.features[0].properties.horizontal, 0);
+    assert.equal(result.features[1].properties.az, 0);
+    assert.equal(result.features[1].properties.horizontal, 90);
+    assert.equal(input.features[0].properties.az, undefined);
+});
+
+test('Rotator usa origen fijo y mantiene salida de rechazados Desktop', async () => {
+    const tool = loadGeometry().geo_rotator;
+    assert.equal(tool.out, 2);
+    const config = { angle_mode: 'fixed', angle_value: 90, origin_mode: 'custom', origin_x: 0, origin_y: 0, on_error: 'reject' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 0] }, properties: {} }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.ok(Math.abs(result.output_1.features[0].geometry.coordinates[0]) < 1e-10);
+    assert.ok(Math.abs(result.output_1.features[0].geometry.coordinates[1] - 1) < 1e-10);
+    assert.equal(result.output_2.features.length, 0);
+});
+
+test('Densifier añade vértices sin modificar la geometría original', async () => {
+    const tool = loadGeometry().geo_densifier;
+    const config = { mode: 'uniform', interval_mode: 'fixed', interval_value: 2, on_error: 'reject' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [4, 0]] }, properties: {} }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.output_1.features[0].geometry.coordinates, (coordinate) => Array.from(coordinate)), [[0, 0], [2, 0], [4, 0]]);
+    assert.equal(input.features[0].geometry.coordinates.length, 2);
+    assert.equal(result.output_2.features.length, 0);
+});
+
+test('MeasureExtractor conserva nulls para vértices sin tercera coordenada', async () => {
+    const tool = loadGeometry().geo_measure_extractor;
+    const config = { measure_type: 'whole', list_attr: 'm' };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0, 4], [1, 1], [2, 2, 8]] }, properties: {} }]);
+    const result = await tool.run('1', [input], { querySelector: () => ({ value: JSON.stringify(config) }) });
+    assert.deepEqual(Array.from(result.features[0].properties.m), [4, null, 8]);
+    assert.equal(input.features[0].properties.m, undefined);
 });

@@ -48,7 +48,210 @@ function geometryDeaggregateParts(feature) {
     }));
 }
 
+function geometryReadTransformConfig(dom, defaults) {
+    try { return { ...defaults, ...JSON.parse(dom.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+    catch (error) { return { ...defaults }; }
+}
+
+function geometryMapCoordsCompat(geometry, transform) {
+    if (!geometry) return geometry;
+    if (geometry.type === 'GeometryCollection') {
+        (geometry.geometries || []).forEach((item) => geometryMapCoordsCompat(item, transform));
+        return geometry;
+    }
+    const walk = (coordinates) => {
+        if (!Array.isArray(coordinates)) return coordinates;
+        if (coordinates.length >= 2 && typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number') return transform(coordinates);
+        return coordinates.map(walk);
+    };
+    geometry.coordinates = walk(geometry.coordinates);
+    return geometry;
+}
+
+function geometryNumberFromFeature(feature, config, modeKey, valueKey, fieldKey, fallback) {
+    const mode = String(config[modeKey] || 'fixed');
+    const value = mode === 'field' ? feature?.properties?.[config[fieldKey]] : config[valueKey];
+    const number = Number(value ?? fallback);
+    if (!Number.isFinite(number)) throw new Error(`Valor no numérico: ${value}`);
+    return number;
+}
+
+function geometryRotationOriginCompat(feature, config) {
+    const mode = String(config.origin_mode || 'centroid');
+    if (mode === 'custom') return [Number(config.origin_x || 0), Number(config.origin_y || 0)];
+    if (mode === 'fields') {
+        const x = Number(feature?.properties?.[config.origin_x_field]);
+        const y = Number(feature?.properties?.[config.origin_y_field]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Origen por campos no numérico');
+        return [x, y];
+    }
+    if (mode === 'bbox_center') {
+        const bbox = turf.bbox(feature);
+        return [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
+    }
+    return turf.centroid(feature)?.geometry?.coordinates || [0, 0];
+}
+
+function geometryRotateFeatureCompat(feature, angle, origin) {
+    const output = geometryCloneCompat(feature);
+    const radians = Number(angle) * Math.PI / 180;
+    const cos = Math.cos(radians); const sin = Math.sin(radians);
+    const ox = Number(origin[0] || 0); const oy = Number(origin[1] || 0);
+    geometryMapCoordsCompat(output.geometry, (coordinate) => {
+        const x = Number(coordinate[0] || 0) - ox; const y = Number(coordinate[1] || 0) - oy;
+        const next = coordinate.slice();
+        next[0] = ox + x * cos - y * sin;
+        next[1] = oy + x * sin + y * cos;
+        return next;
+    });
+    return output;
+}
+
+function geometryDensifyLineCompat(coordinates, interval, mode) {
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return geometryCloneCompat(coordinates || []);
+    const step = Number(interval);
+    if (!Number.isFinite(step) || step <= 0) throw new Error('El intervalo debe ser mayor que cero');
+    const output = [coordinates[0].slice()];
+    for (let index = 1; index < coordinates.length; index++) {
+        const start = coordinates[index - 1]; const end = coordinates[index];
+        const distance = Math.hypot(Number(end[0]) - Number(start[0]), Number(end[1]) - Number(start[1]));
+        const parts = mode === 'exact' ? Math.floor(distance / step) : Math.max(1, Math.ceil(distance / step));
+        for (let part = 1; part < (mode === 'exact' ? parts + 1 : parts); part++) {
+            const ratio = mode === 'exact' ? (step * part) / distance : part / parts;
+            if (ratio > 0 && ratio < 1) output.push(start.map((value, axis) => Number(value || 0) + (Number(end[axis] || 0) - Number(value || 0)) * ratio));
+        }
+        output.push(end.slice());
+    }
+    return output;
+}
+
+function geometryDensifyFeatureCompat(feature, interval, mode) {
+    const output = geometryCloneCompat(feature);
+    const visit = (geometry) => {
+        if (!geometry) return;
+        if (geometry.type === 'GeometryCollection') return (geometry.geometries || []).forEach(visit);
+        if (geometry.type === 'LineString') geometry.coordinates = geometryDensifyLineCompat(geometry.coordinates, interval, mode);
+        else if (geometry.type === 'MultiLineString' || geometry.type === 'Polygon') geometry.coordinates = (geometry.coordinates || []).map((line) => geometryDensifyLineCompat(line, interval, mode));
+        else if (geometry.type === 'MultiPolygon') geometry.coordinates = (geometry.coordinates || []).map((polygon) => polygon.map((ring) => geometryDensifyLineCompat(ring, interval, mode)));
+    };
+    visit(output.geometry);
+    return output;
+}
+
+function geometryExtractMeasuresCompat(feature, config) {
+    const output = geometryCloneCompat(feature);
+    output.properties = output.properties || {};
+    const coordinates = geometryCoordinatesCompat(output.geometry);
+    const measure = (coordinate) => coordinate?.length > 2 ? coordinate[2] : null;
+    const type = String(config.measure_type || 'whole');
+    if (!coordinates.length) return output;
+    if (type === 'point') output.properties[config.point_attr || 'measure'] = measure(coordinates[0]);
+    else if (type === 'vertex') {
+        let index = Math.trunc(Number(config.index || 0));
+        if (index < 0) index = coordinates.length + index;
+        output.properties[config.point_attr || 'measure'] = index >= 0 && index < coordinates.length ? measure(coordinates[index]) : null;
+    } else if (type === 'endpoints') {
+        output.properties[config.start_attr || 'measure_start'] = measure(coordinates[0]);
+        output.properties[config.end_attr || 'measure_end'] = measure(coordinates[coordinates.length - 1]);
+    } else output.properties[config.list_attr || 'measures'] = coordinates.map(measure);
+    return output;
+}
+
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
+    geo_crs_setter: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate System Setter', icon: 'fa-globe-europe', color: '#2980b9', in: 1, out: 1,
+        help: 'Asigna un CRS sin transformar coordenadas.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-globe-europe"></i><div><strong data-geom-transform-summary>EPSG:4326</strong><small>Asignar CRS</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"crs":"EPSG:4326","overwrite":true}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { crs: 'EPSG:4326', overwrite: true });
+            const crs = String(config.crs || '').trim();
+            if (!crs) throw new Error('Coordinate System Setter requiere un CRS');
+            const output = geometryCloneCompat(inputs[0] || turf.featureCollection([]));
+            output.metadata = { ...(output.metadata || {}), crs };
+            (output.features || []).forEach((feature) => {
+                feature.properties = feature.properties || {};
+                if (config.overwrite !== false || !feature.properties._crs) feature.properties._crs = crs;
+            });
+            return output;
+        }
+    },
+
+    geo_horizontal_angle_calculator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Horizontal Angle Calculator', icon: 'fa-compass', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-compass"></i><div><strong data-geom-transform-summary>Grados</strong><small>Azimut + ángulo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"horizontal_azimuth","angle_type":"feature","unit":"degrees","calculation_model":"auto","azimuth_attr":"_azimuth","angle_attr":"_angle"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { unit: 'degrees', azimuth_attr: '_azimuth', angle_attr: '_angle' });
+            const radians = config.unit === 'radians';
+            const features = (inputs[0]?.features || []).map((feature) => {
+                const output = geometryCloneCompat(feature);
+                const geometry = output.geometry;
+                const coordinates = geometry?.type === 'MultiLineString'
+                    ? (geometry.coordinates?.[0] || [])
+                    : geometry?.type === 'LineString'
+                        ? (geometry.coordinates || [])
+                        : [];
+                if (coordinates.length >= 2) {
+                    const azimuth = (turf.bearing(turf.point(coordinates[0]), turf.point(coordinates[coordinates.length - 1])) + 360) % 360;
+                    const angle = (450 - azimuth) % 360;
+                    output.properties = output.properties || {};
+                    output.properties[config.azimuth_attr || '_azimuth'] = radians ? azimuth * Math.PI / 180 : azimuth;
+                    output.properties[config.angle_attr || '_angle'] = radians ? angle * Math.PI / 180 : angle;
+                }
+                return output;
+            });
+            const result = turf.featureCollection(features);
+            if (inputs[0]?.metadata) result.metadata = { ...inputs[0].metadata };
+            return result;
+        }
+    },
+
+    geo_rotator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Rotator', icon: 'fa-redo-alt', color: '#2980b9', in: 1, out: 2,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-redo-alt"></i><div><strong data-geom-transform-summary>0° · centroide</strong><small>Rotación antihoraria</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"angle_mode":"fixed","angle_value":0,"angle_field":"","origin_mode":"centroid","origin_x":0,"origin_y":0,"origin_x_field":"","origin_y_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { angle_mode: 'fixed', angle_value: 0, origin_mode: 'centroid', on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const angle = geometryNumberFromFeature(feature, config, 'angle_mode', 'angle_value', 'angle_field', 0);
+                    passed.push(geometryRotateFeatureCompat(feature, angle, geometryRotationOriginCompat(feature, config)));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _rotator_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_densifier: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Densifier', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 2,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-grip-lines"></i><div><strong data-geom-transform-summary>Uniforme · 1</strong><small>Añadir vértices</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"uniform","interval_mode":"fixed","interval_value":1,"interval_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { mode: 'uniform', interval_mode: 'fixed', interval_value: 1, on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const interval = geometryNumberFromFeature(feature, config, 'interval_mode', 'interval_value', 'interval_field', 1);
+                    passed.push(geometryDensifyFeatureCompat(feature, interval, config.mode));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _densifier_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_measure_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'MeasureExtractor', icon: 'fa-ruler-horizontal', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-ruler-horizontal"></i><div><strong data-geom-transform-summary>Lista measures</strong><small>Extraer tercera coordenada</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"measure_type":"whole","index":0,"point_attr":"measure","start_attr":"measure_start","end_attr":"measure_end","list_attr":"measures"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { measure_type: 'whole', index: 0, point_attr: 'measure', start_attr: 'measure_start', end_attr: 'measure_end', list_attr: 'measures' });
+            return turf.featureCollection((inputs[0]?.features || []).map((feature) => geometryExtractMeasuresCompat(feature, config)));
+        }
+    },
+
     geo_coordinate_extractor: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate Extractor', icon: 'fa-map-marker-alt', color: '#2980b9', in: 1, out: 1,
         help: 'Extrae una coordenada de la geometría y la guarda como atributos X/Y/Z.',

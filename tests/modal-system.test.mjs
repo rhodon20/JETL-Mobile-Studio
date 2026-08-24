@@ -7,6 +7,7 @@ const source = readFileSync(new URL('../js/modalSystem.js', import.meta.url), 'u
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../js/schemaUI.js', import.meta.url), 'utf8');
 const attributes = readFileSync(new URL('../js/nodes/attributes.js', import.meta.url), 'utf8');
+const geometry = readFileSync(new URL('../js/nodes/geometry.js', import.meta.url), 'utf8');
 
 class ObservableClassList {
     constructor(owner, ...values) {
@@ -88,7 +89,7 @@ test('un modal visible converge tras una sola mutación de clase', () => {
 });
 
 test('los módulos auxiliares tienen versión nueva y sólo carga explícita', () => {
-    assert.match(index, /const JETL_EXTRAS_VERSION = '20260824-17'/);
+    assert.match(index, /const JETL_EXTRAS_VERSION = '20260824-18'/);
     assert.match(index, /const JETL_EXTRA_SCRIPTS = \[\s*'js\/modalSystem\.js',\s*'js\/schemaUI\.js'/);
     assert.match(index, /script\.src = src \+ '\?v=' \+ JETL_EXTRAS_VERSION/);
     assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);
@@ -114,6 +115,9 @@ test('String Formatter usa el contrato modal de Desktop y persiste JSON', () => 
     assert.match(index, /id="attribute-manager-editor-modal"/);
     assert.match(schema, /openAggregatorEditor/);
     assert.match(schema, /openAttributeManagerEditor/);
+    assert.match(index, /id="geometry-transform-editor-modal"/);
+    assert.match(schema, /openGeometryTransformEditor/);
+    assert.match(geometry, /data-schema-action="geom-transform-open-editor"/);
     assert.match(attributes, /textarea df-config/);
     assert.match(attributes, /JSON\.parse\(configRaw\)/);
     assert.match(schema, /function openFormatterEditor\(nodeId\)/);

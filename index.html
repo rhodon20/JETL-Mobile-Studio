@@ -2802,6 +2802,19 @@ body.modal-open {
             <div class="modal-footer"><button class="btn" data-ui-action="close-attribute-manager-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-attribute-manager-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
         </div>
     </div>
+    <div id="geometry-transform-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="geometry-transform-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-draw-polygon"></i><div><strong id="geometry-transform-editor-title">Geometry Transformer</strong><small id="geometry-transform-editor-subtitle">Configuración compatible con Desktop</small></div></div>
+                <button class="modal-close" data-ui-action="close-geometry-transform-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div id="geometry-transform-editor-fields" class="modal-form"></div>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> La configuración se conserva dentro del nodo y se aplica en orden durante la ejecución del flujo.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-geometry-transform-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-geometry-transform-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
     <style>
         .ctx-item {
             padding: 8px 12px;
@@ -3660,7 +3673,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(2, 14, &quot;geometry.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
 
-    <script defer src="js/nodes/geometry.js?v=20260824-1"
+    <script defer src="js/nodes/geometry.js?v=20260824-2"
         onload="window.JETLBootModuleLoaded(3, 14, &quot;utils.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/geometry.js&quot;)"></script>
 
@@ -3700,7 +3713,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
         onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
 
-    <script defer src="js/engine.js?v=20260824-23"
+    <script defer src="js/engine.js?v=20260824-24"
         onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
 
@@ -3728,7 +3741,7 @@ window.JETLBootModuleLoaded(1, 14, "readers.js");
             'js/templates.js',
             'js/packages.js'
         ];
-        const JETL_EXTRAS_VERSION = '20260824-17';
+        const JETL_EXTRAS_VERSION = '20260824-18';
 
         const JETL_RUNTIME_SCRIPTS = [
             'js/vendor/leaflet.js',

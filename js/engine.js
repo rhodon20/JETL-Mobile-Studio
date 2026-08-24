@@ -1508,7 +1508,7 @@ function initEngineDelegation() {
         const schemaActionEl = e.target.closest('[data-schema-action]');
         const schemaAction = schemaActionEl?.getAttribute('data-schema-action');
         if (schemaActionEl && !window.JETLSchemaUI &&
-            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor', 'splitter-open-editor', 'list-exploder-open-editor', 'strrep-open-editor', 'aggregator-open-editor', 'attr-manager-open-editor', 'attr-manager-v2-open-editor'].includes(schemaAction)) {
+            ['calc-open-editor', 'formatter-open-editor', 'list-concat-open-editor', 'substring-open-editor', 'splitter-open-editor', 'list-exploder-open-editor', 'strrep-open-editor', 'aggregator-open-editor', 'attr-manager-open-editor', 'attr-manager-v2-open-editor', 'geom-transform-open-editor'].includes(schemaAction)) {
             e.preventDefault();
             const nodeId = schemaActionEl.closest('.drawflow-node')?.id.replace('node-', '');
             window.JETLEnsureExtras?.().then(() => {
@@ -1519,6 +1519,7 @@ function initEngineDelegation() {
                 else if (schemaAction === 'aggregator-open-editor') window.JETLSchemaUI.openAggregatorEditor(nodeId);
                 else if (schemaAction === 'attr-manager-open-editor') window.JETLSchemaUI.openAttributeManagerEditor(nodeId, 'legacy');
                 else if (schemaAction === 'attr-manager-v2-open-editor') window.JETLSchemaUI.openAttributeManagerEditor(nodeId, 'v2');
+                else if (schemaAction === 'geom-transform-open-editor') window.JETLSchemaUI.openGeometryTransformEditor(nodeId);
                 else {
                     const kind = { 'substring-open-editor': 'substring', 'splitter-open-editor': 'splitter', 'list-exploder-open-editor': 'exploder' }[schemaAction] || 'list';
                     window.JETLSchemaUI.openAttributeTextEditor(nodeId, kind);
