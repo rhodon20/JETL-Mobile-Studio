@@ -6,6 +6,8 @@ import vm from 'node:vm';
 
 const attributesSource = readFileSync(new URL('../js/nodes/attributes.js', import.meta.url), 'utf8');
 const spatialSource = readFileSync(new URL('../js/nodes/spatial.js', import.meta.url), 'utf8');
+const geometrySource = readFileSync(new URL('../js/nodes/geometry.js', import.meta.url), 'utf8');
+const utilsSource = readFileSync(new URL('../js/nodes/utils.js', import.meta.url), 'utf8');
 
 function featureCollection(features) {
     return { type: 'FeatureCollection', features };
@@ -54,6 +56,27 @@ function loadSpatial() {
         normalizeResult: (value) => value
     };
     vm.runInNewContext(spatialSource, context, { filename: 'spatial.js' });
+    return window.TOOL_REGISTRY;
+}
+
+function loadGeometry() {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)) };
+    const turf = {
+        featureCollection,
+        point: (coordinates, properties = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates }, properties }),
+        bbox: () => [0, 0, 2, 2],
+        distance: () => 3,
+        convex: (collection) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [2, 0], [2, 2], [0, 0]]] }, properties: { count: collection.features.length } }),
+        concave: (collection, options) => ({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: { maxEdge: options.maxEdge, count: collection.features.length } })
+    };
+    vm.runInNewContext(geometrySource, { window, globalThis: window, console, turf }, { filename: 'geometry.js' });
+    return window.TOOL_REGISTRY;
+}
+
+function loadUtils() {
+    const window = { TOOL_REGISTRY: {}, JETLClone: (value) => JSON.parse(JSON.stringify(value)) };
+    const turf = { featureCollection, getType: (feature) => feature.geometry?.type || '' };
+    vm.runInNewContext(utilsSource, { window, globalThis: window, console, turf }, { filename: 'utils.js' });
     return window.TOOL_REGISTRY;
 }
 
@@ -113,9 +136,9 @@ test('el alcance Studio excluye Raster y LiDAR del gate sin borrar compatibilida
     const report = JSON.parse(result.stdout);
     assert.equal(report.desktopCount, 134);
     assert.equal(report.targetDesktopCount, 117);
-    assert.equal(report.studioCount, 75);
-    assert.equal(report.targetSharedIdCount, 71);
-    assert.equal(report.targetMissingInStudio.length, 46);
+    assert.equal(report.studioCount, 80);
+    assert.equal(report.targetSharedIdCount, 76);
+    assert.equal(report.targetMissingInStudio.length, 41);
     assert.equal(report.excludedDesktop.length, 17);
     assert.deepEqual(report.legacyStudioOutOfScope, ['reader_geotiff', 'sp_point_sampling', 'sp_zonal_stats']);
     assert.ok(!report.targetMissingInStudio.includes('reader_lidar'));
@@ -246,4 +269,68 @@ test('Attribute Manager v2 evalúa condiciones, funciones y selección de atribu
     assert.equal(result.features[0].properties.title, 'MADRID');
     assert.equal(result.features[1].properties.score2, null);
     assert.equal(result.features[1].properties.extra, undefined);
+});
+
+test('Coordinate Extractor usa índices negativos y conserva la entrada', async () => {
+    const tool = loadGeometry().geo_coordinate_extractor;
+    const values = { '[df-index]': '-1', '[df-x-attr]': 'lon', '[df-y-attr]': 'lat', '[df-z-attr]': 'z' };
+    const dom = { querySelector: (selector) => ({ value: values[selector] }) };
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 1, 2], [3, 4, 5]] }, properties: { id: 1 } }]);
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.features[0].properties.lon, '3');
+    assert.equal(result.features[0].properties.lat, '4');
+    assert.equal(result.features[0].properties.z, '5');
+    assert.equal(input.features[0].properties.lon, undefined);
+});
+
+test('CRS Extractor materializa el CRS disponible sin mutar metadatos', async () => {
+    const tool = loadGeometry().geo_crs_extractor;
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { id: 1 } }]);
+    input.metadata = { crs: 'EPSG:25830' };
+    const result = await tool.run('1', [input]);
+    assert.equal(result.features[0].properties.crs_code, 'EPSG:25830');
+    assert.equal(result.features[0].properties.crs_name, 'EPSG:25830');
+    assert.equal(result.features[0].properties.crs_wkt, null);
+    assert.equal(input.features[0].properties.crs_code, undefined);
+});
+
+test('Deaggregator separa multipart y conserva parte, atributos y CRS', async () => {
+    const tool = loadGeometry().geo_deaggregator;
+    const input = featureCollection([{ type: 'Feature', geometry: { type: 'MultiPoint', coordinates: [[0, 0], [1, 1]] }, properties: { id: 7 } }]);
+    input.metadata = { crs: 'EPSG:4326' };
+    const result = await tool.run('1', [input]);
+    assert.equal(result.features.length, 2);
+    assert.deepEqual(Array.from(result.features, (feature) => feature.geometry.type), ['Point', 'Point']);
+    assert.deepEqual(Array.from(result.features, (feature) => feature.properties._part_number), ['0', '1']);
+    assert.ok(result.features.every((feature) => feature.properties._crs === 'EPSG:4326'));
+
+    const nested = featureCollection([{ type: 'Feature', geometry: { type: 'GeometryCollection', geometries: [
+        { type: 'Point', coordinates: [2, 2] },
+        { type: 'MultiPoint', coordinates: [[3, 3], [4, 4]] }
+    ] }, properties: { id: 8 } }]);
+    const nestedResult = await tool.run('2', [nested]);
+    assert.equal(nestedResult.features.length, 3);
+    assert.deepEqual(Array.from(nestedResult.features, (feature) => feature.properties._part_number), ['0', '1', '2']);
+});
+
+test('Hull Creator conserva el selector convexo/cóncavo de Desktop', async () => {
+    const tool = loadGeometry().geo_hull_creator;
+    const input = featureCollection([0, 1, 2, 3].map((value) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [value, value] }, properties: {} })));
+    const dom = { querySelector: (selector) => ({ value: selector === '[df-hulltype]' ? 'concave' : '4' }) };
+    const result = await tool.run('1', [input], dom);
+    assert.equal(result.features.length, 1);
+    assert.equal(result.features[0].geometry.type, 'Polygon');
+    assert.equal(result.features[0].properties.count, 4);
+});
+
+test('Junction Splitter produce cuatro colecciones independientes', () => {
+    const tool = loadUtils().util_tee;
+    assert.equal(tool.in, 1);
+    assert.equal(tool.out, 4);
+    const input = featureCollection([{ type: 'Feature', geometry: null, properties: { value: 1 } }]);
+    const result = tool.run('1', [input]);
+    assert.deepEqual(Object.keys(result), ['output_1', 'output_2', 'output_3', 'output_4']);
+    result.output_1.features[0].properties.value = 99;
+    assert.equal(result.output_2.features[0].properties.value, 1);
+    assert.equal(input.features[0].properties.value, 1);
 });

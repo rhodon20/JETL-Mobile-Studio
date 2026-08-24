@@ -22,6 +22,20 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
 
+    util_tee: {
+        cat: '3. UTILS', label: 'Junction Splitter', icon: 'fa-code-branch', color: '#9b59b6', in: 1, out: 4,
+        help: 'Clona una rama en cuatro salidas independientes.',
+        tpl: () => `<div style="display:grid;gap:4px;align-items:center;justify-items:center;min-height:26px"><div class="junction-point"></div><div style="font-size:0.68em;color:#8bc">Una entrada · cuatro salidas</div></div>`,
+        run: (id, inputs) => {
+            const source = inputs?.[0] || turf.featureCollection([]);
+            const cloneCollection = () => turf.featureCollection((source.features || []).map((feature) => {
+                if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(feature);
+                return JSON.parse(JSON.stringify(feature));
+            }));
+            return { output_1: cloneCollection(), output_2: cloneCollection(), output_3: cloneCollection(), output_4: cloneCollection() };
+        }
+    },
+
     util_holder: {
         cat: '3. UTILS', label: 'Inspector', icon: 'fa-eye', color: '#7f8c8d',
         in: 1, out: 1,

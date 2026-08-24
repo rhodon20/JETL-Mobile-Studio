@@ -71,6 +71,11 @@ Los editores conservan la configuración en JSON y admiten la apertura
 mediante botón o doble clic, con compatibilidad de lectura y guardado para los
 flujos creados antes de esta migración.
 
+Los nodos Geometry de configuración corta mantienen controles compactos como
+Desktop: Coordinate Extractor y Hull Creator no introducen un modal innecesario;
+CRS Extractor, Deaggregator y Junction Splitter son acciones directas sin estado
+editable.
+
 ### Fase 3 — Navegación del flujo
 
 - Buscador global de nodos y atributos. Implementado v1.

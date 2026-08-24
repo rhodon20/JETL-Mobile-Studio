@@ -1,6 +1,145 @@
 ﻿// Cat: geometry
 (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY || {};
+function geometryCloneCompat(value) {
+    if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(value);
+    return JSON.parse(JSON.stringify(value));
+}
+
+function geometryCoordinatesCompat(geometry) {
+    const coordinates = [];
+    const visit = (value) => {
+        if (!Array.isArray(value)) return;
+        if (value.length >= 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+            coordinates.push(value);
+            return;
+        }
+        value.forEach(visit);
+    };
+    if (geometry?.type === 'GeometryCollection') (geometry.geometries || []).forEach((item) => coordinates.push(...geometryCoordinatesCompat(item)));
+    else visit(geometry?.coordinates);
+    return coordinates;
+}
+
+function geometryCrsCompat(collection) {
+    return collection?.metadata?.crs
+        || collection?.crs?.properties?.name
+        || (collection?.features || []).find((feature) => feature?.properties?._crs)?.properties?._crs
+        || null;
+}
+
+function geometryDeaggregateParts(feature) {
+    const geometry = feature?.geometry;
+    if (!geometry) return [geometryCloneCompat(feature)];
+    const props = { ...(feature.properties || {}) };
+    const explode = (part) => {
+        if (!part) return [];
+        if (part.type === 'GeometryCollection') return (part.geometries || []).flatMap(explode);
+        if (part.type === 'MultiPoint') return (part.coordinates || []).map((coordinates) => ({ type: 'Point', coordinates }));
+        if (part.type === 'MultiLineString') return (part.coordinates || []).map((coordinates) => ({ type: 'LineString', coordinates }));
+        if (part.type === 'MultiPolygon') return (part.coordinates || []).map((coordinates) => ({ type: 'Polygon', coordinates }));
+        return [part];
+    };
+    const parts = explode(geometry);
+    if (!geometry.type.startsWith('Multi') && geometry.type !== 'GeometryCollection') return [geometryCloneCompat(feature)];
+    return parts.map((part, index) => ({
+        type: 'Feature',
+        geometry: geometryCloneCompat(part),
+        properties: { ...props, _part_number: String(index) }
+    }));
+}
+
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
+    geo_coordinate_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate Extractor', icon: 'fa-map-marker-alt', color: '#2980b9', in: 1, out: 1,
+        help: 'Extrae una coordenada de la geometría y la guarda como atributos X/Y/Z.',
+        tpl: () => `
+            <div style="display:grid;gap:4px">
+                <label><span style="font-size:0.7em;color:#aaa">Índice (-1 = última)</span><input type="number" df-index class="node-control" value="-1"></label>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">
+                    <input type="text" df-x-attr class="node-control" value="_x" aria-label="Atributo X">
+                    <input type="text" df-y-attr class="node-control" value="_y" aria-label="Atributo Y">
+                    <input type="text" df-z-attr class="node-control" value="_z" aria-label="Atributo Z">
+                </div>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            const index = parseInt(dom.querySelector('[df-index]')?.value || '-1', 10);
+            const xAttr = String(dom.querySelector('[df-x-attr]')?.value || '_x').trim();
+            const yAttr = String(dom.querySelector('[df-y-attr]')?.value || '_y').trim();
+            const zAttr = String(dom.querySelector('[df-z-attr]')?.value || '_z').trim();
+            const features = (inputs[0]?.features || []).map((feature) => {
+                const item = geometryCloneCompat(feature);
+                const coordinates = geometryCoordinatesCompat(item.geometry);
+                if (!coordinates.length) return item;
+                const resolved = index < 0 ? coordinates.length + index : index;
+                const coordinate = coordinates[Math.max(0, Math.min(coordinates.length - 1, resolved))];
+                item.properties = item.properties || {};
+                if (xAttr) item.properties[xAttr] = String(coordinate[0]);
+                if (yAttr) item.properties[yAttr] = String(coordinate[1]);
+                if (zAttr && coordinate.length > 2) item.properties[zAttr] = String(coordinate[2]);
+                return item;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    geo_crs_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'CRS Extractor', icon: 'fa-globe-americas', color: '#2980b9', in: 1, out: 1,
+        help: 'Extrae el sistema de coordenadas y lo añade como propiedad.',
+        tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Añade crs_code, crs_name y crs_wkt</div>`,
+        run: async (id, inputs) => {
+            const source = inputs[0];
+            if (!source?.features?.length) throw new Error('Sin datos de entrada');
+            const output = geometryCloneCompat(source);
+            const code = geometryCrsCompat(source);
+            output.features.forEach((feature) => {
+                feature.properties = feature.properties || {};
+                feature.properties.crs_code = code;
+                feature.properties.crs_name = code;
+                feature.properties.crs_wkt = null;
+            });
+            return output;
+        }
+    },
+
+    geo_deaggregator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Deaggregator', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Multipart <i class="fas fa-arrow-right"></i> Singlepart + part number</div>`,
+        run: async (id, inputs) => {
+            const source = inputs[0] || turf.featureCollection([]);
+            const crs = geometryCrsCompat(source);
+            const features = (source.features || []).flatMap(geometryDeaggregateParts);
+            if (crs) features.forEach((feature) => {
+                feature.properties = feature.properties || {};
+                if (!feature.properties._crs) feature.properties._crs = crs;
+            });
+            const output = turf.featureCollection(features);
+            if (source.metadata) output.metadata = { ...source.metadata };
+            return output;
+        }
+    },
+
+    geo_hull_creator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Hull Creator', icon: 'fa-circle-notch', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `
+            <label><span style="font-size:0.7em;color:#aaa">Tipo de hull</span><select df-hulltype class="node-control"><option value="convex">Convexo</option><option value="concave">Cóncavo</option></select></label>
+            <label><span style="font-size:0.7em;color:#aaa">K (1–10)</span><input type="number" df-k value="3" min="1" max="10" class="node-control"></label>`,
+        run: async (id, inputs, dom) => {
+            const source = inputs[0];
+            if (!source?.features?.length) throw new Error('Conecta una capa de puntos');
+            if (source.features.length < 4) throw new Error('Hull Creator requiere al menos 4 puntos');
+            const hullType = dom.querySelector('[df-hulltype]')?.value || 'convex';
+            const k = Math.max(1, Math.min(10, parseInt(dom.querySelector('[df-k]')?.value || '3', 10) || 3));
+            let hull;
+            if (hullType === 'concave') {
+                const bbox = turf.bbox(source);
+                const diagonal = turf.distance(turf.point([bbox[0], bbox[1]]), turf.point([bbox[2], bbox[3]]));
+                hull = turf.concave(source, { maxEdge: Math.max(0.1, diagonal * k * 0.1), units: 'kilometers' });
+            } else hull = turf.convex(source);
+            if (!hull) throw new Error('No se pudo crear el hull');
+            return turf.featureCollection([hull]);
+        }
+    },
+
     geo_centroid: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'CenterPoint', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Centroide</div>`,

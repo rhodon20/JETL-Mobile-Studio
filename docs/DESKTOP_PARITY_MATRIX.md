@@ -14,7 +14,7 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Catálogo objetivo de nodos | 117 Desktop en alcance / 71 IDs compartidos | Cerrar 46 ausencias vectoriales/tabulares y resolver extensiones incompatibles |
+| Catálogo objetivo de nodos | 117 Desktop en alcance / 76 IDs compartidos | Cerrar 41 ausencias vectoriales/tabulares y resolver extensiones incompatibles |
 | Contratos de puertos compartidos | FeatureJoiner, Snapper y Clipper alineados | Resolver Keeper/Attr Creator y proteger importación bidireccional |
 | Catálogo y QuickSearch | Equivalente móvil | Mantener búsqueda por nombre/categoría y acceso táctil |
 | Encadenar al insertar con una selección | Implementado | Búsqueda y catálogo conectan al primer puerto compatible |
