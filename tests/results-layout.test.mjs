@@ -26,5 +26,5 @@ test('la apariencia final neutraliza los colores de demostración de Drawflow', 
 
 test('la revisión publicada invalida la caché del runtime modificado', () => {
     assert.match(index, /const JETL_RUNTIME_VERSION = '20260824-15'/);
-    assert.match(index, /js\/engine\.js\?v=20260824-25/);
+    assert.match(index, /js\/engine\.js\?v=20260825-26/);
 });

@@ -1834,18 +1834,19 @@ async function runEnginePartial(targetId) {
 
 function saveProject() {
     const exportData = editor.export();
-    const project = {
-        version: "2026.03.05",
-        timestamp: Date.now(),
-        flow: exportData
-    };
+    const project = window.JETLProjectPersistence?.createProject
+        ? window.JETLProjectPersistence.createProject(exportData, document)
+        : { version: "2026.03.05", timestamp: Date.now(), flow: exportData };
+    const workingCopyCount = Object.keys(project.reader_working_copies || {}).length;
     const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `flujo_jetl_${new Date().toISOString().slice(0, 10)}.jetl`;
     a.click();
-    showToast("Proyecto guardado correctamente", "success");
+    showToast(workingCopyCount
+        ? `Proyecto guardado con ${workingCopyCount} ${workingCopyCount === 1 ? 'copia de trabajo' : 'copias de trabajo'}`
+        : "Proyecto guardado correctamente", "success");
 }
 
 function loadProject(input) {
@@ -1856,7 +1857,10 @@ function loadProject(input) {
     reader.onload = function (e) {
         try {
             const json = JSON.parse(e.target.result);
-            const flowData = json.flow ? json.flow : json;
+            const parsedProject = window.JETLProjectPersistence?.parseProject
+                ? window.JETLProjectPersistence.parseProject(json)
+                : { flow: json.flow ? json.flow : json, readerWorkingCopies: {} };
+            const flowData = parsedProject.flow;
 
             // No se requiere auto-reparación de HTML porque los nodos ahora usan delegación
             // y no incrustan su propio ID en el template.
@@ -1888,9 +1892,19 @@ function loadProject(input) {
             // Importamos los datos ya saneados
             editor.import(flowData);
 
+            const restoreReport = window.JETLProjectPersistence?.restoreReaderWorkingCopies
+                ? window.JETLProjectPersistence.restoreReaderWorkingCopies(document, parsedProject.readerWorkingCopies)
+                : { restored: 0, skipped: 0 };
+
             SafeStorage.save('jetl_flow_optimized', JSON.stringify(flowData));
             if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
-            showToast("Proyecto cargado y reparado", "success");
+            if (restoreReport.skipped) {
+                showToast(`Proyecto cargado; ${restoreReport.skipped} copias de trabajo no eran válidas`, "warning");
+            } else if (restoreReport.restored) {
+                showToast(`Proyecto cargado con ${restoreReport.restored} ${restoreReport.restored === 1 ? 'copia de trabajo' : 'copias de trabajo'}`, "success");
+            } else {
+                showToast("Proyecto cargado y reparado", "success");
+            }
         } catch (err) {
             console.error(err);
             showToast("Error al leer el archivo .jetl", "error");

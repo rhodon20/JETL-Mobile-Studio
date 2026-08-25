@@ -1558,10 +1558,30 @@
         return Array.from(nodeEl?.querySelector('[df-file]')?.files || []).filter(Boolean);
     }
 
+    function _readerWorkingCopyCount(nodeEl) {
+        const raw = nodeEl?.querySelector('[df-reader-edited-data]')?.value || '';
+        if (!String(raw).trim()) return null;
+        try {
+            const copy = JSON.parse(raw);
+            return copy?.type === 'FeatureCollection' && Array.isArray(copy.features) ? copy.features.length : null;
+        } catch (_) { return null; }
+    }
+
+    function _readerNodeSummary(nodeEl) {
+        const files = _readerEditorSources(nodeEl);
+        const copyCount = _readerWorkingCopyCount(nodeEl);
+        const source = files.length > 1 ? `${files.length} archivos` : files[0]?.name || '';
+        if (source) return copyCount == null ? source : `${source} · copia editada`;
+        return copyCount == null ? 'Sin fuente' : `Copia del proyecto · ${copyCount} entidades`;
+    }
+
     function _renderReaderEditorSources(nodeEl) {
         const target = document.getElementById('reader-editor-source-list'); if (!target) return;
         const files = _readerEditorSources(nodeEl);
-        target.textContent = files.length ? files.map((file) => `${file.name}${file.size ? ` · ${(file.size / 1048576).toFixed(2)} MB` : ''}`).join(' · ') : 'Sin archivos seleccionados';
+        const copyCount = _readerWorkingCopyCount(nodeEl);
+        target.textContent = files.length
+            ? files.map((file) => `${file.name}${file.size ? ` · ${(file.size / 1048576).toFixed(2)} MB` : ''}`).join(' · ')
+            : copyCount == null ? 'Sin archivos seleccionados' : `Copia portable del proyecto · ${copyCount} entidades`;
     }
 
     function _readerCell(value) {
@@ -1681,14 +1701,14 @@
         if (data.features.length > limits.features || serialized.length > limits.chars) { const status = document.getElementById('reader-editor-preview-status'); if (status) status.textContent = `No se puede aplicar: máximo ${limits.features} entidades y 2 MB por copia editable.`; return false; }
         _commitNodeControl(storage, serialized); currentReaderEditor.dirty = false; currentReaderEditor.dirtyCount = 0; currentReaderEditor.persistedEdited = true; currentReaderEditor.notice = 'Copia de trabajo aplicada; será la fuente de la próxima ejecución.';
         const discard = document.querySelector('#reader-editor-data-toolbar [data-ui-action="reader-discard-edits"]'); if (discard) discard.hidden = false;
-        const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary && !summary.textContent.includes('editada')) summary.textContent += ' · editada';
+        const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary) summary.textContent = _readerNodeSummary(nodeEl);
         _readerEditorStatus(); return true;
     }
 
     async function discardReaderEditorCopy() {
         if (!currentReaderEditor) return false; const nodeEl = document.getElementById('node-' + currentReaderEditor.nodeId); const storage = nodeEl?.querySelector('[df-reader-edited-data]');
         if (storage) _commitNodeControl(storage, '');
-        const summary = nodeEl?.querySelector('[data-reader-file-summary]'); if (summary) { const files = _readerEditorSources(nodeEl); summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Sin fuente'; }
+        const summary = nodeEl?.querySelector('[data-reader-file-summary]'); if (summary) summary.textContent = _readerNodeSummary(nodeEl);
         return await refreshReaderEditorPreview();
     }
 
@@ -1699,7 +1719,7 @@
             const { nodeId, name } = currentReaderEditor; const nodeEl = document.getElementById('node-' + nodeId); const definition = _readerEditorDefinition(name);
             if (nodeEl && definition) {
                 const config = _readerEditorFormConfig(definition); _commitNodeControl(nodeEl.querySelector('[df-reader-config]'), JSON.stringify(config));
-                const files = _readerEditorSources(nodeEl); const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary) summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Sin fuente';
+                const summary = nodeEl.querySelector('[data-reader-file-summary]'); if (summary) summary.textContent = _readerNodeSummary(nodeEl);
             }
         }
         modal.style.display = 'none'; currentReaderEditor = null;
@@ -1949,7 +1969,7 @@
                 const editedStorage = nodeEl.querySelector('[df-reader-edited-data]');
                 if (editedStorage?.value) _commitNodeControl(editedStorage, '');
                 const summary = nodeEl.querySelector('[data-reader-file-summary]');
-                if (summary) summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0].name;
+                if (summary) summary.textContent = _readerNodeSummary(nodeEl);
                 _renderReaderEditorSources(nodeEl);
                 const status = document.getElementById('reader-editor-preview-status');
                 if (status) status.textContent = `${files.length} ${files.length === 1 ? 'archivo recibido' : 'archivos recibidos'} · preparando vista previa…`;
@@ -1962,9 +1982,8 @@
             if (nodeEl) _readerFileStore().set(nodeEl, Array.from(input.files || []).filter(Boolean));
             const summary = input.closest('.drawflow-node')?.querySelector('[data-reader-file-summary]');
             if (!summary) return;
-            const files = Array.from(input.files || []);
-            summary.textContent = files.length > 1 ? `${files.length} archivos` : files[0]?.name || 'Seleccionar archivo';
             const editedStorage = input.closest('.drawflow-node')?.querySelector('[df-reader-edited-data]'); if (editedStorage?.value) _commitNodeControl(editedStorage, '');
+            summary.textContent = _readerNodeSummary(input.closest('.drawflow-node'));
             if (currentReaderEditor && input.closest('.drawflow-node')?.id === 'node-' + currentReaderEditor.nodeId) {
                 _renderReaderEditorSources(input.closest('.drawflow-node'));
                 refreshReaderEditorPreview();

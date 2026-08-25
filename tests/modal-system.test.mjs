@@ -91,7 +91,7 @@ test('un modal visible converge tras una sola mutación de clase', () => {
 });
 
 test('los módulos auxiliares tienen versión nueva y sólo carga explícita', () => {
-    assert.match(index, /const JETL_EXTRAS_VERSION = '20260824-26'/);
+    assert.match(index, /const JETL_EXTRAS_VERSION = '20260825-27'/);
     assert.match(index, /const JETL_EXTRA_SCRIPTS = \[\s*'js\/modalSystem\.js',\s*'js\/schemaUI\.js'/);
     assert.match(index, /script\.src = src \+ '\?v=' \+ JETL_EXTRAS_VERSION/);
     assert.match(index, /window\.JETLEnsureExtras = loadJETLExtras/);

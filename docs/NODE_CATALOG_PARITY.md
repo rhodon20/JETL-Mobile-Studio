@@ -41,7 +41,10 @@ El editor está implementado para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB como
 modal centrado y táctil. Agrupa selección de fuentes, opciones específicas del
 formato, política de esquema, CRS, tipos, geometrías y datos paginados antes de
 ejecutar. CSV, Excel y GeoJSON admiten búsqueda, edición de celdas, altas y bajas
-sobre una copia de trabajo persistida dentro del nodo. Esa copia gobierna las
+sobre una copia de trabajo persistida dentro del nodo. Al exportar un proyecto,
+Studio también declara esas copias por ID de nodo y las valida y restaura al
+importarlo, de modo que no dependen de rutas locales ni del `FileList` de iOS.
+Esa copia gobierna las
 ejecuciones posteriores. KML, GPX, SHP y GDB permanecen en inspección de solo
 lectura porque reescribirlos exige reempaquetado o backend. Los archivos de más
 de 25 MB omiten la previsualización para no bloquear el navegador móvil, pero

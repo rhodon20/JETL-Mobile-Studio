@@ -53,9 +53,9 @@ mantienen en [`NODE_CATALOG_PARITY.md`](./NODE_CATALOG_PARITY.md).
 
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
-| Importar/exportar proyecto | Implementado | Compatibilidad bidireccional de versión y validación |
+| Importar/exportar proyecto | Implementado v2; las copias editables de CSV, Excel y GeoJSON se declaran, validan y restauran sin depender de rutas locales | Ampliar validación bidireccional Desktop/Studio y versionado del esquema |
 | Autoguardado y recuperación | Parcial | Versionado, conflicto y restauración explícitos |
-| Editor de Readers | Implementado para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB; selector nativo táctil y edición de filas en CSV, Excel y GeoJSON | Configuración e inspección para todos; carga móvil sin click programático y copia de trabajo con búsqueda, paginación, altas, bajas y cambios para formatos web seguros |
+| Editor de Readers | Implementado para GeoJSON, KML, CSV, Excel, SHP, GPX y GDB; selector nativo táctil, edición de filas y copias portables en CSV, Excel y GeoJSON | Mantener límites honestos y añadir recuperación/versionado del proyecto |
 | Transformers, paquetes y plantillas | Pendiente | Catálogo compatible con el runtime web |
 | Ajustes, apariencia e idioma | Parcial | Completar preferencias reproducibles por proyecto/dispositivo |
 | Backend y sistema de archivos local | Adaptación explícita: Readers locales cuando es viable; GDB/FeatureReader requieren servicio | Sustituir solo cuando exista una Web API segura |
