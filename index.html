@@ -1,4 +1,3 @@
-<meta name='viewport' content='width=device-width, initial-scale=1' />
 <!DOCTYPE html>
 <html lang="es">
 
@@ -8,24 +7,183 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
     <meta name="theme-color" content="#202020">
     <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="JETL">
     <title>JETL Studio v2026.03.05 - Open Source PWA</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Desactivar temporalmente la capa PWA. Safari estaba quedándose atrapado
+        // antes de entregar el documento, por lo que la aplicación no podía ni
+        // siquiera mostrar un error de inicio.
+        window.__JETL_BOOT = { stage: 'head', startedAt: Date.now(), error: null };
+        function reportJETLBootError(message) {
+            const errorMessage = message || 'Error de JavaScript';
+            window.__JETL_BOOT.stage = 'error';
+            window.__JETL_BOOT.error = errorMessage;
+            const diagnostic = document.getElementById('boot-diagnostic');
+            if (diagnostic) {
+                diagnostic.textContent = `No se pudo iniciar JETL Studio: ${errorMessage}`;
+                diagnostic.style.color = '#ff8a80';
+            }
+        }
+        window.JETLLoadScriptOnce = function (src, globalVar) {
+            window.__JETL_LAZY_SCRIPTS = window.__JETL_LAZY_SCRIPTS || {};
+            if (globalVar && window[globalVar]) return Promise.resolve(window[globalVar]);
+            if (window.__JETL_LAZY_SCRIPTS[src]) return window.__JETL_LAZY_SCRIPTS[src];
+            window.__JETL_LAZY_SCRIPTS[src] = new Promise(function (resolve, reject) {
+                var script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = function () { resolve(globalVar ? window[globalVar] : true); };
+                script.onerror = function () {
+                    delete window.__JETL_LAZY_SCRIPTS[src];
+                    reject(new Error('No se pudo cargar ' + src));
+                };
+                document.head.appendChild(script);
+            });
+            return window.__JETL_LAZY_SCRIPTS[src];
+        };
+        window.JETLBootModuleLoaded = (loaded, total, nextName) => {
+            window.__JETL_BOOT.stage = loaded >= total
+                ? 'modules-ready'
+                : `modules:${loaded}/${total}:next:${nextName}`;
+            const diagnostic = document.getElementById('boot-diagnostic');
+            if (diagnostic) {
+                diagnostic.textContent = loaded >= total
+                    ? 'Preparando el editor…'
+                    : `Cargando ${nextName} (${loaded}/${total})…`;
+            }
+        };
+        window.JETLMarkInteraction = function (action) {
+            window.__JETL_LAST_INTERACTION = { action: action, at: Date.now() };
+            var dot = document.getElementById('sys-status');
+            if (!dot) return;
+            dot.setAttribute('data-last-action', action);
+            dot.style.boxShadow = '0 0 0 4px rgba(52,152,219,.28)';
+            window.setTimeout(function () { dot.style.boxShadow = ''; }, 220);
+        };
+        window.JETLNativeNav = function (view) {
+            if (!document.body || !['flow', 'nodes', 'results', 'project'].includes(view)) return;
+            window.JETLMarkInteraction('nav:' + view);
+            var nativeState = document.getElementById('mobile-state-' + view);
+            document.querySelectorAll('.mobile-view-state').forEach(function (state) {
+                state.checked = state === nativeState;
+            });
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebar-overlay');
+            var project = document.getElementById('mobile-project-sheet');
+            document.body.classList.remove('mobile-nodes-open', 'mobile-results-open', 'mobile-sheet-open');
+            if (sidebar) sidebar.classList.remove('open');
+            if (overlay) overlay.style.display = 'none';
+            if (project) project.setAttribute('aria-hidden', 'true');
 
-    <script src="js/vendor/leaflet.js"></script>
-    <script src="js/vendor/turf.min.js"></script>
-    <script src="js/vendor/drawflow.min.js"></script>
-    <script src="js/vendor/shp.js"></script>
-    <script src="js/vendor/geoblaze.web.min.js"></script>
-    <script src="js/vendor/geotiff.js"></script>
-    <script src="js/vendor/osmtogeojson.js"></script>
-    <script src="js/vendor/proj4.js"></script>
-    <script src="js/vendor/wellknown.js"></script>
-    <script src="js/vendor/geopackage.min.js"></script>
-    <script src="js/vendor/parquet.min.js"></script>
-    <script src="js/vendor/anime.min.js"></script>
+            if (view === 'nodes') {
+                document.body.classList.add('mobile-nodes-open');
+                if (sidebar) sidebar.classList.add('open');
+                if (overlay) overlay.style.display = 'block';
+            } else if (view === 'results') {
+                document.body.classList.add('mobile-results-open');
+                var runtime = typeof window.JETLEnsureRuntime === 'function'
+                    ? window.JETLEnsureRuntime()
+                    : window.JETLRuntimeReady;
+                Promise.resolve(runtime).then(function (ready) {
+                    if (ready !== false && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
+                }).catch(function (error) { console.error('[JETL] Visor no disponible', error); });
+            } else if (view === 'project') {
+                document.body.classList.add('mobile-sheet-open');
+                if (project) project.setAttribute('aria-hidden', 'false');
+            }
+
+            document.querySelectorAll('[data-mobile-view]').forEach(function (button) {
+                var active = button.getAttribute('data-mobile-view') === view;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
+            });
+            if (typeof window.JETLEnsureMotion === 'function') {
+                window.JETLEnsureMotion().then(function (motion) {
+                    if (motion) motion.navigation(view);
+                }).catch(function () { /* el movimiento nunca bloquea la navegación */ });
+            }
+        };
+        window.JETLNativeAddNode = function (key) {
+            window.JETLMarkInteraction('add:' + key);
+            if (typeof window.addNodeClick === 'function') {
+                window.addNodeClick(key);
+            } else {
+                reportJETLBootError('El editor todavía no permite añadir nodos');
+            }
+        };
+        window.JETLRunAll = async function () {
+            window.JETLMarkInteraction('run:all');
+            var runtime = typeof window.JETLEnsureRuntime === 'function'
+                ? window.JETLEnsureRuntime()
+                : window.JETLRuntimeReady;
+            var ready = runtime ? await runtime : true;
+            if (ready !== false && typeof window.runEngine === 'function') return window.runEngine();
+            reportJETLBootError('El motor no está disponible');
+        };
+        window.JETLNativeRun = window.JETLRunAll;
+        window.JETLNativeResultTab = async function (view) {
+            if (!['map', 'table', 'logs'].includes(view)) return false;
+            window.JETLMarkInteraction('results:' + view);
+
+            document.querySelectorAll('#panel-tabs [data-results-view]').forEach(function (button) {
+                var active = button.getAttribute('data-results-view') === view;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+            ['map', 'logs', 'table-container'].forEach(function (id) {
+                var element = document.getElementById(id);
+                if (element) element.style.display = id === (view === 'table' ? 'table-container' : view) ? 'block' : 'none';
+            });
+
+            var runtime = typeof window.JETLEnsureRuntime === 'function'
+                ? window.JETLEnsureRuntime()
+                : window.JETLRuntimeReady;
+            var ready = runtime ? await runtime : true;
+            if (ready !== false && typeof window.switchTab === 'function') window.switchTab(view);
+            return ready !== false;
+        };
+        // La navegación usa un único estado nativo: los <label> cambian el
+        // radio asociado y este listener sincroniza las clases auxiliares. No
+        // se interceptan pointer/touch/click, por lo que un mismo gesto nunca
+        // puede abrir y cerrar la vista en fases distintas.
+        document.addEventListener('change', function (event) {
+            var state = event.target;
+            if (!state || !state.classList || !state.classList.contains('mobile-view-state') || !state.checked) return;
+            window.JETLNativeNav(state.id.replace('mobile-state-', ''));
+        });
+        window.addEventListener('error', (event) => {
+            reportJETLBootError(event.message || 'Error de JavaScript');
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason;
+            reportJETLBootError(reason && reason.message ? reason.message : String(reason || 'Promise rechazada'));
+        });
+        window.setTimeout(() => {
+            if (window.__JETL_BOOT.stage === 'ready' || window.__JETL_BOOT.stage === 'error') return;
+            const diagnostic = document.getElementById('boot-diagnostic');
+            if (diagnostic) {
+                diagnostic.textContent = `El inicio se detuvo en: ${window.__JETL_BOOT.stage}`;
+                diagnostic.style.color = '#ffd180';
+            }
+        }, 45000);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                registrations.forEach((registration) => {
+                    if (registration.scope.includes('/JETL-Mobile-Studio/')) registration.unregister();
+                });
+            }).catch(() => {});
+        }
+        if ('caches' in window) {
+            caches.keys().then((names) => Promise.all(
+                names.filter((name) => name.startsWith('jetl-')).map((name) => caches.delete(name))
+            )).catch(() => {});
+        }
+    </script>
+<!-- Drawflow es la única dependencia necesaria para pintar el editor.
+         Los motores GIS se cargan después de montar la interfaz. -->
 
     <style>
         /* --- CORE VARS --- */
@@ -400,12 +558,16 @@
         }
 
         .drawflow .connection .main-path {
-            stroke-width: 3px;
+            stroke-width: 5px;
             stroke: #666;
+            transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease;
         }
 
-        .drawflow .connection.selected .main-path {
+        .drawflow .connection.selected .main-path,
+        .drawflow .connection .main-path.selected {
             stroke: var(--accent);
+            stroke-width: 8px;
+            filter: drop-shadow(0 0 4px rgba(52, 152, 219, .65));
         }
 
         /* Junction */
@@ -528,6 +690,10 @@
             z-index: 2000;
             overflow: hidden;
             font-family: 'Segoe UI', sans-serif;
+        }
+
+        #quick-search > i {
+            display: none;
         }
 
         #qs-input {
@@ -826,40 +992,67 @@
 
         /* Loading Overlay */
         #loader {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            position: fixed;
+            inset: 0;
             z-index: 9999;
             display: none;
             justify-content: center;
-            align-items: center;
-            flex-direction: column;
+            align-items: flex-start;
+            padding: max(12px, env(safe-area-inset-top)) 12px;
             color: white;
-            backdrop-filter: blur(2px);
+            background: transparent;
+            pointer-events: none;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 10px;
+        .run-monitor-card {
+            width: min(460px, calc(100vw - 24px));
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,.14);
+            border-radius: 14px;
+            background: rgba(30,30,32,.96);
+            box-shadow: 0 14px 38px rgba(0,0,0,.48);
+            backdrop-filter: blur(14px);
+            pointer-events: auto;
         }
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
+        .run-monitor-head, .run-monitor-head>div, .run-monitor-meta, .run-monitor-actions { display:flex; align-items:center; }
+        .run-monitor-head { gap:10px; }
+        .run-monitor-head>div { min-width:0; flex:1; justify-content:space-between; gap:12px; }
+        .run-monitor-head strong { font-size:.82rem; }
+        #loader-elapsed, .run-monitor-meta { color:#96969b; font-size:.7rem; font-variant-numeric:tabular-nums; }
+        #loader-msg { margin-top:8px; color:#e2e2e5; font-size:.78rem; overflow-wrap:anywhere; }
+        .run-monitor-progress { height:5px; margin-top:9px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.09); }
+        #loader-progress-bar { display:block; width:0; height:100%; border-radius:inherit; background:var(--accent); transition:width .18s ease; }
+        .run-monitor-meta { min-height:24px; justify-content:space-between; gap:12px; }
+        .run-monitor-actions { justify-content:flex-end; gap:7px; }
+        .run-monitor-actions button { min-height:34px; padding:0 11px; border:1px solid rgba(255,255,255,.12); border-radius:9px; color:#ddd; background:rgba(255,255,255,.07); cursor:pointer; }
+        #loader-cancel { color:#ffb0aa; background:rgba(192,57,43,.14); }
+        #loader-focus-error { color:#9dcef0; }
+        #loader[data-status="error"] .run-monitor-card { border-color:rgba(231,76,60,.38); }
+        .run-monitor-indicator { width:10px; height:10px; flex:0 0 10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px rgba(52,152,219,.12); }
+        #loader[data-status="ok"] .run-monitor-indicator { background:#2ecc71; box-shadow:0 0 0 4px rgba(46,204,113,.12); }
+        #loader[data-status="error"] .run-monitor-indicator { background:#e05a5a; box-shadow:0 0 0 4px rgba(224,90,90,.12); }
+        #loader[data-status="cancelled"] .run-monitor-indicator { background:#e0a84d; box-shadow:0 0 0 4px rgba(224,168,77,.12); }
 
-            100% {
-                transform: rotate(360deg);
-            }
+        .drawflow .drawflow-node[data-run-state]::after {
+            content:"";
+            position:absolute;
+            top:-6px;
+            left:10px;
+            width:10px;
+            height:10px;
+            z-index:4;
+            border:2px solid #1e1e20;
+            border-radius:50%;
+            background:#777;
         }
+        .drawflow .drawflow-node.jetl-run-running { border-color:rgba(52,152,219,.72)!important; box-shadow:0 0 0 2px rgba(52,152,219,.18),0 12px 30px rgba(0,0,0,.38)!important; }
+        .drawflow .drawflow-node.jetl-run-running::after { background:#3498db; animation:run-node-pulse 1s ease-in-out infinite; }
+        .drawflow .drawflow-node.jetl-run-ok::after { background:#2ecc71; }
+        .drawflow .drawflow-node.jetl-run-cached::after { background:#66afe3; }
+        .drawflow .drawflow-node.jetl-run-error::after { background:#e05a5a; }
+        .drawflow .drawflow-node.jetl-run-cancelled::after { background:#e0a84d; }
+        @keyframes run-node-pulse { 50% { transform:scale(1.35); box-shadow:0 0 0 5px rgba(52,152,219,.12); } }
 
         /* Symbology Panel */
         #symbology-panel {
@@ -979,23 +1172,1265 @@
             color: #aaa;
         }
     </style>
+
+    <style data-jetl-critical-css>
+/* ---- css/vendor/drawflow.min.css ---- */
+.drawflow,.drawflow .parent-node{position:relative}.parent-drawflow{display:flex;overflow:hidden;touch-action:none;outline:0}.drawflow{width:100%;height:100%;user-select:none;perspective:0}.drawflow .drawflow-node{display:flex;align-items:center;position:absolute;background:#0ff;width:160px;min-height:40px;border-radius:4px;border:2px solid #000;color:#000;z-index:2;padding:15px}.drawflow .drawflow-node.selected{background:red}.drawflow .drawflow-node:hover{cursor:move}.drawflow .drawflow-node .inputs,.drawflow .drawflow-node .outputs{width:0}.drawflow .drawflow-node .drawflow_content_node{width:100%;display:block}.drawflow .drawflow-node .input,.drawflow .drawflow-node .output{position:relative;width:20px;height:20px;background:#fff;border-radius:50%;border:2px solid #000;cursor:crosshair;z-index:1;margin-bottom:5px}.drawflow .drawflow-node .input{left:-27px;top:2px;background:#ff0}.drawflow .drawflow-node .output{right:-3px;top:2px}.drawflow svg{z-index:0;position:absolute;overflow:visible!important}.drawflow .connection{position:absolute;pointer-events:none;aspect-ratio:1/1}.drawflow .connection .main-path{fill:none;stroke-width:5px;stroke:#4682b4;pointer-events:all}.drawflow .connection .main-path:hover{stroke:#1266ab;cursor:pointer}.drawflow .connection .main-path.selected{stroke:#43b993}.drawflow .connection .point{cursor:move;stroke:#000;stroke-width:2;fill:#fff;pointer-events:all}.drawflow .connection .point.selected,.drawflow .connection .point:hover{fill:#1266ab}.drawflow .main-path{fill:none;stroke-width:5px;stroke:#4682b4}.drawflow-delete{position:absolute;display:block;width:30px;height:30px;background:#000;color:#fff;z-index:4;border:2px solid #fff;line-height:30px;font-weight:700;text-align:center;border-radius:50%;font-family:monospace;cursor:pointer}.drawflow>.drawflow-delete{margin-left:-15px;margin-top:15px}.parent-node .drawflow-delete{right:-15px;top:-15px}
+
+/* ---- css/ui-system.css ---- */
+/* Shared Studio surfaces, aligned with JETL Desktop's UI contract. */
+:root {
+    --surface-1: #1e1e20;
+    --surface-2: #252528;
+    --surface-3: #2d2d31;
+    --surface-border: rgba(255, 255, 255, .11);
+    --surface-shadow: 0 22px 70px rgba(0, 0, 0, .55);
+    --focus-ring: 0 0 0 3px rgba(52, 152, 219, .3);
+}
+
+/* Drawflow ships with cyan/red demo surfaces. Keep state in the border and
+   preserve the same neutral surface language as the rest of Studio. */
+.drawflow .drawflow-node,
+.drawflow .drawflow-node.selected {
+    color: var(--text);
+    background: var(--node);
+}
+
+.drawflow .drawflow-node {
+    width: 240px;
+    min-height: 0;
+    padding: 0;
+    align-items: stretch;
+    flex-direction: column;
+    border-width: 1px;
+    border-radius: 8px;
+    border-color: rgba(255, 255, 255, .16);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .32);
+}
+
+.drawflow .drawflow-node:hover {
+    border-color: rgba(255, 255, 255, .28);
+}
+
+.drawflow .drawflow-node.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, .24), 0 14px 34px rgba(0, 0, 0, .42) !important;
+}
+
+.drawflow .drawflow-node .drawflow_content_node,
+.drawflow .drawflow-node .node-body {
+    background: var(--node);
+}
+
+#bottom-panel {
+    --panel-collapsed-height: 44px;
+    min-height: 0;
+}
+
+body.panel-collapsed #bottom-panel {
+    height: var(--panel-collapsed-height) !important;
+}
+
+body.panel-collapsed #panel-content {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#panel-tabs {
+    min-height: 42px;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+#results-context-bar {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+#results-context-bar:empty {
+    display: none;
+}
+
+#results-context-bar > div {
+    flex: 0 0 auto;
+}
+
+.panel-tabs-main,
+.panel-tabs-actions {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    height: 100%;
+}
+
+.panel-tabs-main {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+
+.panel-tabs-main::-webkit-scrollbar {
+    display: none;
+}
+
+.panel-tabs-actions {
+    flex: 0 0 auto;
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    padding-left: 4px;
+    background: linear-gradient(90deg, rgba(37, 37, 38, 0), #252526 12px);
+}
+
+.panel-collapse-btn {
+    min-width: 88px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #c9c9cc;
+    border-left: 1px solid #3b3b3d;
+}
+
+.panel-collapse-btn:hover,
+.panel-collapse-btn:focus-visible {
+    color: #fff;
+    background: rgba(255, 255, 255, .07);
+}
+
+.panel-collapse-btn:focus-visible,
+.modal-close:focus-visible,
+.modal button:focus-visible,
+.modal input:focus-visible,
+.modal select:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.modal {
+    z-index: 10000;
+    padding: 24px;
+    background: rgba(5, 7, 10, .68);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+.modal.is-open {
+    opacity: 1;
+}
+
+.modal-content {
+    width: min(620px, calc(100vw - 32px));
+    max-width: none;
+    max-height: min(82dvh, 760px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface-1);
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    box-shadow: var(--surface-shadow);
+    transform: translateY(8px) scale(.985);
+    transition: transform .2s cubic-bezier(.2, .8, .2, 1);
+}
+
+.modal.is-open .modal-content {
+    transform: translateY(0) scale(1);
+}
+
+.modal-content-wide {
+    width: min(820px, calc(100vw - 32px));
+}
+
+.modal-header {
+    flex: 0 0 auto;
+    min-height: 68px;
+    padding: 13px 16px;
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.modal-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-title > i {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #74bef5;
+    background: rgba(52, 152, 219, .14);
+}
+
+.modal-title > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.modal-title strong {
+    color: #f5f5f6;
+    font-size: 1rem;
+}
+
+.modal-title small {
+    color: #9b9ba0;
+    font-size: .73rem;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-close {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #d4d4d7;
+    background: rgba(255, 255, 255, .06);
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, .12);
+}
+
+.modal-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+}
+
+.modal-scroll {
+    padding: 14px 16px;
+    max-height: 50dvh;
+    overflow: auto;
+}
+
+.modal-help {
+    padding: 12px 16px;
+    color: #aaa;
+    font-size: .8rem;
+    line-height: 1.45;
+    background: rgba(52, 152, 219, .06);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.modal-help code {
+    color: #8ecbf5;
+}
+
+.modal-footer {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    border-top: 1px solid var(--surface-border);
+    background: var(--surface-2);
+}
+
+.btn-primary {
+    color: #fff;
+    background: #237fbe;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background: #298fce;
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
+.modal-form {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.flow-navigator-content {
+    width: min(680px, calc(100vw - 32px));
+}
+
+.run-history-content { width:min(920px,calc(100vw - 32px)); }
+.run-history-toolbar { min-height:44px; padding:7px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#96969b; font-size:.75rem; border-bottom:1px solid var(--surface-border); }
+.run-history-toolbar button, .run-history-focus { border:0; border-radius:9px; color:#c9c9cd; background:rgba(255,255,255,.07); cursor:pointer; }
+.run-history-toolbar button { min-height:32px; padding:0 10px; }
+.run-history-toolbar>div{display:flex;gap:6px}
+.run-history-layout{min-height:0;height:min(64dvh,640px);display:grid;grid-template-columns:minmax(210px,30%) minmax(0,1fr)}
+.run-history-list{min-height:0;padding:8px;overflow-y:auto;border-right:1px solid var(--surface-border)}
+.run-history-item{width:100%;display:grid;grid-template-columns:9px minmax(0,1fr) auto;align-items:center;gap:9px;min-height:64px;padding:10px 11px;border:1px solid transparent;border-radius:10px;color:inherit;background:transparent;text-align:left;cursor:pointer}
+.run-history-item:hover{background:rgba(255,255,255,.04)}.run-history-item.active{border-color:rgba(52,152,219,.45);background:rgba(52,152,219,.11)}
+.run-history-status { width:9px; height:9px; border-radius:50%; background:#8b8b90; }
+.run-status-ok .run-history-status { background:#2ecc71; }
+.run-status-error .run-history-status { background:#e05a5a; }
+.run-status-cancelled .run-history-status { background:#e0a84d; }
+.run-history-copy { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.run-history-copy strong { color:#f1f1f2; font-size:.88rem; }
+.run-history-copy small { color:#929298; font-size:.71rem; }
+.run-history-badge { padding:4px 8px; border-radius:999px; color:#b9bbc0; background:rgba(255,255,255,.06); font-size:.68rem; }
+.run-history-duration{color:#d9d9dc;font-size:.72rem;font-variant-numeric:tabular-nums}
+.run-history-detail{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}.run-history-detail-head{padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--surface-border)}.run-history-detail-head>div{min-width:0;display:flex;flex-direction:column;gap:3px}.run-history-detail-head strong{color:#f4f4f5}.run-history-detail-head small{color:#939399;font-size:.72rem}
+.run-history-kpis{padding:10px 12px;display:grid;grid-template-columns:repeat(7,minmax(72px,1fr));gap:7px;overflow-x:auto}.run-history-kpis>div{min-width:72px;padding:8px;border:1px solid rgba(255,255,255,.08);border-radius:9px;background:rgba(255,255,255,.035)}.run-history-kpis span,.run-history-kpis strong{display:block}.run-history-kpis span{color:#8f8f95;font-size:.64rem}.run-history-kpis strong{margin-top:3px;color:#eeeef0;font-size:.85rem}
+.run-history-error{margin:0 12px 9px;padding:9px 11px;display:flex;gap:8px;color:#faa;background:rgba(192,57,43,.12);border:1px solid rgba(231,76,60,.25);border-radius:9px;font-size:.73rem;overflow-wrap:anywhere}.run-history-filter{margin:0 12px 9px;min-height:38px;display:flex;align-items:center;gap:8px;padding:0 10px;color:#89898f;border:1px solid var(--surface-border);border-radius:9px;background:#171719}.run-history-filter input{min-width:0;flex:1;border:0;outline:0;color:#eee;background:transparent;font:inherit;font-size:16px}.run-history-filter span{font-size:.68rem;font-variant-numeric:tabular-nums}
+.run-history-table-wrap{min-height:0;flex:1;overflow:auto}.run-history-node-table{width:100%;border-collapse:collapse;font-size:.74rem}.run-history-node-table th,.run-history-node-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.07);text-align:left;vertical-align:top}.run-history-node-table th{position:sticky;top:0;z-index:1;color:#9c9ca1;background:var(--surface-1)}.run-history-node-table td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}.run-history-node-table td>small{display:block;margin-top:3px;color:#85858b;font-size:.62rem}.run-history-node-link{padding:0;border:0;color:#dcdce0;background:transparent;text-align:left;cursor:pointer}.run-history-node-link small{color:#85858b}.run-history-node-error{display:block;margin-top:3px;color:#f08b8b;font-size:.65rem}.run-node-state{display:inline-block;padding:3px 6px;border-radius:999px;color:#aaa;background:rgba(255,255,255,.06);font-size:.62rem}.run-node-ok{color:#68d895;background:rgba(46,204,113,.12)}.run-node-cached{color:#79bff0;background:rgba(52,152,219,.12)}.run-node-error{color:#f08b8b;background:rgba(231,76,60,.12)}.run-node-cancelled{color:#e0b766;background:rgba(224,168,77,.12)}
+.run-history-empty { min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#8f8f94; text-align:center; }
+.run-history-empty i { font-size:1.5rem; color:#66afe3; }
+.run-history-empty strong { color:#d7d7da; }
+.run-history-empty span { font-size:.78rem; }
+
+.flow-navigator-search {
+    flex: 0 0 auto;
+    margin: 14px 16px 8px;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 13px;
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    color: #85858a;
+    background: #171719;
+}
+
+.flow-navigator-search:focus-within {
+    border-color: #3498db;
+    box-shadow: var(--focus-ring);
+}
+
+#flow-navigator-filter {
+    min-width: 0;
+    flex: 1 1 auto;
+    border: 0;
+    outline: 0;
+    color: #f1f1f2;
+    background: transparent;
+    font: inherit;
+    font-size: .9rem;
+    user-select: text;
+}
+
+.flow-navigator-summary {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 10px;
+    color: #94949a;
+    font-size: .7rem;
+}
+
+.flow-navigator-summary span {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .05);
+}
+
+.flow-navigator-summary strong {
+    color: #dcdce0;
+}
+
+.flow-navigator-list {
+    min-height: 160px;
+    max-height: min(54dvh, 520px);
+    overflow: auto;
+    padding: 4px 12px 14px;
+}
+
+.flow-navigator-item {
+    width: 100%;
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 0 0 7px;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: #e7e7e9;
+    background: rgba(255, 255, 255, .035);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.flow-navigator-item:hover,
+.flow-navigator-item:focus-visible {
+    border-color: rgba(52, 152, 219, .55);
+    background: rgba(52, 152, 219, .1);
+    outline: 0;
+}
+
+.flow-navigator-icon {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    color: var(--node-accent);
+    background: rgba(52, 152, 219, .12);
+    background: color-mix(in srgb, var(--node-accent) 14%, transparent);
+}
+
+.flow-navigator-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.flow-navigator-copy strong,
+.flow-navigator-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.flow-navigator-copy small,
+.flow-navigator-ports {
+    color: #8f8f95;
+    font-size: .68rem;
+}
+
+.flow-navigator-ports {
+    display: flex;
+    gap: 7px;
+}
+
+.flow-navigator-ports span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.flow-navigator-target {
+    color: #6faedd;
+}
+
+.flow-navigator-empty {
+    min-height: 190px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #85858a;
+    text-align: center;
+}
+
+.flow-navigator-empty i {
+    margin-bottom: 5px;
+    color: #5c9dca;
+    font-size: 1.5rem;
+}
+
+.flow-navigator-empty strong {
+    color: #d4d4d7;
+}
+
+.flow-navigator-empty span {
+    font-size: .75rem;
+}
+
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #bcbcc0;
+    font-size: .78rem;
+    font-weight: 650;
+}
+
+.form-field .node-control {
+    min-height: 42px;
+    margin: 0;
+    font-size: .9rem;
+}
+
+.form-field textarea.node-control {
+    min-height: 132px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    line-height: 1.45;
+}
+
+.form-inline {
+    display: flex;
+    gap: 8px;
+}
+
+.form-inline > .node-control {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.node-editor-summary {
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .035);
+}
+
+.node-editor-summary > i {
+    color: #55b982;
+}
+
+.node-editor-summary > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.node-editor-summary strong,
+.node-editor-summary small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-editor-summary small {
+    color: #85858a;
+    font-size: .65rem;
+}
+
+.node-editor-open {
+    width: 100%;
+    margin-top: 7px;
+    gap: 6px;
+}
+
+.node-editor-storage {
+    display: none;
+}
+
+.strrep-editor-rule {
+    display: grid;
+    grid-template-columns: 28px minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 36px;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+.attr-manager-editor-rule {
+    display: grid;
+    grid-template-columns: 28px 120px minmax(90px, 1fr) minmax(90px, 1fr) minmax(110px, 1.4fr) 100px minmax(130px, 1.2fr) 36px;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+#strrep-editor-rules,
+#attribute-manager-editor-rules {
+    display: block;
+    max-height: min(42vh, 360px);
+}
+
+@media (max-width: 680px) {
+    .strrep-editor-rule { grid-template-columns: 28px minmax(0, 1fr) 36px; }
+    .strrep-editor-rule [data-strrep-attribute] { grid-column: 2; }
+    .strrep-editor-rule [data-ui-action="strrep-remove-rule"] { grid-column: 3; grid-row: 1; }
+    .strrep-editor-rule [data-strrep-search],
+    .strrep-editor-rule [data-strrep-replace] { grid-column: 2 / 4; }
+    .attr-manager-editor-rule { grid-template-columns: 28px minmax(0, 1fr) 36px; }
+    .attr-manager-editor-rule [data-attr-manager-enabled] { grid-column: 1; grid-row: 1; }
+    .attr-manager-editor-rule [data-ui-action="attribute-manager-remove-rule"] { grid-column: 3; grid-row: 1; }
+    .attr-manager-editor-rule select,
+    .attr-manager-editor-rule input:not([type="checkbox"]) { grid-column: 2 / 4; }
+}
+
+.node-editor-field-list {
+    max-height: 180px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    overflow: auto;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, .16);
+}
+
+.node-editor-field-option {
+    min-width: 0;
+    padding: 8px 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    color: #d7d7da;
+    background: rgba(255, 255, 255, .035);
+    cursor: pointer;
+}
+
+.node-editor-field-option span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.node-editor-empty {
+    grid-column: 1 / -1;
+    padding: 8px;
+    color: #8e8e94;
+    font-size: .78rem;
+    line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal,
+    .modal-content,
+    #bottom-panel {
+        transition: none !important;
+    }
+}
+
+/* ---- css/mobile.css ---- */
+:root {
+    --mobile-dock-height: 72px;
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-safe-top: env(safe-area-inset-top, 0px);
+}
+
+#mobile-dock,
+#mobile-scrim,
+#mobile-project-sheet,
+#interaction-diagnostic {
+    display: none;
+}
+
+.mobile-view-state {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    html,
+    body {
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+        overscroll-behavior: none;
+    }
+
+    body {
+        padding-top: var(--mobile-safe-top);
+        padding-bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+    }
+
+    #header {
+        min-height: 54px;
+        flex: 0 0 54px;
+        padding: 0 14px;
+        flex-wrap: nowrap;
+    }
+
+    #header > .btn[data-ui-action="toggle-sidebar"] {
+        display: none;
+    }
+
+    #header .brand {
+        width: auto;
+        flex: 0 0 auto;
+        margin: 0 !important;
+        justify-content: flex-start;
+        font-size: .9rem;
+    }
+
+    #header .brand span { display: none; }
+
+    #quick-search {
+        position: relative;
+        inset: auto;
+        display: flex !important;
+        min-width: 70px;
+        max-width: 230px;
+        flex: 1 1 180px;
+        align-items: center;
+        overflow: visible;
+        border: 1px solid rgba(255, 255, 255, .12);
+        border-radius: 11px;
+        background: #171719;
+        box-shadow: none;
+    }
+
+    #quick-search:focus-within { border-color: #3498db; box-shadow: 0 0 0 3px rgba(52, 152, 219, .2); }
+    #quick-search > i { display:block; flex:0 0 auto; margin-left:10px; color:#85858a; font-size:.78rem; }
+    #qs-input { min-width:0; height:38px; flex:1 1 auto; padding:0 9px; border:0; background:transparent; font-size:16px; }
+    #qs-results { position:absolute; display:none; top:calc(100% + 8px); left:0; width:min(300px, calc(100vw - 110px)); max-height:min(48dvh, 360px); overflow-y:auto; border:1px solid rgba(255,255,255,.14); border-radius:12px; background:#252526; box-shadow:0 14px 35px rgba(0,0,0,.48); }
+    #quick-search.has-results #qs-results { display:block; }
+    .qs-item { min-height:44px; padding:8px 11px; touch-action:manipulation; }
+
+    #header .toolbar {
+        width: auto;
+        flex: 0 0 auto;
+        margin-left: auto;
+        flex-wrap: nowrap;
+    }
+
+    #header .toolbar .btn {
+        display: none;
+    }
+
+    #header .toolbar .btn[data-ui-action="undo"],
+    #header .toolbar .btn[data-ui-action="redo"] {
+        display: inline-flex;
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        font-size: 1rem;
+    }
+
+    .toolbar-separator {
+        display: none;
+    }
+
+    #layout {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
+    }
+
+    #workspace {
+        min-width: 0;
+        min-height: 0;
+        width: 100%;
+    }
+
+    #sidebar {
+        position: fixed;
+        z-index: 1200;
+        top: calc(var(--mobile-safe-top) + 54px);
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        left: 0;
+        width: min(88vw, 380px);
+        max-width: none;
+        height: auto;
+        border-radius: 0 22px 22px 0;
+        box-shadow: 14px 0 40px rgba(0, 0, 0, .45);
+    }
+
+    #mobile-state-nodes:checked ~ #layout #sidebar {
+        transform: translateX(0) !important;
+    }
+
+    body.mobile-nodes-open #sidebar {
+        transform: translateX(0) !important;
+    }
+
+    #mobile-state-nodes:checked ~ #layout #sidebar-overlay {
+        display: block !important;
+    }
+
+    body.mobile-nodes-open #sidebar-overlay {
+        display: block !important;
+    }
+
+    #sidebar-search {
+        padding: 14px;
+    }
+
+    #sidebar-search input {
+        min-height: 46px;
+        padding: 10px 14px;
+        font-size: 16px;
+        border-radius: 12px;
+    }
+
+    .category-header,
+    .drag-drawflow {
+        min-height: 48px;
+    }
+
+    input,
+    textarea,
+    select,
+    .node-control {
+        -webkit-user-select: text;
+        user-select: text;
+        touch-action: manipulation;
+    }
+
+    .node-item,
+    .cat-title,
+    [data-mobile-view],
+    [data-ui-action],
+    [data-mobile-close] {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    #sidebar-overlay {
+        position: fixed !important;
+        z-index: 1100 !important;
+        inset: calc(var(--mobile-safe-top) + 54px) 0 calc(var(--mobile-dock-height) + var(--mobile-safe-bottom)) !important;
+        width: auto !important;
+        height: auto !important;
+        backdrop-filter: blur(2px);
+    }
+
+    #bottom-panel {
+        position: fixed !important;
+        z-index: 1200 !important;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        height: min(58dvh, 560px) !important;
+        border-radius: 22px 22px 0 0;
+        border: 1px solid var(--border);
+        visibility: hidden;
+        pointer-events: none;
+        transform: translate3d(0, calc(100% + 4px), 0) !important;
+        transition: transform .26s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .26s;
+        box-shadow: 0 -18px 50px rgba(0, 0, 0, .45);
+    }
+
+    body.mobile-results-open #bottom-panel {
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) !important;
+        transition-delay: 0s;
+    }
+
+    #mobile-state-results:checked ~ #bottom-panel {
+        visibility: visible;
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0) !important;
+        transition-delay: 0s;
+    }
+
+    #panel-tabs {
+        min-height: 54px;
+        flex: 0 0 54px;
+        flex-wrap: nowrap;
+        padding: 6px 8px;
+        overflow: hidden;
+    }
+
+    #panel-tabs .panel-tabs-main {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    #panel-tabs .panel-tabs-actions,
+    #panel-tabs .btn[data-ui-action="zoom-all"],
+    #btn-map-expand {
+        display: none;
+    }
+
+    #panel-tabs .tab-btn {
+        min-width: 0;
+        justify-content: center;
+    }
+
+    #results-context-bar {
+        flex: 0 0 auto;
+        min-height: 48px;
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    #results-context-bar:empty {
+        display: none;
+        min-height: 0;
+        padding: 0;
+    }
+
+    #results-context-bar #feature-cache-browser,
+    #results-context-bar #port-inspector {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        border-left: 0 !important;
+    }
+
+    #results-context-bar #feature-cache-node {
+        min-width: 150px !important;
+        max-width: 44vw;
+    }
+
+    #results-context-bar #feature-cache-port {
+        min-width: 92px !important;
+        max-width: 29vw;
+    }
+
+    .tab-btn,
+    #panel-tabs .btn {
+        min-height: 42px;
+        border-radius: 10px;
+        padding: 0 13px;
+    }
+
+    .drawflow .drawflow-node {
+        width: min(240px, calc(100vw - 40px));
+        max-width: calc(100vw - 40px);
+    }
+
+    #table-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    #table-toolbar .table-tools {
+        overflow-x: auto;
+    }
+
+    #table-filter {
+        min-width: 190px;
+        font-size: 16px;
+    }
+
+    #mobile-dock {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        align-items: stretch;
+        position: fixed;
+        z-index: 2147483647;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        padding: 6px 6px var(--mobile-safe-bottom);
+        background: rgba(25, 25, 26, .96);
+        border-top: 1px solid rgba(255, 255, 255, .1);
+        box-shadow: 0 -10px 28px rgba(0, 0, 0, .28);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        pointer-events: auto !important;
+        isolation: isolate;
+    }
+
+    #interaction-diagnostic {
+        display: block;
+        position: fixed;
+        z-index: 2147483647;
+        right: 8px;
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 8px);
+        max-width: calc(100vw - 16px);
+        padding: 4px 8px;
+        border: 1px solid rgba(255, 255, 255, .16);
+        border-radius: 999px;
+        color: #aeb2b9;
+        background: rgba(18, 18, 19, .88);
+        font-size: 10px;
+        line-height: 1.2;
+        pointer-events: none;
+    }
+
+    .mobile-dock-btn {
+        min-width: 0;
+        border: 0;
+        border-radius: 14px;
+        background: transparent;
+        color: #92949a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font: inherit;
+        font-size: .67rem;
+        font-weight: 650;
+        touch-action: manipulation;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .mobile-dock-btn i {
+        font-size: 1.15rem;
+    }
+
+    .mobile-dock-btn.active {
+        color: #71b9ff;
+        background: rgba(52, 152, 219, .13);
+    }
+
+    #mobile-state-nodes:checked ~ #mobile-dock [data-mobile-view="nodes"],
+    #mobile-state-results:checked ~ #mobile-dock [data-mobile-view="results"],
+    #mobile-state-project:checked ~ #mobile-dock [data-mobile-view="project"] {
+        color: #71b9ff;
+        background: rgba(52, 152, 219, .13);
+    }
+
+    .mobile-run-btn {
+        align-self: center;
+        height: 62px;
+        margin-top: -20px;
+        color: #fff;
+        background: linear-gradient(145deg, #2589d8, #1768ab);
+        border: 4px solid #19191a;
+        border-radius: 20px;
+        box-shadow: 0 8px 20px rgba(24, 112, 181, .42);
+    }
+
+    .mobile-run-btn:active {
+        transform: scale(.96);
+    }
+
+    #mobile-scrim {
+        position: fixed;
+        display: block;
+        z-index: 1190;
+        inset: calc(var(--mobile-safe-top) + 54px) 0 calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        background: rgba(0, 0, 0, .42);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .22s ease;
+    }
+
+    body.mobile-sheet-open #mobile-scrim,
+    body.mobile-results-open #mobile-scrim {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    #mobile-state-project:checked ~ #mobile-scrim,
+    #mobile-state-results:checked ~ #mobile-scrim {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    #mobile-project-sheet {
+        display: block;
+        position: fixed;
+        z-index: 1210;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        padding: 8px 18px 22px;
+        background: #202023;
+        border-radius: 24px 24px 0 0;
+        box-shadow: 0 -18px 50px rgba(0, 0, 0, .5);
+        transform: translateY(calc(100% + 4px));
+        transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+    }
+
+    body.mobile-sheet-open #mobile-project-sheet {
+        transform: translateY(0);
+    }
+
+    #mobile-state-project:checked ~ #mobile-project-sheet {
+        transform: translateY(0);
+    }
+
+    .mobile-sheet-handle {
+        width: 42px;
+        height: 5px;
+        margin: 0 auto 10px;
+        border-radius: 999px;
+        background: #5b5b60;
+    }
+
+    .mobile-sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+
+    .mobile-sheet-header div {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .mobile-sheet-header small {
+        color: #8d8d93;
+        font-size: .65rem;
+        font-weight: 700;
+        letter-spacing: .12em;
+    }
+
+    .mobile-sheet-header strong {
+        color: #fff;
+        font-size: 1.3rem;
+    }
+
+    .mobile-sheet-close {
+        width: 42px;
+        height: 42px;
+        border: 0;
+        border-radius: 50%;
+        color: #ddd;
+        background: #303034;
+        display: grid;
+        place-items: center;
+    }
+
+    .mobile-project-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .mobile-project-grid button {
+        min-height: 84px;
+        padding: 12px 6px;
+        border: 1px solid #3b3b40;
+        border-radius: 15px;
+        color: #e8e8ea;
+        background: #29292d;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        font: inherit;
+        font-size: .75rem;
+    }
+
+    .mobile-project-grid button:disabled {
+        opacity: .38;
+        filter: grayscale(1);
+    }
+
+    .mobile-project-grid i {
+        color: #69b4f2;
+        font-size: 1.25rem;
+    }
+
+    .flow-navigator-content {
+        max-height: 82dvh;
+    }
+
+    .flow-navigator-search {
+        margin: 12px 12px 8px;
+    }
+
+    .flow-navigator-summary {
+        padding: 0 12px 8px;
+        overflow-x: auto;
+    }
+
+    .flow-navigator-summary span {
+        flex: 0 0 auto;
+    }
+
+    .flow-navigator-list {
+        max-height: none;
+        flex: 1 1 auto;
+        padding: 4px 8px 12px;
+    }
+
+    .flow-navigator-item {
+        min-height: 66px;
+    }
+
+    #toast {
+        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 14px);
+        max-width: calc(100vw - 24px);
+        text-align: center;
+    }
+
+    #loader { align-items:flex-end; padding:12px 12px calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 12px); }
+    .run-monitor-card { width:100%; }
+
+    .modal {
+        align-items: center;
+        padding: max(10px, var(--mobile-safe-top)) 8px max(10px, var(--mobile-safe-bottom));
+    }
+
+    .modal-content {
+        width: 100% !important;
+        max-width: none !important;
+        max-height: calc(100dvh - max(20px, var(--mobile-safe-top)) - max(20px, var(--mobile-safe-bottom)));
+        border-radius: 16px !important;
+    }
+
+    .node-editor-field-list { grid-template-columns: 1fr; max-height: 160px; }
+
+    .run-history-content { max-height: 84dvh; }
+    .run-history-layout { height:min(70dvh,690px); grid-template-columns:1fr; grid-template-rows:minmax(118px,30%) minmax(0,1fr); }
+    .run-history-list { padding:6px; border-right:0; border-bottom:1px solid var(--surface-border); }
+    .run-history-item { grid-template-columns:9px minmax(0,1fr) auto; min-height:58px; }
+    .run-history-item .run-history-badge { display:none; }
+    .run-history-kpis { grid-template-columns:repeat(3,minmax(82px,1fr)); overflow:visible; }
+    .run-history-node-table { min-width:560px; }
+
+    body.modal-open #mobile-dock {
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+@media (max-width: 380px) {
+    .mobile-dock-btn span {
+        font-size: .61rem;
+    }
+
+    .mobile-project-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+    </style>
 </head>
 
 <body>
 
-    <div id="loader">
-        <div class="spinner"></div>
-        <div id="loader-msg">Procesando...</div>
-        <button id="loader-cancel"
-            style="display:none; margin-top:15px; background:var(--danger); border:none; padding:8px 16px; color:white; cursor:pointer; border-radius:4px; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"
-            data-ui-action="cancel-run">Cancelar Operación</button>
+    <div id="boot-diagnostic" role="status" aria-live="polite"
+        style="position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;background:#121212;color:#ddd;font:15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        Iniciando JETL Studio…
+    </div>
+
+    <div id="loader" role="status" aria-live="polite" aria-label="Estado de la ejecución">
+        <div class="run-monitor-card">
+            <div class="run-monitor-head">
+                <span class="run-monitor-indicator" aria-hidden="true"></span>
+                <div><strong id="loader-title">Ejecución</strong><span id="loader-elapsed">0 ms</span></div>
+            </div>
+            <div id="loader-msg">Preparando flujo…</div>
+            <div class="run-monitor-progress" aria-hidden="true"><span id="loader-progress-bar"></span></div>
+            <div class="run-monitor-meta"><span id="loader-progress-text">0/0 nodos</span><span id="loader-node-time"></span></div>
+            <div class="run-monitor-actions">
+                <button id="loader-focus-error" type="button" data-ui-action="focus-run-error" hidden><i class="fas fa-location-crosshairs"></i> Ver nodo con error</button>
+                <button id="loader-cancel" type="button" data-ui-action="cancel-run">Cancelar</button>
+                <button id="loader-close" type="button" data-ui-action="close-run-monitor" hidden>Cerrar</button>
+            </div>
+        </div>
     </div>
     <div id="toast"><i class="fas fa-info-circle"></i><span id="toast-msg">Notificación</span></div>
-
-    <div id="quick-search">
-        <input type="text" id="qs-input" placeholder="Escribe para buscar..." autocomplete="off">
-        <div id="qs-results"></div>
-    </div>
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-flow" checked>
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-nodes">
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-results">
+    <input class="mobile-view-state" type="radio" name="mobile-view-state" id="mobile-state-project">
 
     <div id="header">
         <button class="btn" data-ui-action="toggle-sidebar"><i class="fas fa-bars"></i></button>
@@ -1003,9 +2438,14 @@
             <div class="status-dot" id="sys-status" title="Sistema Listo"></div>&nbsp;JETL Studio
             <span>v2026.03.05</span>
         </div>
+        <div id="quick-search" role="search">
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="qs-input" placeholder="Buscar nodo" aria-label="Buscar y añadir un nodo" autocomplete="off">
+            <div id="qs-results" role="listbox" aria-label="Nodos disponibles"></div>
+        </div>
         <div class="toolbar">
-            <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-            <button class="btn" data-ui-action="redo" title="Rehacer (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            <button class="btn" data-ui-action="undo" title="Deshacer (Ctrl+Z)" onclick="event.stopPropagation(); if(typeof undo==='function') undo()" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()"><i class="fas fa-undo"></i></button>
+            <button class="btn" data-ui-action="redo" title="Rehacer (Ctrl+Y)" onclick="event.stopPropagation(); if(typeof redo==='function') redo()" ontouchend="event.preventDefault(); event.stopPropagation(); this.click()"><i class="fas fa-redo"></i></button>
             <button class="btn" data-ui-action="clear-canvas" title="Borrar todo"><i class="fas fa-trash-alt"></i></button>
             <button class="btn" data-ui-action="save-project" title="Guardar Proyecto (.jetl)"><i
                     class="fas fa-save"></i></button>
@@ -1013,6 +2453,8 @@
                     class="fas fa-folder-open"></i></button>
             <button class="btn" data-ui-action="open-params" title="Parametros del Workspace"><i
                     class="fas fa-sliders-h"></i></button>
+            <button class="btn" data-ui-action="open-flow-navigator" title="Navegar por el flujo"
+                onclick="event.stopPropagation(); JETLOpenFlowNavigator()"><i class="fas fa-magnifying-glass-location"></i></button>
             <button class="btn" data-ui-action="export-run-report" title="Exportar Run Report"><i
                     class="fas fa-file-alt"></i></button>
             <button class="btn" data-ui-action="export-run-report-csv" title="Exportar Run Report CSV"><i
@@ -1037,9 +2479,9 @@
             </div>
             <div id="sidebar-content"></div>
         </div>
-        <div id="sidebar-overlay" data-ui-action="toggle-sidebar"
+        <label id="sidebar-overlay" for="mobile-state-flow"
             style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:40;">
-        </div>
+        </label>
 
         <div id="workspace">
             <div id="drawflow"  ></div>
@@ -1048,21 +2490,25 @@
 
     <div id="bottom-panel">
         <div id="panel-tabs">
-            <div style="display:flex; height:100%">
+            <div class="panel-tabs-main">
                 <button class="btn" data-ui-action="zoom-all"><i class="fas fa-expand"></i></button>
                 <button class="btn" id="btn-map-expand" data-ui-action="toggle-map-expand" title="Ampliar mapa"><i
                         class="fas fa-up-right-and-down-left-from-center"></i></button>
-                <button class="tab-btn active" data-ui-action="tab-map"><i class="fas fa-map-marked-alt"></i>
+                <button class="tab-btn active" data-ui-action="tab-map" data-results-view="map" aria-selected="true" onclick="event.stopPropagation(); JETLNativeResultTab('map')"><i class="fas fa-map-marked-alt"></i>
                     Mapa</button>
-                <button class="tab-btn" data-ui-action="tab-table"><i class="fas fa-table"></i> Datos</button>
-                <button class="tab-btn" data-ui-action="tab-logs"><i class="fas fa-terminal"></i>
+                <button class="tab-btn" data-ui-action="tab-table" data-results-view="table" aria-selected="false" onclick="event.stopPropagation(); JETLNativeResultTab('table')"><i class="fas fa-table"></i> Datos</button>
+                <button class="tab-btn" data-ui-action="tab-logs" data-results-view="logs" aria-selected="false" onclick="event.stopPropagation(); JETLNativeResultTab('logs')"><i class="fas fa-terminal"></i>
                     Consola</button>
             </div>
-            <button class="tab-btn" style="padding:0 15px" data-ui-action="toggle-panel"><i
-                    class="fas fa-compress-alt"></i></button>
+            <div class="panel-tabs-actions">
+                <button class="tab-btn panel-collapse-btn" id="btn-panel-collapse" data-ui-action="toggle-panel"
+                    title="Ocultar visor" aria-label="Ocultar visor" aria-expanded="true"><i
+                        class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span></button>
+            </div>
         </div>
+        <div id="results-context-bar" aria-label="Origen de resultados"></div>
         <div id="panel-content">
-            <div id="logs" style="display:block">Sistema listo.</div>
+            <div id="logs">Sistema listo.</div>
 
             <div id="table-container">
                 <div id="table-toolbar">
@@ -1105,6 +2551,43 @@
             </div>
         </div>
     </div>
+
+    <nav id="mobile-dock" aria-label="Navegación principal">
+        <button type="button" class="mobile-dock-btn" data-mobile-view="nodes" aria-label="Abrir catálogo de nodos" aria-pressed="false" onclick="JETLNativeNav('nodes')">
+            <i class="fas fa-shapes"></i><span>Nodos</span>
+        </button>
+        <button type="button" class="mobile-dock-btn" id="mobile-history" aria-label="Abrir historial de ejecuciones" onclick="event.stopPropagation(); JETLOpenRunHistory()">
+            <i class="fas fa-clock-rotate-left"></i><span>Historial</span>
+        </button>
+        <button type="button" id="mobile-run" class="mobile-dock-btn mobile-run-btn" aria-label="Ejecutar todo el flujo" title="Ejecutar todo el flujo" onclick="event.stopPropagation(); JETLRunAll()">
+            <i class="fas fa-play"></i><span>Ejecutar todo</span>
+        </button>
+        <button type="button" class="mobile-dock-btn" data-mobile-view="results" aria-label="Abrir resultados" aria-pressed="false" onclick="JETLNativeNav('results')">
+            <i class="fas fa-chart-area"></i><span>Resultados</span>
+        </button>
+        <button type="button" class="mobile-dock-btn" data-mobile-view="project" aria-label="Abrir acciones del proyecto" aria-pressed="false" onclick="JETLNativeNav('project')">
+            <i class="fas fa-folder-open"></i><span>Proyecto</span>
+        </button>
+    </nav>
+
+    <label id="mobile-scrim" for="mobile-state-flow" aria-hidden="true"></label>
+    <section id="mobile-project-sheet" aria-hidden="true" aria-label="Acciones del proyecto">
+        <div class="mobile-sheet-handle"></div>
+        <div class="mobile-sheet-header">
+            <div><small>ESPACIO DE TRABAJO</small><strong>Proyecto</strong></div>
+            <label class="mobile-sheet-close" for="mobile-state-flow" data-mobile-close aria-label="Cerrar"><i class="fas fa-times"></i></label>
+        </div>
+        <div class="mobile-project-grid">
+            <button type="button" data-ui-action="save-project"><i class="fas fa-save"></i><span>Guardar</span></button>
+            <button type="button" data-ui-action="open-project"><i class="fas fa-folder-open"></i><span>Abrir</span></button>
+            <button type="button" data-ui-action="new-project"><i class="fas fa-file-circle-plus"></i><span>Nuevo</span></button>
+            <button type="button" data-ui-action="restore-draft"><i class="fas fa-clock-rotate-left"></i><span>Restaurar</span></button>
+            <button type="button" data-ui-action="open-templates"><i class="fas fa-layer-group"></i><span>Plantillas</span></button>
+            <button type="button" data-ui-action="open-params"><i class="fas fa-sliders-h"></i><span>Parámetros</span></button>
+            <button type="button" data-ui-action="open-flow-navigator"
+                onclick="event.stopPropagation(); JETLOpenFlowNavigator()"><i class="fas fa-magnifying-glass-location"></i><span>Navegar flujo</span></button>
+        </div>
+    </section>
     <div id="ctx-menu"
         style="display:none; position:absolute; z-index:9000; background:#252526; border:1px solid #444; box-shadow:0 5px 15px rgba(0,0,0,0.5); border-radius:4px; min-width:150px; overflow:hidden;">
         <div class="ctx-item" data-ui-action="ctx-run"><i class="fas fa-play"></i> Ejecutar hasta aquí</div>
@@ -1112,41 +2595,317 @@
         <div class="ctx-item" data-ui-action="ctx-delete" style="color:#e74c3c"><i class="fas fa-trash"></i> Eliminar
         </div>
     </div>
-    <div id="templates-modal" class="modal">
-        <div class="modal-content">
+    <div id="templates-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="templates-modal-title">
+        <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div>Plantillas de flujo</div>
-                <button class="btn" data-ui-action="close-templates"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-layer-group"></i><div><strong id="templates-modal-title">Plantillas de flujo</strong><small>Inicia un flujo a partir de una estructura preparada</small></div></div>
+                <button class="modal-close" data-ui-action="close-templates" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div id="templates-list"></div>
+            <div class="modal-body"><div id="templates-list"></div></div>
         </div>
     </div>
-    <div id="params-modal" class="modal">
+    <div id="params-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="params-modal-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div>Parametros del Workspace</div>
-                <button class="btn" data-ui-action="close-params"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-sliders-h"></i><div><strong id="params-modal-title">Parámetros del espacio de trabajo</strong><small>Variables reutilizables en los nodos compatibles</small></div></div>
+                <button class="modal-close" data-ui-action="close-params" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div style="padding:12px; border-bottom:1px solid #333; color:#aaa; font-size:0.8rem">
-                Usa <code>${param_key}</code> en campos de texto de nodos compatibles.
+            <div class="modal-body">
+                <div class="modal-help">
+                    Usa <code>${param_key}</code> en campos de texto de nodos compatibles.
+                </div>
+                <div id="params-rows" class="modal-scroll"></div>
             </div>
-            <div id="params-rows" style="padding:12px; max-height:50vh; overflow:auto"></div>
-            <div style="padding:10px 12px; border-top:1px solid #333; display:flex; gap:8px; justify-content:flex-end">
-                <button class="btn" data-ui-action="add-param-row"><i class="fas fa-plus"></i></button>
-                <button class="btn" data-ui-action="save-params"><i class="fas fa-save"></i> Guardar</button>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="add-param-row"><i class="fas fa-plus"></i> Añadir</button>
+                <button class="btn btn-primary" data-ui-action="save-params"><i class="fas fa-save"></i> Guardar y cerrar</button>
             </div>
         </div>
     </div>
-    <div id="packages-modal" class="modal">
+    <div id="flow-navigator-modal" class="modal" role="dialog" aria-modal="true"
+        aria-labelledby="flow-navigator-title" aria-hidden="true">
+        <div class="modal-content flow-navigator-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-route"></i><div>
+                    <strong id="flow-navigator-title">Navegador de flujo</strong>
+                    <small>Busca, selecciona y centra cualquier nodo</small>
+                </div></div>
+                <button class="modal-close" data-ui-action="close-flow-navigator" aria-label="Cerrar"
+                    onclick="event.stopPropagation(); JETLCloseFlowNavigator()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flow-navigator-search">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <input id="flow-navigator-filter" type="search"
+                    placeholder="Nombre, categoría, atributo o ID…" autocomplete="off">
+            </div>
+            <div id="flow-navigator-summary" class="flow-navigator-summary" aria-live="polite"></div>
+            <div id="flow-navigator-list" class="flow-navigator-list"></div>
+        </div>
+    </div>
+    <div id="run-history-modal" class="modal" role="dialog" aria-modal="true"
+        aria-labelledby="run-history-title" aria-hidden="true">
+        <div class="modal-content run-history-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-clock-rotate-left"></i><div>
+                    <strong id="run-history-title">Historial de ejecuciones</strong>
+                    <small>Últimas 30 ejecuciones completas y parciales</small>
+                </div></div>
+                <button class="modal-close" type="button" data-run-history-close aria-label="Cerrar"
+                    onclick="event.stopPropagation(); JETLCloseRunHistory()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="run-history-toolbar">
+                <span id="run-history-count">0 ejecuciones</span>
+                <div>
+                    <button type="button" data-run-history-export="json" aria-label="Exportar ejecución seleccionada"><i class="fas fa-file-code"></i></button>
+                    <button type="button" data-run-history-export="csv" aria-label="Exportar ejecución seleccionada como CSV"><i class="fas fa-file-csv"></i></button>
+                    <button type="button" data-run-history-clear><i class="fas fa-trash-can"></i> Borrar</button>
+                </div>
+            </div>
+            <div class="run-history-layout">
+                <div id="run-history-list" class="run-history-list" aria-label="Ejecuciones"></div>
+                <div id="run-history-detail" class="run-history-detail" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+    <div id="packages-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="packages-modal-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-box-open"></i><div><strong id="packages-modal-title">Paquetes comunitarios</strong><small>Amplía el catálogo de transformadores disponibles</small></div></div>
+                <button class="modal-close" data-ui-action="close-packages" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body"><div id="packages-list"></div></div>
+        </div>
+    </div>
+    <div id="calc-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="calc-editor-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div>Paquetes Comunitarios</div>
-                <button class="btn" data-ui-action="close-packages"><i class="fas fa-times"></i></button>
+                <div class="modal-title"><i class="fas fa-keyboard"></i><div><strong id="calc-editor-title">Calculadora de campos</strong><small>Define el campo de salida y su expresión</small></div></div>
+                <button class="modal-close" data-ui-action="close-calc-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-            <div id="packages-list"></div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span>Campo de destino</span><input id="calc-editor-name" class="node-control" autocomplete="off"></label>
+                <label class="form-field"><span>Expresión</span><textarea id="calc-editor-expression" class="node-control" rows="6" placeholder='props["poblacion"] / props["area"]'></textarea></label>
+                <div class="form-field"><span>Insertar campo disponible</span><div class="form-inline"><select id="calc-editor-source" class="node-control"></select><button class="btn" data-ui-action="calc-editor-insert" title="Insertar en la expresión"><i class="fas fa-arrow-down"></i> Insertar</button></div></div>
+                <label class="form-field"><span>Si la expresión produce un error</span><select id="calc-editor-error" class="node-control"><option value="null">Asignar null y continuar</option><option value="reject">Enviar el elemento a la salida 2</option></select></label>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Puedes usar <code>props</code>, <code>feat</code>, <code>Math</code> y <code>turf</code>. La expresión se ejecuta localmente.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-calc-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-calc-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="formatter-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formatter-editor-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-text-width"></i><div><strong id="formatter-editor-title">String Formatter</strong><small>Transforma uno o varios campos de texto</small></div></div>
+                <button class="modal-close" data-ui-action="close-formatter-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span>Campos objetivo</span><input id="formatter-editor-fields" class="node-control" autocomplete="off" placeholder="name, type"></label>
+                <div class="form-field"><span>Campos detectados</span><div id="formatter-editor-available-fields" class="node-editor-field-list"></div></div>
+                <label class="form-field"><span>Operación</span><select id="formatter-editor-operation" class="node-control">
+                    <option value="upper">Mayúsculas</option><option value="lower">Minúsculas</option>
+                    <option value="capitalize">Capitalizar</option><option value="trim">Limpiar espacios</option>
+                    <option value="replace">Reemplazar</option><option value="concat">Concatenar</option>
+                    <option value="pad">Rellenar</option><option value="template">Plantilla</option>
+                </select></label>
+                <label class="form-field"><span>Argumentos</span><input id="formatter-editor-arguments" class="node-control" autocomplete="off" placeholder="buscar|reemplazo, sufijo o plantilla"></label>
+                <label class="form-field"><span>Si se produce un error</span><select id="formatter-editor-error" class="node-control"><option value="null">Asignar vacío y continuar</option><option value="reject">Enviar a la salida 2</option></select></label>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Para reemplazar usa <code>buscar|reemplazo</code>. En plantillas puedes insertar campos como <code>ID_{id}_zona</code>.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-formatter-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-formatter-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="attribute-text-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="attribute-text-editor-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i id="attribute-text-editor-icon" class="fas fa-list"></i><div><strong id="attribute-text-editor-title">Editor de atributos</strong><small id="attribute-text-editor-subtitle">Configura la transformación</small></div></div>
+                <button class="modal-close" data-ui-action="close-attribute-text-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span id="attribute-text-source-label">Campo de origen</span><input id="attribute-text-source" class="node-control" autocomplete="off"></label>
+                <label class="form-field"><span>Campo de destino</span><input id="attribute-text-target" class="node-control" autocomplete="off"></label>
+                <div id="attribute-text-list-fields">
+                    <label class="form-field"><span>Separador</span><input id="attribute-text-delimiter" class="node-control" autocomplete="off"></label>
+                    <label id="attribute-text-drop-empty-field" class="form-field form-inline"><input id="attribute-text-drop-empty" type="checkbox"> <span>Omitir valores vacíos</span></label>
+                </div>
+                <div id="attribute-text-substring-fields" class="form-inline" hidden>
+                    <label class="form-field"><span>Inicio</span><input id="attribute-text-start" type="number" class="node-control"></label>
+                    <label class="form-field"><span>Fin inclusivo</span><input id="attribute-text-end" type="number" class="node-control"></label>
+                </div>
+                <div id="attribute-text-editor-help" class="modal-help"><i class="fas fa-circle-info"></i> Admite listas directas y rutas anidadas como <code>items{}.name</code>.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-attribute-text-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-attribute-text-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="string-replacer-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="string-replacer-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-exchange-alt"></i><div><strong id="string-replacer-editor-title">String Replacer</strong><small>Aplica reglas de sustitución en orden</small></div></div>
+                <button class="modal-close" data-ui-action="close-string-replacer-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div class="form-inline">
+                    <label class="form-field"><span>Modo</span><select id="strrep-editor-mode" class="node-control"><option value="text">Texto literal</option><option value="regex">Expresión regular</option></select></label>
+                    <label class="form-field form-inline"><input id="strrep-editor-case" type="checkbox" checked> <span>Distinguir mayúsculas</span></label>
+                </div>
+                <div class="form-inline">
+                    <label class="form-field"><span>Si no coincide</span><select id="strrep-editor-no-match" class="node-control"><option value="none">Conservar valor</option><option value="null">Asignar null</option><option value="set">Asignar otro valor</option></select></label>
+                    <label id="strrep-editor-no-match-value-field" class="form-field" hidden><span>Valor alternativo</span><input id="strrep-editor-no-match-value" class="node-control" autocomplete="off"></label>
+                </div>
+                <div class="form-field"><span>Reglas</span><div id="strrep-editor-rules" class="node-editor-field-list"></div></div>
+                <button type="button" class="btn" data-ui-action="strrep-add-rule"><i class="fas fa-plus"></i> Añadir regla</button>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> En modo regex, las referencias de captura Desktop <code>\1</code> se convierten automáticamente.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-ui-action="close-string-replacer-editor">Cancelar</button>
+                <button class="btn btn-primary" data-ui-action="save-string-replacer-editor"><i class="fas fa-save"></i> Guardar y cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="aggregator-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="aggregator-editor-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-layer-group"></i><div><strong id="aggregator-editor-title">Aggregator</strong><small>Agrupa atributos y geometrías</small></div></div>
+                <button class="modal-close" data-ui-action="close-aggregator-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field"><span>Agrupar por campos</span><input id="aggregator-editor-group" class="node-control" autocomplete="off" placeholder="MATRICULA, TIPO"></label>
+                <label class="form-field form-inline"><input id="aggregator-editor-remove-geometry" type="checkbox"> <span>Eliminar geometría</span></label>
+                <label class="form-field form-inline"><input id="aggregator-editor-produce-multis" type="checkbox" checked> <span>Construir geometrías Multi*</span></label>
+                <label class="form-field form-inline"><input id="aggregator-editor-preserve-multis" type="checkbox"> <span>Conservar entradas Multi dentro de GeometryCollection</span></label>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Los campos se comparan sin distinguir mayúsculas. Los primeros valores no vacíos se conservan.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-aggregator-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-aggregator-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
+    <div id="attribute-manager-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="attribute-manager-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-table-columns"></i><div><strong id="attribute-manager-editor-title">Attribute Manager</strong><small id="attribute-manager-editor-subtitle">Configura reglas ordenadas</small></div></div>
+                <button class="modal-close" data-ui-action="close-attribute-manager-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <label class="form-field form-inline"><input id="attribute-manager-editor-preserve" type="checkbox" checked> <span>Conservar atributos no gestionados</span></label>
+                <label id="attribute-manager-editor-error-field" class="form-field"><span>Si una regla falla</span><select id="attribute-manager-editor-error" class="node-control"><option value="null">Conservar feature con diagnóstico</option><option value="reject">Enviar a salida 2</option></select></label>
+                <div class="form-field"><span>Reglas</span><div id="attribute-manager-editor-rules" class="node-editor-field-list"></div></div>
+                <button type="button" class="btn" data-ui-action="attribute-manager-add-rule"><i class="fas fa-plus"></i> Añadir regla</button>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Las reglas se aplican de arriba abajo. Los campos disponibles cambian después de cada regla.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-attribute-manager-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-attribute-manager-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
+    <div id="keeper-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="keeper-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-check-square"></i><div><strong id="keeper-editor-title">Attribute Keeper</strong><small>Selecciona los atributos que permanecerán</small></div></div>
+                <button class="modal-close" data-ui-action="close-keeper-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div class="form-inline"><button type="button" class="btn" data-ui-action="keeper-select-all"><i class="fas fa-check-double"></i> Todos</button><button type="button" class="btn" data-ui-action="keeper-select-none"><i class="fas fa-square"></i> Ninguno</button><span id="keeper-editor-count" class="reader-editor-preview-status">0 seleccionados</span></div>
+                <label class="form-field"><span>Campos manuales o heredados</span><input id="keeper-editor-manual" class="node-control" autocomplete="off" placeholder="id, name, type"></label>
+                <div class="form-field"><span>Campos detectados</span><div id="keeper-editor-fields" class="node-editor-field-list"></div></div>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Los campos no seleccionados se eliminan. La salida conserva el único puerto definido por Desktop.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-keeper-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-keeper-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
+    <div id="creator-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="creator-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-plus-square"></i><div><strong id="creator-editor-title">Attribute Creator</strong><small>Crea varios atributos en orden</small></div></div>
+                <button class="modal-close" data-ui-action="close-creator-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div class="form-inline"><button type="button" class="btn" data-ui-action="creator-add-rule"><i class="fas fa-plus"></i> Añadir atributo</button><button type="button" class="btn" data-ui-action="creator-import-fields"><i class="fas fa-file-import"></i> Partir de campos</button><span id="creator-editor-count" class="reader-editor-preview-status">0 atributos</span></div>
+                <div id="creator-editor-rules" class="node-editor-field-list"></div>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> Admite texto, <code>@Value(campo)</code>, <code>@concat(...)</code>, funciones de texto y expresiones seguras iniciadas por <code>=</code>.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-creator-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-creator-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
+    <div id="geometry-transform-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="geometry-transform-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-draw-polygon"></i><div><strong id="geometry-transform-editor-title">Geometry Transformer</strong><small id="geometry-transform-editor-subtitle">Configuración compatible con Desktop</small></div></div>
+                <button class="modal-close" data-ui-action="close-geometry-transform-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <div id="geometry-transform-editor-fields" class="modal-form"></div>
+                <div class="modal-help"><i class="fas fa-circle-info"></i> La configuración se conserva dentro del nodo y se aplica en orden durante la ejecución del flujo.</div>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-geometry-transform-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-geometry-transform-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
+        </div>
+    </div>
+    <div id="reader-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reader-editor-title">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-file-import"></i><div><strong id="reader-editor-title">Reader</strong><small id="reader-editor-subtitle">Fuente, esquema y vista previa</small></div></div>
+                <button class="modal-close" data-ui-action="close-reader-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body modal-form">
+                <section class="reader-editor-source">
+                    <div class="reader-editor-section-title">Fuente</div>
+                    <label class="reader-editor-native-picker" for="reader-editor-file-input">
+                        <span><i class="fas fa-folder-open"></i> Cargar datos desde el dispositivo</span>
+                        <input id="reader-editor-file-input" type="file" multiple aria-describedby="reader-editor-source-list">
+                    </label>
+                    <div id="reader-editor-source-list" class="reader-editor-source-list">Sin archivos seleccionados</div>
+                    <div class="modal-help"><i class="fas fa-shield-halved"></i> El navegador no conserva rutas locales. Si se recarga la página, será necesario volver a autorizar los archivos.</div>
+                </section>
+                <section>
+                    <div class="reader-editor-section-title">Configuración</div>
+                    <div id="reader-editor-fields" class="modal-form"></div>
+                </section>
+                <section>
+                    <div class="reader-editor-preview-head"><div class="reader-editor-section-title">Datos</div><button type="button" class="btn" data-ui-action="reader-refresh-preview"><i class="fas fa-rotate"></i> Actualizar</button></div>
+                    <div id="reader-editor-preview-status" class="reader-editor-preview-status">Selecciona una fuente.</div>
+                    <div id="reader-editor-schema" class="reader-editor-schema"></div>
+                    <div id="reader-editor-data-toolbar" class="reader-editor-data-toolbar" hidden>
+                        <label class="reader-editor-search"><i class="fas fa-search"></i><input id="reader-editor-search" class="node-control" type="search" placeholder="Buscar en los datos"></label>
+                        <button type="button" class="btn" data-ui-action="reader-add-row"><i class="fas fa-plus"></i> Fila</button>
+                        <button type="button" class="btn btn-primary" data-ui-action="reader-apply-edits"><i class="fas fa-check"></i> Aplicar cambios</button>
+                        <button type="button" class="btn" data-ui-action="reader-discard-edits"><i class="fas fa-rotate-left"></i> Descartar copia</button>
+                    </div>
+                    <div class="reader-editor-table-wrap"><table id="reader-editor-preview-table" class="reader-editor-preview-table"></table></div>
+                    <div id="reader-editor-pagination" class="reader-editor-pagination" hidden><button type="button" class="btn" data-ui-action="reader-prev-page" aria-label="Página anterior"><i class="fas fa-chevron-left"></i></button><span id="reader-editor-page-info">Página 1 / 1</span><button type="button" class="btn" data-ui-action="reader-next-page" aria-label="Página siguiente"><i class="fas fa-chevron-right"></i></button></div>
+                </section>
+            </div>
+            <div class="modal-footer"><button class="btn" data-ui-action="close-reader-editor">Cancelar</button><button class="btn btn-primary" data-ui-action="save-reader-editor"><i class="fas fa-save"></i> Guardar y cerrar</button></div>
         </div>
     </div>
     <style>
+        .reader-editor-section-title { font-weight:700; color:#eee; margin:2px 0 8px; }
+        .reader-editor-native-picker { display:grid; gap:8px; padding:12px; border:1px solid #3f6480; border-radius:10px; background:#182532; color:#bfe4ff; font-weight:700; cursor:pointer; }
+        .reader-editor-native-picker input[type="file"] { display:block; width:100%; min-height:44px; color:#d8d8dc; font:inherit; cursor:pointer; }
+        .reader-editor-native-picker input[type="file"]::file-selector-button { min-height:44px; margin-right:10px; padding:9px 13px; border:1px solid #4aa9e8; border-radius:8px; background:#2687c8; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
+        .reader-editor-source-list,.reader-editor-preview-status { color:#aaa; font-size:.82rem; line-height:1.4; margin:8px 0; }
+        .reader-editor-preview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .reader-editor-schema { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+        .reader-editor-schema span { border:1px solid #3a3a3a; border-radius:999px; padding:4px 8px; color:#bbb; font-size:.72rem; }
+        .reader-editor-data-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+        .reader-editor-data-toolbar[hidden],.reader-editor-pagination[hidden] { display:none; }
+        .reader-editor-search { display:flex; align-items:center; gap:7px; flex:1 1 180px; border:1px solid #3a3a3a; border-radius:8px; padding:0 9px; color:#888; }
+        .reader-editor-search input { min-width:0; width:100%; border:0; background:transparent; }
+        .reader-editor-table-wrap { width:100%; overflow:auto; border:1px solid #353535; border-radius:8px; max-height:240px; }
+        .reader-editor-preview-table { border-collapse:collapse; min-width:100%; font-size:.72rem; color:#ddd; }
+        .reader-editor-preview-table th,.reader-editor-preview-table td { padding:7px 9px; border-bottom:1px solid #333; text-align:left; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+        .reader-editor-preview-table th { position:sticky; top:0; background:#252525; color:#9ed5ff; }
+        .reader-editor-preview-table input { min-width:110px; width:100%; border:1px solid transparent; background:#161616; color:#eee; padding:6px 7px; border-radius:5px; }
+        .reader-editor-preview-table input:focus,.reader-editor-preview-table input.is-edited { border-color:#3498db; outline:0; }
+        .reader-editor-preview-table tr.is-deleted { opacity:.4; text-decoration:line-through; }
+        .reader-editor-pagination { display:flex; justify-content:center; align-items:center; gap:10px; color:#aaa; font-size:.78rem; margin-top:8px; }
+        .creator-editor-rule { display:grid; grid-template-columns:auto minmax(110px,1fr) minmax(150px,1.6fr) minmax(100px,1fr) minmax(90px,.7fr) auto; gap:7px; align-items:end; width:100%; }
+        .creator-editor-rule label { min-width:0; }
+        .creator-editor-rule .node-control { width:100%; min-width:0; }
+        @media (max-width:700px) { .creator-editor-rule { grid-template-columns:auto 1fr auto; } .creator-editor-rule label { grid-column:2; } .creator-editor-rule [data-creator-remove-rule] { grid-column:3; grid-row:1; } }
         .ctx-item {
             padding: 8px 12px;
             font-size: 0.85rem;
@@ -1162,42 +2921,1023 @@
             color: white;
         }
     </style>
-    <script src="js/core.js"></script>
-    <script src="js/params.js"></script>
-    <script src="js/formats.js"></script>
-    <script src="js/nodes/readers.js"></script>
-    <script src="js/nodes/geometry.js"></script>
-    <script src="js/nodes/utils.js"></script>
-    <script src="js/nodes/spatial.js"></script>
-    <script src="js/nodes/attributes.js"></script>
-    <script src="js/nodes/raster.js"></script>
-    <script src="js/nodes/writers.js"></script>
-    <script src="js/tools.js"></script>
-    <script src="js/schemaUI.js"></script>
-    <script src="js/core/workerPool.js"></script>
-    <script src="js/state/history.js"></script>
-    <script src="js/engine.js"></script>
-    <script src="js/processNode.js"></script>
-    <script src="js/visualization.js"></script>
-    <script src="js/templates.js"></script>
-    <script src="js/packages.js"></script>
-    <script src="js/smoke.js"></script>
+    <script data-jetl-core-inline>
+/* ---- js/vendor/drawflow.min.js ---- */
+!function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t():"function"==typeof define&&define.amd?define([],t):"object"==typeof exports?exports.Drawflow=t():e.Drawflow=t()}("undefined"!=typeof self?self:this,(function(){return function(e){var t={};function n(i){if(t[i])return t[i].exports;var s=t[i]={i:i,l:!1,exports:{}};return e[i].call(s.exports,s,s.exports,n),s.l=!0,s.exports}return n.m=e,n.c=t,n.d=function(e,t,i){n.o(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:i})},n.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},n.t=function(e,t){if(1&t&&(e=n(e)),8&t)return e;if(4&t&&"object"==typeof e&&e&&e.__esModule)return e;var i=Object.create(null);if(n.r(i),Object.defineProperty(i,"default",{enumerable:!0,value:e}),2&t&&"string"!=typeof e)for(var s in e)n.d(i,s,function(t){return e[t]}.bind(null,s));return i},n.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return n.d(t,"a",t),t},n.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},n.p="",n(n.s=0)}([function(e,t,n){"use strict";n.r(t),n.d(t,"default",(function(){return i}));class i{constructor(e,t=null,n=null){this.events={},this.container=e,this.precanvas=null,this.nodeId=1,this.ele_selected=null,this.node_selected=null,this.drag=!1,this.reroute=!1,this.reroute_fix_curvature=!1,this.curvature=.5,this.reroute_curvature_start_end=.5,this.reroute_curvature=.5,this.reroute_width=6,this.drag_point=!1,this.editor_selected=!1,this.connection=!1,this.connection_ele=null,this.connection_selected=null,this.canvas_x=0,this.canvas_y=0,this.pos_x=0,this.pos_x_start=0,this.pos_y=0,this.pos_y_start=0,this.mouse_x=0,this.mouse_y=0,this.line_path=5,this.first_click=null,this.force_first_input=!1,this.draggable_inputs=!0,this.useuuid=!1,this.parent=n,this.noderegister={},this.render=t,this.drawflow={drawflow:{Home:{data:{}}}},this.module="Home",this.editor_mode="edit",this.zoom=1,this.zoom_max=1.6,this.zoom_min=.5,this.zoom_value=.1,this.zoom_last_value=1,this.evCache=new Array,this.prevDiff=-1}start(){this.container.classList.add("parent-drawflow"),this.container.tabIndex=0,this.precanvas=document.createElement("div"),this.precanvas.classList.add("drawflow"),this.container.appendChild(this.precanvas),this.container.addEventListener("mouseup",this.dragEnd.bind(this)),this.container.addEventListener("mousemove",this.position.bind(this)),this.container.addEventListener("mousedown",this.click.bind(this)),this.container.addEventListener("touchend",this.dragEnd.bind(this)),this.container.addEventListener("touchmove",this.position.bind(this)),this.container.addEventListener("touchstart",this.click.bind(this)),this.container.addEventListener("contextmenu",this.contextmenu.bind(this)),this.container.addEventListener("keydown",this.key.bind(this)),this.container.addEventListener("wheel",this.zoom_enter.bind(this)),this.container.addEventListener("input",this.updateNodeValue.bind(this)),this.container.addEventListener("dblclick",this.dblclick.bind(this)),this.container.onpointerdown=this.pointerdown_handler.bind(this),this.container.onpointermove=this.pointermove_handler.bind(this),this.container.onpointerup=this.pointerup_handler.bind(this),this.container.onpointercancel=this.pointerup_handler.bind(this),this.container.onpointerout=this.pointerup_handler.bind(this),this.container.onpointerleave=this.pointerup_handler.bind(this),this.load()}pointerdown_handler(e){this.evCache.push(e)}pointermove_handler(e){for(var t=0;t<this.evCache.length;t++)if(e.pointerId==this.evCache[t].pointerId){this.evCache[t]=e;break}if(2==this.evCache.length){var n=Math.abs(this.evCache[0].clientX-this.evCache[1].clientX);this.prevDiff>100&&(n>this.prevDiff&&this.zoom_in(),n<this.prevDiff&&this.zoom_out()),this.prevDiff=n}}pointerup_handler(e){this.remove_event(e),this.evCache.length<2&&(this.prevDiff=-1)}remove_event(e){for(var t=0;t<this.evCache.length;t++)if(this.evCache[t].pointerId==e.pointerId){this.evCache.splice(t,1);break}}load(){for(var e in this.drawflow.drawflow[this.module].data)this.addNodeImport(this.drawflow.drawflow[this.module].data[e],this.precanvas);if(this.reroute)for(var e in this.drawflow.drawflow[this.module].data)this.addRerouteImport(this.drawflow.drawflow[this.module].data[e]);for(var e in this.drawflow.drawflow[this.module].data)this.updateConnectionNodes("node-"+e);const t=this.drawflow.drawflow;let n=1;Object.keys(t).map((function(e,i){Object.keys(t[e].data).map((function(e,t){parseInt(e)>=n&&(n=parseInt(e)+1)}))})),this.nodeId=n}removeReouteConnectionSelected(){this.dispatch("connectionUnselected",!0),this.reroute_fix_curvature&&this.connection_selected.parentElement.querySelectorAll(".main-path").forEach((e,t)=>{e.classList.remove("selected")})}click(e){if(this.dispatch("click",e),"fixed"===this.editor_mode){if("parent-drawflow"!==e.target.classList[0]&&"drawflow"!==e.target.classList[0])return!1;this.ele_selected=e.target.closest(".parent-drawflow"),e.preventDefault()}else"view"===this.editor_mode?(null!=e.target.closest(".drawflow")||e.target.matches(".parent-drawflow"))&&(this.ele_selected=e.target.closest(".parent-drawflow"),e.preventDefault()):(this.first_click=e.target,this.ele_selected=e.target,0===e.button&&this.contextmenuDel(),null!=e.target.closest(".drawflow_content_node")&&(this.ele_selected=e.target.closest(".drawflow_content_node").parentElement));switch(this.ele_selected.classList[0]){case"drawflow-node":null!=this.node_selected&&(this.node_selected.classList.remove("selected"),this.node_selected!=this.ele_selected&&this.dispatch("nodeUnselected",!0)),null!=this.connection_selected&&(this.connection_selected.classList.remove("selected"),this.removeReouteConnectionSelected(),this.connection_selected=null),this.node_selected!=this.ele_selected&&this.dispatch("nodeSelected",this.ele_selected.id.slice(5)),this.node_selected=this.ele_selected,this.node_selected.classList.add("selected"),this.draggable_inputs?"SELECT"!==e.target.tagName&&(this.drag=!0):"INPUT"!==e.target.tagName&&"TEXTAREA"!==e.target.tagName&&"SELECT"!==e.target.tagName&&!0!==e.target.hasAttribute("contenteditable")&&(this.drag=!0);break;case"output":this.connection=!0,null!=this.node_selected&&(this.node_selected.classList.remove("selected"),this.node_selected=null,this.dispatch("nodeUnselected",!0)),null!=this.connection_selected&&(this.connection_selected.classList.remove("selected"),this.removeReouteConnectionSelected(),this.connection_selected=null),this.drawConnection(e.target);break;case"parent-drawflow":case"drawflow":null!=this.node_selected&&(this.node_selected.classList.remove("selected"),this.node_selected=null,this.dispatch("nodeUnselected",!0)),null!=this.connection_selected&&(this.connection_selected.classList.remove("selected"),this.removeReouteConnectionSelected(),this.connection_selected=null),this.editor_selected=!0;break;case"main-path":null!=this.node_selected&&(this.node_selected.classList.remove("selected"),this.node_selected=null,this.dispatch("nodeUnselected",!0)),null!=this.connection_selected&&(this.connection_selected.classList.remove("selected"),this.removeReouteConnectionSelected(),this.connection_selected=null),this.connection_selected=this.ele_selected,this.connection_selected.classList.add("selected");const t=this.connection_selected.parentElement.classList;t.length>1&&(this.dispatch("connectionSelected",{output_id:t[2].slice(14),input_id:t[1].slice(13),output_class:t[3],input_class:t[4]}),this.reroute_fix_curvature&&this.connection_selected.parentElement.querySelectorAll(".main-path").forEach((e,t)=>{e.classList.add("selected")}));break;case"point":this.drag_point=!0,this.ele_selected.classList.add("selected");break;case"drawflow-delete":this.node_selected&&this.removeNodeId(this.node_selected.id),this.connection_selected&&this.removeConnection(),null!=this.node_selected&&(this.node_selected.classList.remove("selected"),this.node_selected=null,this.dispatch("nodeUnselected",!0)),null!=this.connection_selected&&(this.connection_selected.classList.remove("selected"),this.removeReouteConnectionSelected(),this.connection_selected=null)}"touchstart"===e.type?(this.pos_x=e.touches[0].clientX,this.pos_x_start=e.touches[0].clientX,this.pos_y=e.touches[0].clientY,this.pos_y_start=e.touches[0].clientY,this.mouse_x=e.touches[0].clientX,this.mouse_y=e.touches[0].clientY):(this.pos_x=e.clientX,this.pos_x_start=e.clientX,this.pos_y=e.clientY,this.pos_y_start=e.clientY),["input","output","main-path"].includes(this.ele_selected.classList[0])&&e.preventDefault(),this.dispatch("clickEnd",e)}position(e){if("touchmove"===e.type)var t=e.touches[0].clientX,n=e.touches[0].clientY;else t=e.clientX,n=e.clientY;if(this.connection&&this.updateConnection(t,n),this.editor_selected&&(i=this.canvas_x+-(this.pos_x-t),s=this.canvas_y+-(this.pos_y-n),this.dispatch("translate",{x:i,y:s}),this.precanvas.style.transform="translate("+i+"px, "+s+"px) scale("+this.zoom+")"),this.drag){e.preventDefault();var i=(this.pos_x-t)*this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom),s=(this.pos_y-n)*this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom);this.pos_x=t,this.pos_y=n,this.ele_selected.style.top=this.ele_selected.offsetTop-s+"px",this.ele_selected.style.left=this.ele_selected.offsetLeft-i+"px",this.drawflow.drawflow[this.module].data[this.ele_selected.id.slice(5)].pos_x=this.ele_selected.offsetLeft-i,this.drawflow.drawflow[this.module].data[this.ele_selected.id.slice(5)].pos_y=this.ele_selected.offsetTop-s,this.updateConnectionNodes(this.ele_selected.id)}if(this.drag_point){i=(this.pos_x-t)*this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom),s=(this.pos_y-n)*this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom);this.pos_x=t,this.pos_y=n;var o=this.pos_x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom))-this.precanvas.getBoundingClientRect().x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom)),l=this.pos_y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom))-this.precanvas.getBoundingClientRect().y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom));this.ele_selected.setAttributeNS(null,"cx",o),this.ele_selected.setAttributeNS(null,"cy",l);const e=this.ele_selected.parentElement.classList[2].slice(9),c=this.ele_selected.parentElement.classList[1].slice(13),d=this.ele_selected.parentElement.classList[3],a=this.ele_selected.parentElement.classList[4];let r=Array.from(this.ele_selected.parentElement.children).indexOf(this.ele_selected)-1;if(this.reroute_fix_curvature){r-=this.ele_selected.parentElement.querySelectorAll(".main-path").length-1,r<0&&(r=0)}const h=e.slice(5),u=this.drawflow.drawflow[this.module].data[h].outputs[d].connections.findIndex((function(e,t){return e.node===c&&e.output===a}));this.drawflow.drawflow[this.module].data[h].outputs[d].connections[u].points[r]={pos_x:o,pos_y:l};const p=this.ele_selected.parentElement.classList[2].slice(9);this.updateConnectionNodes(p)}"touchmove"===e.type&&(this.mouse_x=t,this.mouse_y=n),this.dispatch("mouseMove",{x:t,y:n})}dragEnd(e){if("touchend"===e.type)var t=this.mouse_x,n=this.mouse_y,i=document.elementFromPoint(t,n);else t=e.clientX,n=e.clientY,i=e.target;if(this.drag&&(this.pos_x_start==t&&this.pos_y_start==n||this.dispatch("nodeMoved",this.ele_selected.id.slice(5))),this.drag_point&&(this.ele_selected.classList.remove("selected"),this.pos_x_start==t&&this.pos_y_start==n||this.dispatch("rerouteMoved",this.ele_selected.parentElement.classList[2].slice(14))),this.editor_selected&&(this.canvas_x=this.canvas_x+-(this.pos_x-t),this.canvas_y=this.canvas_y+-(this.pos_y-n),this.editor_selected=!1),!0===this.connection)if("input"===i.classList[0]||this.force_first_input&&(null!=i.closest(".drawflow_content_node")||"drawflow-node"===i.classList[0])){if(!this.force_first_input||null==i.closest(".drawflow_content_node")&&"drawflow-node"!==i.classList[0])s=i.parentElement.parentElement.id,o=i.classList[1];else{if(null!=i.closest(".drawflow_content_node"))var s=i.closest(".drawflow_content_node").parentElement.id;else var s=i.id;if(0===Object.keys(this.getNodeFromId(s.slice(5)).inputs).length)var o=!1;else var o="input_1"}var l=this.ele_selected.parentElement.parentElement.id,c=this.ele_selected.classList[1];if(l!==s&&!1!==o){if(0===this.container.querySelectorAll(".connection.node_in_"+s+".node_out_"+l+"."+c+"."+o).length){this.connection_ele.classList.add("node_in_"+s),this.connection_ele.classList.add("node_out_"+l),this.connection_ele.classList.add(c),this.connection_ele.classList.add(o);var d=s.slice(5),a=l.slice(5);this.drawflow.drawflow[this.module].data[a].outputs[c].connections.push({node:d,output:o}),this.drawflow.drawflow[this.module].data[d].inputs[o].connections.push({node:a,input:c}),this.updateConnectionNodes("node-"+a),this.updateConnectionNodes("node-"+d),this.dispatch("connectionCreated",{output_id:a,input_id:d,output_class:c,input_class:o})}else this.dispatch("connectionCancel",!0),this.connection_ele.remove();this.connection_ele=null}else this.dispatch("connectionCancel",!0),this.connection_ele.remove(),this.connection_ele=null}else this.dispatch("connectionCancel",!0),this.connection_ele.remove(),this.connection_ele=null;this.drag=!1,this.drag_point=!1,this.connection=!1,this.ele_selected=null,this.editor_selected=!1,this.dispatch("mouseUp",e)}contextmenu(e){if(this.dispatch("contextmenu",e),e.preventDefault(),"fixed"===this.editor_mode||"view"===this.editor_mode)return!1;if(this.precanvas.getElementsByClassName("drawflow-delete").length&&this.precanvas.getElementsByClassName("drawflow-delete")[0].remove(),this.node_selected||this.connection_selected){var t=document.createElement("div");t.classList.add("drawflow-delete"),t.innerHTML="x",this.node_selected&&this.node_selected.appendChild(t),this.connection_selected&&this.connection_selected.parentElement.classList.length>1&&(t.style.top=e.clientY*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom))-this.precanvas.getBoundingClientRect().y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom))+"px",t.style.left=e.clientX*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom))-this.precanvas.getBoundingClientRect().x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom))+"px",this.precanvas.appendChild(t))}}contextmenuDel(){this.precanvas.getElementsByClassName("drawflow-delete").length&&this.precanvas.getElementsByClassName("drawflow-delete")[0].remove()}key(e){if(this.dispatch("keydown",e),"fixed"===this.editor_mode||"view"===this.editor_mode)return!1;("Delete"===e.key||"Backspace"===e.key&&e.metaKey)&&(null!=this.node_selected&&"INPUT"!==this.first_click.tagName&&"TEXTAREA"!==this.first_click.tagName&&!0!==this.first_click.hasAttribute("contenteditable")&&this.removeNodeId(this.node_selected.id),null!=this.connection_selected&&this.removeConnection())}zoom_enter(e,t){e.ctrlKey&&(e.preventDefault(),e.deltaY>0?this.zoom_out():this.zoom_in())}zoom_refresh(){this.dispatch("zoom",this.zoom),this.canvas_x=this.canvas_x/this.zoom_last_value*this.zoom,this.canvas_y=this.canvas_y/this.zoom_last_value*this.zoom,this.zoom_last_value=this.zoom,this.precanvas.style.transform="translate("+this.canvas_x+"px, "+this.canvas_y+"px) scale("+this.zoom+")"}zoom_in(){this.zoom<this.zoom_max&&(this.zoom+=this.zoom_value,this.zoom_refresh())}zoom_out(){this.zoom>this.zoom_min&&(this.zoom-=this.zoom_value,this.zoom_refresh())}zoom_reset(){1!=this.zoom&&(this.zoom=1,this.zoom_refresh())}createCurvature(e,t,n,i,s,o){var l=e,c=t,d=n,a=i,r=s;switch(o){case"open":if(e>=n)var h=l+Math.abs(d-l)*r,u=d-Math.abs(d-l)*(-1*r);else h=l+Math.abs(d-l)*r,u=d-Math.abs(d-l)*r;return" M "+l+" "+c+" C "+h+" "+c+" "+u+" "+a+" "+d+"  "+a;case"close":if(e>=n)h=l+Math.abs(d-l)*(-1*r),u=d-Math.abs(d-l)*r;else h=l+Math.abs(d-l)*r,u=d-Math.abs(d-l)*r;return" M "+l+" "+c+" C "+h+" "+c+" "+u+" "+a+" "+d+"  "+a;case"other":if(e>=n)h=l+Math.abs(d-l)*(-1*r),u=d-Math.abs(d-l)*(-1*r);else h=l+Math.abs(d-l)*r,u=d-Math.abs(d-l)*r;return" M "+l+" "+c+" C "+h+" "+c+" "+u+" "+a+" "+d+"  "+a;default:return" M "+l+" "+c+" C "+(h=l+Math.abs(d-l)*r)+" "+c+" "+(u=d-Math.abs(d-l)*r)+" "+a+" "+d+"  "+a}}drawConnection(e){var t=document.createElementNS("http://www.w3.org/2000/svg","svg");this.connection_ele=t;var n=document.createElementNS("http://www.w3.org/2000/svg","path");n.classList.add("main-path"),n.setAttributeNS(null,"d",""),t.classList.add("connection"),t.appendChild(n),this.precanvas.appendChild(t);var i=e.parentElement.parentElement.id.slice(5),s=e.classList[1];this.dispatch("connectionStart",{output_id:i,output_class:s})}updateConnection(e,t){const n=this.precanvas,i=this.zoom;let s=n.clientWidth/(n.clientWidth*i);s=s||0;let o=n.clientHeight/(n.clientHeight*i);o=o||0;var l=this.connection_ele.children[0],c=this.ele_selected.offsetWidth/2+(this.ele_selected.getBoundingClientRect().x-n.getBoundingClientRect().x)*s,d=this.ele_selected.offsetHeight/2+(this.ele_selected.getBoundingClientRect().y-n.getBoundingClientRect().y)*o,a=e*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom))-this.precanvas.getBoundingClientRect().x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom)),r=t*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom))-this.precanvas.getBoundingClientRect().y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom)),h=this.curvature,u=this.createCurvature(c,d,a,r,h,"openclose");l.setAttributeNS(null,"d",u)}addConnection(e,t,n,i){var s=this.getModuleFromNodeId(e);if(s===this.getModuleFromNodeId(t)){var o=this.getNodeFromId(e),l=!1;for(var c in o.outputs[n].connections){var d=o.outputs[n].connections[c];d.node==t&&d.output==i&&(l=!0)}if(!1===l){if(this.drawflow.drawflow[s].data[e].outputs[n].connections.push({node:t.toString(),output:i}),this.drawflow.drawflow[s].data[t].inputs[i].connections.push({node:e.toString(),input:n}),this.module===s){var a=document.createElementNS("http://www.w3.org/2000/svg","svg"),r=document.createElementNS("http://www.w3.org/2000/svg","path");r.classList.add("main-path"),r.setAttributeNS(null,"d",""),a.classList.add("connection"),a.classList.add("node_in_node-"+t),a.classList.add("node_out_node-"+e),a.classList.add(n),a.classList.add(i),a.appendChild(r),this.precanvas.appendChild(a),this.updateConnectionNodes("node-"+e),this.updateConnectionNodes("node-"+t)}this.dispatch("connectionCreated",{output_id:e,input_id:t,output_class:n,input_class:i})}}}updateConnectionNodes(e){const t="node_in_"+e,n="node_out_"+e;this.line_path;const i=this.container,s=this.precanvas,o=this.curvature,l=this.createCurvature,c=this.reroute_curvature,d=this.reroute_curvature_start_end,a=this.reroute_fix_curvature,r=this.reroute_width,h=this.zoom;let u=s.clientWidth/(s.clientWidth*h);u=u||0;let p=s.clientHeight/(s.clientHeight*h);p=p||0;const f=i.querySelectorAll("."+n);Object.keys(f).map((function(t,n){if(null===f[t].querySelector(".point")){var m=i.querySelector("#"+e),g=f[t].classList[1].replace("node_in_",""),_=i.querySelector("#"+g).querySelectorAll("."+f[t].classList[4])[0],w=_.offsetWidth/2+(_.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,v=_.offsetHeight/2+(_.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,y=m.querySelectorAll("."+f[t].classList[3])[0],C=y.offsetWidth/2+(y.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,x=y.offsetHeight/2+(y.getBoundingClientRect().y-s.getBoundingClientRect().y)*p;const n=l(C,x,w,v,o,"openclose");f[t].children[0].setAttributeNS(null,"d",n)}else{const n=f[t].querySelectorAll(".point");let o="";const m=[];n.forEach((t,a)=>{if(0===a&&n.length-1==0){var f=i.querySelector("#"+e),g=((x=t).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,_=(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,w=(L=f.querySelectorAll("."+t.parentElement.classList[3])[0]).offsetWidth/2+(L.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,v=L.offsetHeight/2+(L.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,y=l(w,v,g,_,d,"open");o+=y,m.push(y);f=t;var C=t.parentElement.classList[1].replace("node_in_",""),x=(E=i.querySelector("#"+C)).querySelectorAll("."+t.parentElement.classList[4])[0];g=(R=E.querySelectorAll("."+t.parentElement.classList[4])[0]).offsetWidth/2+(R.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,_=R.offsetHeight/2+(R.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,w=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,v=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,y=l(w,v,g,_,d,"close");o+=y,m.push(y)}else if(0===a){var L;f=i.querySelector("#"+e),g=((x=t).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,_=(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,w=(L=f.querySelectorAll("."+t.parentElement.classList[3])[0]).offsetWidth/2+(L.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,v=L.offsetHeight/2+(L.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,y=l(w,v,g,_,d,"open");o+=y,m.push(y);f=t,g=((x=n[a+1]).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,_=(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,w=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,v=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,y=l(w,v,g,_,c,"other");o+=y,m.push(y)}else if(a===n.length-1){var E,R;f=t,C=t.parentElement.classList[1].replace("node_in_",""),x=(E=i.querySelector("#"+C)).querySelectorAll("."+t.parentElement.classList[4])[0],g=(R=E.querySelectorAll("."+t.parentElement.classList[4])[0]).offsetWidth/2+(R.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,_=R.offsetHeight/2+(R.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,w=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*(s.clientWidth/(s.clientWidth*h))+r,v=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*(s.clientHeight/(s.clientHeight*h))+r,y=l(w,v,g,_,d,"close");o+=y,m.push(y)}else{f=t,g=((x=n[a+1]).getBoundingClientRect().x-s.getBoundingClientRect().x)*(s.clientWidth/(s.clientWidth*h))+r,_=(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*(s.clientHeight/(s.clientHeight*h))+r,w=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*(s.clientWidth/(s.clientWidth*h))+r,v=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*(s.clientHeight/(s.clientHeight*h))+r,y=l(w,v,g,_,c,"other");o+=y,m.push(y)}}),a?m.forEach((e,n)=>{f[t].children[n].setAttributeNS(null,"d",e)}):f[t].children[0].setAttributeNS(null,"d",o)}}));const m=i.querySelectorAll("."+t);Object.keys(m).map((function(t,n){if(null===m[t].querySelector(".point")){var h=i.querySelector("#"+e),f=m[t].classList[2].replace("node_out_",""),g=i.querySelector("#"+f).querySelectorAll("."+m[t].classList[3])[0],_=g.offsetWidth/2+(g.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,w=g.offsetHeight/2+(g.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,v=(h=h.querySelectorAll("."+m[t].classList[4])[0]).offsetWidth/2+(h.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,y=h.offsetHeight/2+(h.getBoundingClientRect().y-s.getBoundingClientRect().y)*p;const n=l(_,w,v,y,o,"openclose");m[t].children[0].setAttributeNS(null,"d",n)}else{const n=m[t].querySelectorAll(".point");let o="";const h=[];n.forEach((t,a)=>{if(0===a&&n.length-1==0){var f=i.querySelector("#"+e),m=((C=t).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,g=(C.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,_=(E=f.querySelectorAll("."+t.parentElement.classList[4])[0]).offsetWidth/2+(E.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,w=E.offsetHeight/2+(E.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,v=l(m,g,_,w,d,"close");o+=v,h.push(v);f=t;var y=t.parentElement.classList[2].replace("node_out_",""),C=(L=i.querySelector("#"+y)).querySelectorAll("."+t.parentElement.classList[3])[0];m=(x=L.querySelectorAll("."+t.parentElement.classList[3])[0]).offsetWidth/2+(x.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,g=x.offsetHeight/2+(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,_=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,w=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,v=l(m,g,_,w,d,"open");o+=v,h.push(v)}else if(0===a){var x;f=t,y=t.parentElement.classList[2].replace("node_out_",""),C=(L=i.querySelector("#"+y)).querySelectorAll("."+t.parentElement.classList[3])[0],m=(x=L.querySelectorAll("."+t.parentElement.classList[3])[0]).offsetWidth/2+(x.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,g=x.offsetHeight/2+(x.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,_=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,w=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,v=l(m,g,_,w,d,"open");o+=v,h.push(v);f=t,_=((C=n[a+1]).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,w=(C.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,m=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,g=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,v=l(m,g,_,w,c,"other");o+=v,h.push(v)}else if(a===n.length-1){var L,E;f=t,y=t.parentElement.classList[1].replace("node_in_",""),C=(L=i.querySelector("#"+y)).querySelectorAll("."+t.parentElement.classList[4])[0],_=(E=L.querySelectorAll("."+t.parentElement.classList[4])[0]).offsetWidth/2+(E.getBoundingClientRect().x-s.getBoundingClientRect().x)*u,w=E.offsetHeight/2+(E.getBoundingClientRect().y-s.getBoundingClientRect().y)*p,m=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,g=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,v=l(m,g,_,w,d,"close");o+=v,h.push(v)}else{f=t,_=((C=n[a+1]).getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,w=(C.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,m=(f.getBoundingClientRect().x-s.getBoundingClientRect().x)*u+r,g=(f.getBoundingClientRect().y-s.getBoundingClientRect().y)*p+r,v=l(m,g,_,w,c,"other");o+=v,h.push(v)}}),a?h.forEach((e,n)=>{m[t].children[n].setAttributeNS(null,"d",e)}):m[t].children[0].setAttributeNS(null,"d",o)}}))}dblclick(e){null!=this.connection_selected&&this.reroute&&this.createReroutePoint(this.connection_selected),"point"===e.target.classList[0]&&this.removeReroutePoint(e.target)}createReroutePoint(e){this.connection_selected.classList.remove("selected");const t=this.connection_selected.parentElement.classList[2].slice(9),n=this.connection_selected.parentElement.classList[1].slice(13),i=this.connection_selected.parentElement.classList[3],s=this.connection_selected.parentElement.classList[4];this.connection_selected=null;const o=document.createElementNS("http://www.w3.org/2000/svg","circle");o.classList.add("point");var l=this.pos_x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom))-this.precanvas.getBoundingClientRect().x*(this.precanvas.clientWidth/(this.precanvas.clientWidth*this.zoom)),c=this.pos_y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom))-this.precanvas.getBoundingClientRect().y*(this.precanvas.clientHeight/(this.precanvas.clientHeight*this.zoom));o.setAttributeNS(null,"cx",l),o.setAttributeNS(null,"cy",c),o.setAttributeNS(null,"r",this.reroute_width);let d=0;if(this.reroute_fix_curvature){const t=e.parentElement.querySelectorAll(".main-path").length;var a=document.createElementNS("http://www.w3.org/2000/svg","path");if(a.classList.add("main-path"),a.setAttributeNS(null,"d",""),e.parentElement.insertBefore(a,e.parentElement.children[t]),1===t)e.parentElement.appendChild(o);else{const n=Array.from(e.parentElement.children).indexOf(e);d=n,e.parentElement.insertBefore(o,e.parentElement.children[n+t+1])}}else e.parentElement.appendChild(o);const r=t.slice(5),h=this.drawflow.drawflow[this.module].data[r].outputs[i].connections.findIndex((function(e,t){return e.node===n&&e.output===s}));void 0===this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points&&(this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points=[]),this.reroute_fix_curvature?(d>0||this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points!==[]?this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points.splice(d,0,{pos_x:l,pos_y:c}):this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points.push({pos_x:l,pos_y:c}),e.parentElement.querySelectorAll(".main-path").forEach((e,t)=>{e.classList.remove("selected")})):this.drawflow.drawflow[this.module].data[r].outputs[i].connections[h].points.push({pos_x:l,pos_y:c}),this.dispatch("addReroute",r),this.updateConnectionNodes(t)}removeReroutePoint(e){const t=e.parentElement.classList[2].slice(9),n=e.parentElement.classList[1].slice(13),i=e.parentElement.classList[3],s=e.parentElement.classList[4];let o=Array.from(e.parentElement.children).indexOf(e);const l=t.slice(5),c=this.drawflow.drawflow[this.module].data[l].outputs[i].connections.findIndex((function(e,t){return e.node===n&&e.output===s}));if(this.reroute_fix_curvature){const t=e.parentElement.querySelectorAll(".main-path").length;e.parentElement.children[t-1].remove(),o-=t,o<0&&(o=0)}else o--;this.drawflow.drawflow[this.module].data[l].outputs[i].connections[c].points.splice(o,1),e.remove(),this.dispatch("removeReroute",l),this.updateConnectionNodes(t)}registerNode(e,t,n=null,i=null){this.noderegister[e]={html:t,props:n,options:i}}getNodeFromId(e){var t=this.getModuleFromNodeId(e);return JSON.parse(JSON.stringify(this.drawflow.drawflow[t].data[e]))}getNodesFromName(e){var t=[];const n=this.drawflow.drawflow;return Object.keys(n).map((function(i,s){for(var o in n[i].data)n[i].data[o].name==e&&t.push(n[i].data[o].id)})),t}addNode(e,t,n,i,s,o,l,c,d=!1){if(this.useuuid)var a=this.getUuid();else a=this.nodeId;const r=document.createElement("div");r.classList.add("parent-node");const h=document.createElement("div");h.innerHTML="",h.setAttribute("id","node-"+a),h.classList.add("drawflow-node"),""!=o&&h.classList.add(...o.split(" "));const u=document.createElement("div");u.classList.add("inputs");const p=document.createElement("div");p.classList.add("outputs");const f={};for(var m=0;m<t;m++){const e=document.createElement("div");e.classList.add("input"),e.classList.add("input_"+(m+1)),f["input_"+(m+1)]={connections:[]},u.appendChild(e)}const g={};for(m=0;m<n;m++){const e=document.createElement("div");e.classList.add("output"),e.classList.add("output_"+(m+1)),g["output_"+(m+1)]={connections:[]},p.appendChild(e)}const _=document.createElement("div");if(_.classList.add("drawflow_content_node"),!1===d)_.innerHTML=c;else if(!0===d)_.appendChild(this.noderegister[c].html.cloneNode(!0));else if(3===parseInt(this.render.version)){let e=this.render.h(this.noderegister[c].html,this.noderegister[c].props,this.noderegister[c].options);e.appContext=this.parent,this.render.render(e,_)}else{let e=new this.render({parent:this.parent,render:e=>e(this.noderegister[c].html,{props:this.noderegister[c].props}),...this.noderegister[c].options}).$mount();_.appendChild(e.$el)}Object.entries(l).forEach((function(e,t){if("object"==typeof e[1])!function e(t,n,i){if(null===t)t=l[n];else t=t[n];null!==t&&Object.entries(t).forEach((function(n,s){if("object"==typeof n[1])e(t,n[0],i+"-"+n[0]);else for(var o=_.querySelectorAll("[df-"+i+"-"+n[0]+"]"),l=0;l<o.length;l++)o[l].value=n[1],o[l].isContentEditable&&(o[l].innerText=n[1])}))}(null,e[0],e[0]);else for(var n=_.querySelectorAll("[df-"+e[0]+"]"),i=0;i<n.length;i++)n[i].value=e[1],n[i].isContentEditable&&(n[i].innerText=e[1])})),h.appendChild(u),h.appendChild(_),h.appendChild(p),h.style.top=s+"px",h.style.left=i+"px",r.appendChild(h),this.precanvas.appendChild(r);var w={id:a,name:e,data:l,class:o,html:c,typenode:d,inputs:f,outputs:g,pos_x:i,pos_y:s};return this.drawflow.drawflow[this.module].data[a]=w,this.dispatch("nodeCreated",a),this.useuuid||this.nodeId++,a}addNodeImport(e,t){const n=document.createElement("div");n.classList.add("parent-node");const i=document.createElement("div");i.innerHTML="",i.setAttribute("id","node-"+e.id),i.classList.add("drawflow-node"),""!=e.class&&i.classList.add(...e.class.split(" "));const s=document.createElement("div");s.classList.add("inputs");const o=document.createElement("div");o.classList.add("outputs"),Object.keys(e.inputs).map((function(n,i){const o=document.createElement("div");o.classList.add("input"),o.classList.add(n),s.appendChild(o),Object.keys(e.inputs[n].connections).map((function(i,s){var o=document.createElementNS("http://www.w3.org/2000/svg","svg"),l=document.createElementNS("http://www.w3.org/2000/svg","path");l.classList.add("main-path"),l.setAttributeNS(null,"d",""),o.classList.add("connection"),o.classList.add("node_in_node-"+e.id),o.classList.add("node_out_node-"+e.inputs[n].connections[i].node),o.classList.add(e.inputs[n].connections[i].input),o.classList.add(n),o.appendChild(l),t.appendChild(o)}))}));for(var l=0;l<Object.keys(e.outputs).length;l++){const e=document.createElement("div");e.classList.add("output"),e.classList.add("output_"+(l+1)),o.appendChild(e)}const c=document.createElement("div");if(c.classList.add("drawflow_content_node"),!1===e.typenode)c.innerHTML=e.html;else if(!0===e.typenode)c.appendChild(this.noderegister[e.html].html.cloneNode(!0));else if(3===parseInt(this.render.version)){let t=this.render.h(this.noderegister[e.html].html,this.noderegister[e.html].props,this.noderegister[e.html].options);t.appContext=this.parent,this.render.render(t,c)}else{let t=new this.render({parent:this.parent,render:t=>t(this.noderegister[e.html].html,{props:this.noderegister[e.html].props}),...this.noderegister[e.html].options}).$mount();c.appendChild(t.$el)}Object.entries(e.data).forEach((function(t,n){if("object"==typeof t[1])!function t(n,i,s){if(null===n)n=e.data[i];else n=n[i];null!==n&&Object.entries(n).forEach((function(e,i){if("object"==typeof e[1])t(n,e[0],s+"-"+e[0]);else for(var o=c.querySelectorAll("[df-"+s+"-"+e[0]+"]"),l=0;l<o.length;l++)o[l].value=e[1],o[l].isContentEditable&&(o[l].innerText=e[1])}))}(null,t[0],t[0]);else for(var i=c.querySelectorAll("[df-"+t[0]+"]"),s=0;s<i.length;s++)i[s].value=t[1],i[s].isContentEditable&&(i[s].innerText=t[1])})),i.appendChild(s),i.appendChild(c),i.appendChild(o),i.style.top=e.pos_y+"px",i.style.left=e.pos_x+"px",n.appendChild(i),this.precanvas.appendChild(n)}addRerouteImport(e){const t=this.reroute_width,n=this.reroute_fix_curvature,i=this.container;Object.keys(e.outputs).map((function(s,o){Object.keys(e.outputs[s].connections).map((function(o,l){const c=e.outputs[s].connections[o].points;void 0!==c&&c.forEach((l,d)=>{const a=e.outputs[s].connections[o].node,r=e.outputs[s].connections[o].output,h=i.querySelector(".connection.node_in_node-"+a+".node_out_node-"+e.id+"."+s+"."+r);if(n&&0===d)for(var u=0;u<c.length;u++){var p=document.createElementNS("http://www.w3.org/2000/svg","path");p.classList.add("main-path"),p.setAttributeNS(null,"d",""),h.appendChild(p)}const f=document.createElementNS("http://www.w3.org/2000/svg","circle");f.classList.add("point");var m=l.pos_x,g=l.pos_y;f.setAttributeNS(null,"cx",m),f.setAttributeNS(null,"cy",g),f.setAttributeNS(null,"r",t),h.appendChild(f)})}))}))}updateNodeValue(e){for(var t=e.target.attributes,n=0;n<t.length;n++)if(t[n].nodeName.startsWith("df-")){for(var i=t[n].nodeName.slice(3).split("-"),s=this.drawflow.drawflow[this.module].data[e.target.closest(".drawflow_content_node").parentElement.id.slice(5)].data,o=0;o<i.length-1;o+=1)null==s[i[o]]&&(s[i[o]]={}),s=s[i[o]];s[i[i.length-1]]=e.target.value,e.target.isContentEditable&&(s[i[i.length-1]]=e.target.innerText),this.dispatch("nodeDataChanged",e.target.closest(".drawflow_content_node").parentElement.id.slice(5))}}updateNodeDataFromId(e,t){var n=this.getModuleFromNodeId(e);if(this.drawflow.drawflow[n].data[e].data=t,this.module===n){const n=this.container.querySelector("#node-"+e);Object.entries(t).forEach((function(e,i){if("object"==typeof e[1])!function e(i,s,o){if(null===i)i=t[s];else i=i[s];null!==i&&Object.entries(i).forEach((function(t,s){if("object"==typeof t[1])e(i,t[0],o+"-"+t[0]);else for(var l=n.querySelectorAll("[df-"+o+"-"+t[0]+"]"),c=0;c<l.length;c++)l[c].value=t[1],l[c].isContentEditable&&(l[c].innerText=t[1])}))}(null,e[0],e[0]);else for(var s=n.querySelectorAll("[df-"+e[0]+"]"),o=0;o<s.length;o++)s[o].value=e[1],s[o].isContentEditable&&(s[o].innerText=e[1])}))}}addNodeInput(e){var t=this.getModuleFromNodeId(e);const n=this.getNodeFromId(e),i=Object.keys(n.inputs).length;if(this.module===t){const t=document.createElement("div");t.classList.add("input"),t.classList.add("input_"+(i+1));this.container.querySelector("#node-"+e+" .inputs").appendChild(t),this.updateConnectionNodes("node-"+e)}this.drawflow.drawflow[t].data[e].inputs["input_"+(i+1)]={connections:[]}}addNodeOutput(e){var t=this.getModuleFromNodeId(e);const n=this.getNodeFromId(e),i=Object.keys(n.outputs).length;if(this.module===t){const t=document.createElement("div");t.classList.add("output"),t.classList.add("output_"+(i+1));this.container.querySelector("#node-"+e+" .outputs").appendChild(t),this.updateConnectionNodes("node-"+e)}this.drawflow.drawflow[t].data[e].outputs["output_"+(i+1)]={connections:[]}}removeNodeInput(e,t){var n=this.getModuleFromNodeId(e);const i=this.getNodeFromId(e);this.module===n&&this.container.querySelector("#node-"+e+" .inputs .input."+t).remove();const s=[];Object.keys(i.inputs[t].connections).map((function(n,o){const l=i.inputs[t].connections[o].node,c=i.inputs[t].connections[o].input;s.push({id_output:l,id:e,output_class:c,input_class:t})})),s.forEach((e,t)=>{this.removeSingleConnection(e.id_output,e.id,e.output_class,e.input_class)}),delete this.drawflow.drawflow[n].data[e].inputs[t];const o=[],l=this.drawflow.drawflow[n].data[e].inputs;Object.keys(l).map((function(e,t){o.push(l[e])})),this.drawflow.drawflow[n].data[e].inputs={};const c=t.slice(6);let d=[];if(o.forEach((t,i)=>{t.connections.forEach((e,t)=>{d.push(e)}),this.drawflow.drawflow[n].data[e].inputs["input_"+(i+1)]=t}),d=new Set(d.map(e=>JSON.stringify(e))),d=Array.from(d).map(e=>JSON.parse(e)),this.module===n){this.container.querySelectorAll("#node-"+e+" .inputs .input").forEach((e,t)=>{const n=e.classList[1].slice(6);parseInt(c)<parseInt(n)&&(e.classList.remove("input_"+n),e.classList.add("input_"+(n-1)))})}d.forEach((t,i)=>{this.drawflow.drawflow[n].data[t.node].outputs[t.input].connections.forEach((i,s)=>{if(i.node==e){const o=i.output.slice(6);if(parseInt(c)<parseInt(o)){if(this.module===n){const n=this.container.querySelector(".connection.node_in_node-"+e+".node_out_node-"+t.node+"."+t.input+".input_"+o);n.classList.remove("input_"+o),n.classList.add("input_"+(o-1))}i.points?this.drawflow.drawflow[n].data[t.node].outputs[t.input].connections[s]={node:i.node,output:"input_"+(o-1),points:i.points}:this.drawflow.drawflow[n].data[t.node].outputs[t.input].connections[s]={node:i.node,output:"input_"+(o-1)}}}})}),this.updateConnectionNodes("node-"+e)}removeNodeOutput(e,t){var n=this.getModuleFromNodeId(e);const i=this.getNodeFromId(e);this.module===n&&this.container.querySelector("#node-"+e+" .outputs .output."+t).remove();const s=[];Object.keys(i.outputs[t].connections).map((function(n,o){const l=i.outputs[t].connections[o].node,c=i.outputs[t].connections[o].output;s.push({id:e,id_input:l,output_class:t,input_class:c})})),s.forEach((e,t)=>{this.removeSingleConnection(e.id,e.id_input,e.output_class,e.input_class)}),delete this.drawflow.drawflow[n].data[e].outputs[t];const o=[],l=this.drawflow.drawflow[n].data[e].outputs;Object.keys(l).map((function(e,t){o.push(l[e])})),this.drawflow.drawflow[n].data[e].outputs={};const c=t.slice(7);let d=[];if(o.forEach((t,i)=>{t.connections.forEach((e,t)=>{d.push({node:e.node,output:e.output})}),this.drawflow.drawflow[n].data[e].outputs["output_"+(i+1)]=t}),d=new Set(d.map(e=>JSON.stringify(e))),d=Array.from(d).map(e=>JSON.parse(e)),this.module===n){this.container.querySelectorAll("#node-"+e+" .outputs .output").forEach((e,t)=>{const n=e.classList[1].slice(7);parseInt(c)<parseInt(n)&&(e.classList.remove("output_"+n),e.classList.add("output_"+(n-1)))})}d.forEach((t,i)=>{this.drawflow.drawflow[n].data[t.node].inputs[t.output].connections.forEach((i,s)=>{if(i.node==e){const o=i.input.slice(7);if(parseInt(c)<parseInt(o)){if(this.module===n){const n=this.container.querySelector(".connection.node_in_node-"+t.node+".node_out_node-"+e+".output_"+o+"."+t.output);n.classList.remove("output_"+o),n.classList.remove(t.output),n.classList.add("output_"+(o-1)),n.classList.add(t.output)}i.points?this.drawflow.drawflow[n].data[t.node].inputs[t.output].connections[s]={node:i.node,input:"output_"+(o-1),points:i.points}:this.drawflow.drawflow[n].data[t.node].inputs[t.output].connections[s]={node:i.node,input:"output_"+(o-1)}}}})}),this.updateConnectionNodes("node-"+e)}removeNodeId(e){this.removeConnectionNodeId(e);var t=this.getModuleFromNodeId(e.slice(5));this.module===t&&this.container.querySelector("#"+e).remove(),delete this.drawflow.drawflow[t].data[e.slice(5)],this.dispatch("nodeRemoved",e.slice(5))}removeConnection(){if(null!=this.connection_selected){var e=this.connection_selected.parentElement.classList;this.connection_selected.parentElement.remove();var t=this.drawflow.drawflow[this.module].data[e[2].slice(14)].outputs[e[3]].connections.findIndex((function(t,n){return t.node===e[1].slice(13)&&t.output===e[4]}));this.drawflow.drawflow[this.module].data[e[2].slice(14)].outputs[e[3]].connections.splice(t,1);var n=this.drawflow.drawflow[this.module].data[e[1].slice(13)].inputs[e[4]].connections.findIndex((function(t,n){return t.node===e[2].slice(14)&&t.input===e[3]}));this.drawflow.drawflow[this.module].data[e[1].slice(13)].inputs[e[4]].connections.splice(n,1),this.dispatch("connectionRemoved",{output_id:e[2].slice(14),input_id:e[1].slice(13),output_class:e[3],input_class:e[4]}),this.connection_selected=null}}removeSingleConnection(e,t,n,i){var s=this.getModuleFromNodeId(e);if(s===this.getModuleFromNodeId(t)){if(this.drawflow.drawflow[s].data[e].outputs[n].connections.findIndex((function(e,n){return e.node==t&&e.output===i}))>-1){this.module===s&&this.container.querySelector(".connection.node_in_node-"+t+".node_out_node-"+e+"."+n+"."+i).remove();var o=this.drawflow.drawflow[s].data[e].outputs[n].connections.findIndex((function(e,n){return e.node==t&&e.output===i}));this.drawflow.drawflow[s].data[e].outputs[n].connections.splice(o,1);var l=this.drawflow.drawflow[s].data[t].inputs[i].connections.findIndex((function(t,i){return t.node==e&&t.input===n}));return this.drawflow.drawflow[s].data[t].inputs[i].connections.splice(l,1),this.dispatch("connectionRemoved",{output_id:e,input_id:t,output_class:n,input_class:i}),!0}return!1}return!1}removeConnectionNodeId(e){const t="node_in_"+e,n="node_out_"+e,i=this.container.querySelectorAll("."+n);for(var s=i.length-1;s>=0;s--){var o=i[s].classList,l=this.drawflow.drawflow[this.module].data[o[1].slice(13)].inputs[o[4]].connections.findIndex((function(e,t){return e.node===o[2].slice(14)&&e.input===o[3]}));this.drawflow.drawflow[this.module].data[o[1].slice(13)].inputs[o[4]].connections.splice(l,1);var c=this.drawflow.drawflow[this.module].data[o[2].slice(14)].outputs[o[3]].connections.findIndex((function(e,t){return e.node===o[1].slice(13)&&e.output===o[4]}));this.drawflow.drawflow[this.module].data[o[2].slice(14)].outputs[o[3]].connections.splice(c,1),i[s].remove(),this.dispatch("connectionRemoved",{output_id:o[2].slice(14),input_id:o[1].slice(13),output_class:o[3],input_class:o[4]})}const d=this.container.querySelectorAll("."+t);for(s=d.length-1;s>=0;s--){o=d[s].classList,c=this.drawflow.drawflow[this.module].data[o[2].slice(14)].outputs[o[3]].connections.findIndex((function(e,t){return e.node===o[1].slice(13)&&e.output===o[4]}));this.drawflow.drawflow[this.module].data[o[2].slice(14)].outputs[o[3]].connections.splice(c,1);l=this.drawflow.drawflow[this.module].data[o[1].slice(13)].inputs[o[4]].connections.findIndex((function(e,t){return e.node===o[2].slice(14)&&e.input===o[3]}));this.drawflow.drawflow[this.module].data[o[1].slice(13)].inputs[o[4]].connections.splice(l,1),d[s].remove(),this.dispatch("connectionRemoved",{output_id:o[2].slice(14),input_id:o[1].slice(13),output_class:o[3],input_class:o[4]})}}getModuleFromNodeId(e){var t;const n=this.drawflow.drawflow;return Object.keys(n).map((function(i,s){Object.keys(n[i].data).map((function(n,s){n==e&&(t=i)}))})),t}addModule(e){this.drawflow.drawflow[e]={data:{}},this.dispatch("moduleCreated",e)}changeModule(e){this.dispatch("moduleChanged",e),this.module=e,this.precanvas.innerHTML="",this.canvas_x=0,this.canvas_y=0,this.pos_x=0,this.pos_y=0,this.mouse_x=0,this.mouse_y=0,this.zoom=1,this.zoom_last_value=1,this.precanvas.style.transform="",this.import(this.drawflow,!1)}removeModule(e){this.module===e&&this.changeModule("Home"),delete this.drawflow.drawflow[e],this.dispatch("moduleRemoved",e)}clearModuleSelected(){this.precanvas.innerHTML="",this.drawflow.drawflow[this.module]={data:{}}}clear(){this.precanvas.innerHTML="",this.drawflow={drawflow:{Home:{data:{}}}}}export(){const e=JSON.parse(JSON.stringify(this.drawflow));return this.dispatch("export",e),e}import(e,t=!0){this.clear(),this.drawflow=JSON.parse(JSON.stringify(e)),this.load(),t&&this.dispatch("import","import")}on(e,t){return"function"!=typeof t?(console.error("The listener callback must be a function, the given type is "+typeof t),!1):"string"!=typeof e?(console.error("The event name must be a string, the given type is "+typeof e),!1):(void 0===this.events[e]&&(this.events[e]={listeners:[]}),void this.events[e].listeners.push(t))}removeListener(e,t){if(!this.events[e])return!1;const n=this.events[e].listeners,i=n.indexOf(t);i>-1&&n.splice(i,1)}dispatch(e,t){if(void 0===this.events[e])return!1;this.events[e].listeners.forEach(e=>{e(t)})}getUuid(){for(var e=[],t=0;t<36;t++)e[t]="0123456789abcdef".substr(Math.floor(16*Math.random()),1);return e[14]="4",e[19]="0123456789abcdef".substr(3&e[19]|8,1),e[8]=e[13]=e[18]=e[23]="-",e.join("")}}}]).default}));
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(error => {
-                        console.warn('ServiceWorker registration failed: ', error);
-                    });
+/* ---- js/core.js ---- */
+        // =============================================
+        // 1. SISTEMA CORE Y STORAGE
+        // =============================================
+        const SafeStorage={isAvailable:!1,init:function(){try{let e="__test__";localStorage.setItem(e,e),localStorage.removeItem(e),this.isAvailable=!0}catch(e){console.warn("Storage disabled")}},save:function(e,t){this.isAvailable&&localStorage.setItem(e,t)},load:function(e){return this.isAvailable?localStorage.getItem(e):null},clear:function(e){this.isAvailable&&localStorage.removeItem(e)}};SafeStorage.init();
+
+        const CITIES = [{n:"Madrid",c:[40.416,-3.703]},{n:"Barcelona",c:[41.385,2.173]},{n:"Valencia",c:[39.469,-0.376]},{n:"Sevilla",c:[37.389,-5.984]}];
+        let layerControl;
+        let currentNodeId = null;
+        let currentRunTimestamp = 0; // Para el control de estado (verde/naranja)
+
+        const ensureFC = (geo) => {
+            if (!geo) return turf.featureCollection([]);
+            if (geo.type === 'FeatureCollection') return geo;
+            if (geo.type === 'Feature') return turf.featureCollection([geo]);
+            if (geo.type === 'GeometryCollection') return turf.featureCollection(geo.geometries.map(g => turf.feature(g)));
+            return turf.featureCollection([turf.feature(geo)]);
+        };
+
+        function JETLCloneFallback(value, seen) {
+            if (value === null || value === undefined) return value;
+            const t = typeof value;
+            if (t !== 'object') return value;
+            if (value instanceof Date) return new Date(value.getTime());
+            if (value instanceof RegExp) return new RegExp(value.source, value.flags);
+            if (value instanceof ArrayBuffer) return value.slice(0);
+            if (ArrayBuffer.isView(value)) {
+                if (typeof value.slice === 'function') return value.slice(0);
+                return new value.constructor(value);
+            }
+
+            const refs = seen || new Map();
+            if (refs.has(value)) return refs.get(value);
+
+            if (Array.isArray(value)) {
+                const outArr = new Array(value.length);
+                refs.set(value, outArr);
+                for (let i = 0; i < value.length; i++) outArr[i] = JETLCloneFallback(value[i], refs);
+                return outArr;
+            }
+
+            const out = {};
+            refs.set(value, out);
+            Object.keys(value).forEach((k) => { out[k] = JETLCloneFallback(value[k], refs); });
+            return out;
+        }
+
+        function JETLClone(value) {
+            if (value === null || value === undefined) return value;
+            if (typeof structuredClone === 'function') {
+                try { return structuredClone(value); } catch (e) {}
+            }
+            return JETLCloneFallback(value);
+        }
+        window.JETLClone = JETLClone;
+        window.JETLCloneFallback = JETLCloneFallback;
+
+        function JETLIsCancelledError(err) {
+            return !!(
+                (typeof window !== 'undefined' && window.isEngineCancelled) ||
+                (err && (err.cancelled || err.name === 'CancelledError'))
+            );
+        }
+        window.JETLIsCancelledError = JETLIsCancelledError;
+
+        function JETLThrowIfCancelled() {
+            if (typeof window !== 'undefined' && window.isEngineCancelled) {
+                const err = new Error('Operacion cancelada por el usuario');
+                err.name = 'CancelledError';
+                err.cancelled = true;
+                throw err;
+            }
+        }
+        window.JETLThrowIfCancelled = JETLThrowIfCancelled;
+
+        function JETLNextTick() {
+            return new Promise(resolve => setTimeout(resolve, 0));
+        }
+        window.JETLNextTick = JETLNextTick;
+
+        // =============================================
+        // 1.b PARAMETROS GLOBALES DE WORKSPACE
+        // =============================================
+        const PARAMS_STORAGE_KEY = 'jetl_workspace_params';
+        let __jetlParams = {};
+        try {
+            const raw = SafeStorage.load(PARAMS_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') __jetlParams = parsed;
+            }
+        } catch (e) { /* noop */ }
+
+        function JETLGetParams() {
+            return { ...(__jetlParams || {}) };
+        }
+
+        function JETLSetParams(map) {
+            __jetlParams = (map && typeof map === 'object') ? { ...map } : {};
+            SafeStorage.save(PARAMS_STORAGE_KEY, JSON.stringify(__jetlParams));
+            return JETLGetParams();
+        }
+
+        function JETLSetParam(key, value) {
+            const k = String(key || '').trim();
+            if (!k) return JETLGetParams();
+            __jetlParams[k] = value == null ? '' : String(value);
+            SafeStorage.save(PARAMS_STORAGE_KEY, JSON.stringify(__jetlParams));
+            return JETLGetParams();
+        }
+
+        function JETLGetParam(key, fallback = '') {
+            const k = String(key || '').trim();
+            if (!k) return fallback;
+            return Object.prototype.hasOwnProperty.call(__jetlParams, k) ? __jetlParams[k] : fallback;
+        }
+
+        function JETLResolveParamText(input) {
+            const source = input == null ? '' : String(input);
+            if (!source.includes('${')) return source;
+            return source.replace(/\$\{([a-zA-Z0-9_.-]+)\}/g, (m, key) => {
+                const k = String(key || '').trim();
+                if (!k) return m;
+                return Object.prototype.hasOwnProperty.call(__jetlParams, k) ? String(__jetlParams[k]) : m;
             });
         }
+
+        window.JETLParams = {
+            getAll: JETLGetParams,
+            setAll: JETLSetParams,
+            get: JETLGetParam,
+            set: JETLSetParam
+        };
+        window.JETLResolveParamText = JETLResolveParamText;
+
+        // =============================================
+        // 1.c FALLBACK DE CARGA SMOKE (anti-cache/SW)
+        // =============================================
+        const SMOKE_SRC = 'js/smoke.js';
+        let __smokeLoadPromise = null;
+
+        function ensureSmokeApiLoaded() {
+            if (typeof window === 'undefined') return;
+            if (window.JETLSmoke) return;
+            const existing = document.querySelector('script[data-jetl-smoke-fallback="1"]');
+            if (existing) return;
+            const s = document.createElement('script');
+            s.src = SMOKE_SRC;
+            s.defer = true;
+            s.setAttribute('data-jetl-smoke-fallback', '1');
+            s.onload = () => console.log('[JETL] smoke fallback loaded');
+            s.onerror = (e) => console.warn('[JETL] smoke fallback failed', e);
+            (document.head || document.body || document.documentElement).appendChild(s);
+        }
+
+        function ensureSmokeApiLoadedAsync(timeoutMs = 5000) {
+            if (typeof window === 'undefined') return Promise.resolve(false);
+            if (window.JETLSmoke && !window.JETLSmoke.__proxy) return Promise.resolve(true);
+            if (__smokeLoadPromise) return __smokeLoadPromise;
+
+            __smokeLoadPromise = new Promise((resolve) => {
+                let done = false;
+                const finish = (ok) => {
+                    if (done) return;
+                    done = true;
+                    resolve(!!ok);
+                };
+
+                const checkReady = () => !!(window.JETLSmoke && !window.JETLSmoke.__proxy);
+                if (checkReady()) return finish(true);
+
+                let s = document.querySelector('script[data-jetl-smoke-fallback="1"]');
+                if (!s) {
+                    s = document.createElement('script');
+                    s.src = SMOKE_SRC;
+                    s.defer = true;
+                    s.setAttribute('data-jetl-smoke-fallback', '1');
+                    (document.head || document.body || document.documentElement).appendChild(s);
+                }
+
+                s.addEventListener('load', () => finish(checkReady()), { once: true });
+                s.addEventListener('error', () => finish(false), { once: true });
+                setTimeout(() => finish(checkReady()), timeoutMs);
+            }).finally(() => {
+                __smokeLoadPromise = null;
+            });
+            return __smokeLoadPromise;
+        }
+
+        if (typeof window !== 'undefined' && !window.JETLSmoke) {
+            const smokeProxy = {
+                __proxy: true,
+                runBasic: async () => {
+                    await ensureSmokeApiLoadedAsync();
+                    if (!window.JETLSmoke || window.JETLSmoke === smokeProxy || typeof window.JETLSmoke.runBasic !== 'function') {
+                        throw new Error('JETLSmoke no disponible (fallo de carga de js/smoke.js)');
+                    }
+                    return window.JETLSmoke.runBasic();
+                },
+                runExtended: async () => {
+                    await ensureSmokeApiLoadedAsync();
+                    if (!window.JETLSmoke || window.JETLSmoke === smokeProxy || typeof window.JETLSmoke.runExtended !== 'function') {
+                        throw new Error('JETLSmoke no disponible (fallo de carga de js/smoke.js)');
+                    }
+                    return window.JETLSmoke.runExtended();
+                }
+            };
+            window.JETLSmoke = smokeProxy;
+        }
+
+        if (typeof window !== 'undefined') {
+            window.ensureSmokeApiLoaded = ensureSmokeApiLoaded;
+            window.ensureSmokeApiLoadedAsync = ensureSmokeApiLoadedAsync;
+        }
+
+
+/* ---- js/params.js ---- */
+// =============================================
+// WORKSPACE PARAMS UI
+// =============================================
+(function () {
+    function ensureRowsContainer() {
+        return document.getElementById('params-rows');
+    }
+
+    function getParamMapFromUI() {
+        const rows = Array.from(document.querySelectorAll('#params-rows [data-param-row]'));
+        const out = {};
+        rows.forEach((row) => {
+            const k = (row.querySelector('[data-param-key]')?.value || '').trim();
+            const v = row.querySelector('[data-param-val]')?.value || '';
+            if (!k) return;
+            out[k] = v;
+        });
+        return out;
+    }
+
+    function addParamRow(key = '', value = '') {
+        const rows = ensureRowsContainer();
+        if (!rows) return;
+        const row = document.createElement('div');
+        row.setAttribute('data-param-row', '1');
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '1fr 1fr auto';
+        row.style.gap = '6px';
+        row.style.marginBottom = '6px';
+        row.innerHTML = `
+            <input data-param-key class="node-control" placeholder="param_key" value="${String(key).replace(/"/g, '&quot;')}">
+            <input data-param-val class="node-control" placeholder="valor" value="${String(value).replace(/"/g, '&quot;')}">
+            <button class="btn" data-ui-action="remove-param-row" title="Eliminar"><i class="fas fa-times"></i></button>
+        `;
+        rows.appendChild(row);
+    }
+
+    function openParamsModal() {
+        const modal = document.getElementById('params-modal');
+        const rows = ensureRowsContainer();
+        if (!modal || !rows) return;
+        rows.innerHTML = '';
+        const data = (window.JETLParams && typeof window.JETLParams.getAll === 'function')
+            ? window.JETLParams.getAll()
+            : {};
+        const keys = Object.keys(data || {});
+        if (!keys.length) addParamRow('', '');
+        else keys.forEach((k) => addParamRow(k, data[k]));
+        modal.style.display = 'flex';
+    }
+
+    function closeParamsModal() {
+        const modal = document.getElementById('params-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function saveParamsFromModal() {
+        const map = getParamMapFromUI();
+        if (window.JETLParams && typeof window.JETLParams.setAll === 'function') {
+            window.JETLParams.setAll(map);
+        }
+        closeParamsModal();
+        if (typeof showToast === 'function') showToast('Parametros guardados', 'success');
+    }
+
+    document.addEventListener('click', (e) => {
+        const actionEl = e.target.closest('[data-ui-action]');
+        if (!actionEl) return;
+        const action = actionEl.getAttribute('data-ui-action');
+        if (action === 'open-params') openParamsModal();
+        else if (action === 'close-params') closeParamsModal();
+        else if (action === 'save-params') saveParamsFromModal();
+        else if (action === 'add-param-row') addParamRow('', '');
+        else if (action === 'remove-param-row') {
+            const row = actionEl.closest('[data-param-row]');
+            if (row) row.remove();
+        }
+    });
+
+    window.openParamsModal = openParamsModal;
+    window.closeParamsModal = closeParamsModal;
+})();
+
+
+/* ---- js/formats.js ---- */
+// =============================================
+// FORMATS REGISTRY (MODULAR I/O)
+// =============================================
+// This module isolates new/experimental formats so they are easy to locate.
+(function () {
+    const registry = {
+        readers: [],
+        writers: []
+    };
+
+    function _xmlEscape(v) {
+        return String(v)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    function _coordsToKml(coords) {
+        return coords.map(c => {
+            const x = Number(c[0]);
+            const y = Number(c[1]);
+            const z = c.length > 2 ? Number(c[2]) : null;
+            return z === null || Number.isNaN(z) ? `${x},${y}` : `${x},${y},${z}`;
+        }).join(' ');
+    }
+
+    function _parseCoords(text) {
+        if (!text) return [];
+        return text
+            .trim()
+            .split(/\s+/)
+            .map(token => token.split(',').map(Number))
+            .filter(c => c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]))
+            .map(c => c.length >= 3 && Number.isFinite(c[2]) ? [c[0], c[1], c[2]] : [c[0], c[1]]);
+    }
+
+    function _elText(parent, tag) {
+        const el = parent.getElementsByTagName(tag)[0];
+        return el && el.textContent ? el.textContent.trim() : '';
+    }
+
+    function _firstDirectChild(el, tagName) {
+        for (const child of el.children || []) {
+            if (child.tagName === tagName) return child;
+        }
+        return null;
+    }
+
+    function _kmlGeometryToGeoJSON(el) {
+        if (!el) return null;
+        const tag = el.tagName;
+
+        if (tag === 'Point') {
+            const coords = _parseCoords(_elText(el, 'coordinates'));
+            if (!coords.length) return null;
+            return { type: 'Point', coordinates: coords[0] };
+        }
+        if (tag === 'LineString') {
+            const coords = _parseCoords(_elText(el, 'coordinates'));
+            if (coords.length < 2) return null;
+            return { type: 'LineString', coordinates: coords };
+        }
+        if (tag === 'Polygon') {
+            const rings = [];
+            const outer = el.getElementsByTagName('outerBoundaryIs')[0];
+            if (outer) {
+                const lr = outer.getElementsByTagName('LinearRing')[0];
+                const coords = _parseCoords(_elText(lr || outer, 'coordinates'));
+                if (coords.length >= 4) rings.push(coords);
+            }
+            const inners = el.getElementsByTagName('innerBoundaryIs');
+            for (let i = 0; i < inners.length; i++) {
+                const lr = inners[i].getElementsByTagName('LinearRing')[0];
+                const coords = _parseCoords(_elText(lr || inners[i], 'coordinates'));
+                if (coords.length >= 4) rings.push(coords);
+            }
+            if (!rings.length) return null;
+            return { type: 'Polygon', coordinates: rings };
+        }
+        if (tag === 'MultiGeometry') {
+            const geoms = [];
+            for (const child of el.children || []) {
+                const g = _kmlGeometryToGeoJSON(child);
+                if (g) geoms.push(g);
+            }
+            if (!geoms.length) return null;
+
+            const same = geoms.every(g => g.type === geoms[0].type);
+            if (same && geoms[0].type === 'Point') return { type: 'MultiPoint', coordinates: geoms.map(g => g.coordinates) };
+            if (same && geoms[0].type === 'LineString') return { type: 'MultiLineString', coordinates: geoms.map(g => g.coordinates) };
+            if (same && geoms[0].type === 'Polygon') return { type: 'MultiPolygon', coordinates: geoms.map(g => g.coordinates) };
+            return { type: 'GeometryCollection', geometries: geoms };
+        }
+
+        return null;
+    }
+
+    function parseKMLToGeoJSON(text) {
+        const xml = new DOMParser().parseFromString(text, 'text/xml');
+        const parseErr = xml.getElementsByTagName('parsererror');
+        if (parseErr && parseErr.length) throw new Error("KML invalido");
+
+        const placemarks = Array.from(xml.getElementsByTagName('Placemark'));
+        const features = [];
+
+        const kmlGeomTags = ['Point', 'LineString', 'Polygon', 'MultiGeometry'];
+        const findGeom = (pm) => {
+            for (const t of kmlGeomTags) {
+                const el = _firstDirectChild(pm, t);
+                if (el) return el;
+            }
+            for (const t of kmlGeomTags) {
+                const all = pm.getElementsByTagName(t);
+                if (all.length) return all[0];
+            }
+            return null;
+        };
+
+        placemarks.forEach(pm => {
+            const geomEl = findGeom(pm);
+            const geometry = _kmlGeometryToGeoJSON(geomEl);
+            if (!geometry) return;
+
+            const props = {};
+            const name = _elText(pm, 'name');
+            const description = _elText(pm, 'description');
+            if (name) props.name = name;
+            if (description) props.description = description;
+
+            const dataEls = pm.getElementsByTagName('Data');
+            for (let i = 0; i < dataEls.length; i++) {
+                const key = dataEls[i].getAttribute('name');
+                if (!key) continue;
+                const valEl = dataEls[i].getElementsByTagName('value')[0];
+                props[key] = valEl ? (valEl.textContent || '').trim() : '';
+            }
+
+            features.push(turf.feature(geometry, props));
+        });
+
+        if (features.length) return turf.featureCollection(features);
+
+        const firstGeom = (() => {
+            for (const t of kmlGeomTags) {
+                const all = xml.getElementsByTagName(t);
+                if (all.length) return all[0];
+            }
+            return null;
+        })();
+
+        const g = _kmlGeometryToGeoJSON(firstGeom);
+        if (!g) throw new Error("KML sin geometrias compatibles");
+        return turf.featureCollection([turf.feature(g, {})]);
+    }
+
+    function _geomToKml(geometry) {
+        if (!geometry || !geometry.type) return '';
+        const t = geometry.type;
+        const c = geometry.coordinates;
+
+        if (t === 'Point') {
+            return `<Point><coordinates>${_coordsToKml([c])}</coordinates></Point>`;
+        }
+        if (t === 'LineString') {
+            return `<LineString><coordinates>${_coordsToKml(c)}</coordinates></LineString>`;
+        }
+        if (t === 'Polygon') {
+            const rings = (c || []).map(r => {
+                if (!r || !r.length) return null;
+                const first = r[0];
+                const last = r[r.length - 1];
+                const closed = (first[0] === last[0] && first[1] === last[1]) ? r : [...r, first];
+                return closed;
+            }).filter(Boolean);
+            if (!rings.length) return '';
+            const outer = `<outerBoundaryIs><LinearRing><coordinates>${_coordsToKml(rings[0])}</coordinates></LinearRing></outerBoundaryIs>`;
+            const inners = rings.slice(1).map(r => `<innerBoundaryIs><LinearRing><coordinates>${_coordsToKml(r)}</coordinates></LinearRing></innerBoundaryIs>`).join('');
+            return `<Polygon>${outer}${inners}</Polygon>`;
+        }
+        if (t === 'MultiPoint') {
+            return `<MultiGeometry>${(c || []).map(p => `<Point><coordinates>${_coordsToKml([p])}</coordinates></Point>`).join('')}</MultiGeometry>`;
+        }
+        if (t === 'MultiLineString') {
+            return `<MultiGeometry>${(c || []).map(line => `<LineString><coordinates>${_coordsToKml(line)}</coordinates></LineString>`).join('')}</MultiGeometry>`;
+        }
+        if (t === 'MultiPolygon') {
+            const polys = (c || []).map(poly => _geomToKml({ type: 'Polygon', coordinates: poly })).join('');
+            return `<MultiGeometry>${polys}</MultiGeometry>`;
+        }
+        if (t === 'GeometryCollection') {
+            return `<MultiGeometry>${(geometry.geometries || []).map(g => _geomToKml(g)).join('')}</MultiGeometry>`;
+        }
+        return '';
+    }
+
+    function toKML(data) {
+        const fc = (data && data.type === 'FeatureCollection')
+            ? data
+            : turf.featureCollection(Array.isArray(data) ? data : [data]);
+
+        const body = (fc.features || []).map((f, idx) => {
+            const geomXml = _geomToKml(f.geometry);
+            if (!geomXml) return '';
+
+            const props = f.properties || {};
+            const name = props.name !== undefined ? `<name>${_xmlEscape(props.name)}</name>` : `<name>feature_${idx + 1}</name>`;
+            const desc = props.description !== undefined ? `<description>${_xmlEscape(props.description)}</description>` : '';
+            const ext = Object.keys(props)
+                .filter(k => k !== 'name' && k !== 'description' && !k.startsWith('_'))
+                .map(k => `<Data name="${_xmlEscape(k)}"><value>${_xmlEscape(props[k])}</value></Data>`)
+                .join('');
+            const extXml = ext ? `<ExtendedData>${ext}</ExtendedData>` : '';
+
+            return `<Placemark>${name}${desc}${extXml}${geomXml}</Placemark>`;
+        }).join('');
+
+        return [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<kml xmlns="http://www.opengis.net/kml/2.2">',
+            '<Document>',
+            body,
+            '</Document>',
+            '</kml>'
+        ].join('');
+    }
+
+    function _ext(name) {
+        const i = name.lastIndexOf('.');
+        return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
+    }
+
+    function registerReader(def) {
+        if (!def || !def.exts || !def.read) return;
+        registry.readers.push(def);
+    }
+
+    function registerWriter(def) {
+        if (!def || !def.exts || !def.write) return;
+        registry.writers.push(def);
+    }
+
+    async function readFile(file) {
+        if (!file) throw new Error("Archivo no válido.");
+        const ext = _ext(file.name);
+        const reader = registry.readers.find(r => r.exts.includes(ext));
+        if (!reader) throw new Error(`Formato no soportado: .${ext}`);
+        const timeoutMs = reader.timeoutMs || 30000;
+        return await _withTimeout(reader.read(file), timeoutMs, `Timeout leyendo .${ext}`);
+    }
+
+    async function writeFile(ext, data) {
+        const writer = registry.writers.find(w => w.exts.includes(ext));
+        if (!writer) throw new Error(`Formato de salida no soportado: .${ext}`);
+        return await writer.write(data);
+    }
+
+    // ----------------------------
+    // Built-in readers
+    // ----------------------------
+    registerReader({
+        exts: ['geojson', 'json'],
+        label: 'GeoJSON',
+        read: async (file) => {
+            const text = await file.text();
+            return JSON.parse(text);
+        }
+    });
+
+    registerReader({
+        exts: ['kml'],
+        label: 'KML',
+        read: async (file) => {
+            const text = await file.text();
+            return parseKMLToGeoJSON(text);
+        }
+    });
+
+    registerReader({
+        exts: ['zip'],
+        label: 'Shapefile ZIP',
+        read: async (file) => {
+            await window.JETLLoadScriptOnce('js/vendor/shp.js', 'shp');
+            const buffer = await file.arrayBuffer();
+            const result = await shp(buffer);
+            return Array.isArray(result) ? turf.featureCollection(result.flatMap(r => r.features)) : result;
+        }
+    });
+
+    // ----------------------------
+    // Experimental readers
+    // ----------------------------
+    registerReader({
+        exts: ['gpkg'],
+        label: 'GeoPackage (Experimental)',
+        timeoutMs: 45000,
+        read: async (file) => {
+            if (window.log) window.log("⏳ Descargando motor GeoPackage desde CDN para Lectura...", "info");
+            await loadScript('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/geopackage.min.js', 'GeoPackage');
+            const GP = window.GeoPackage;
+            if (!GP || !GP.GeoPackageAPI) throw new Error("Motor GeoPackage no disponible.");
+
+            if (window.log) window.log("⏳ Abriendo GeoPackage en memoria...", "info");
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+
+            const gpkg = await GP.GeoPackageAPI.open(bytes);
+            const tables = gpkg.getFeatureTables ? gpkg.getFeatureTables() : [];
+            if (!tables || tables.length === 0) {
+                if (gpkg.close) gpkg.close();
+                throw new Error("No se encontraron tablas vectoriales en el GPKG.");
+            }
+
+            const tableName = tables[0];
+            const dao = gpkg.getFeatureDao(tableName);
+            const rows = dao.queryForAll();
+            const features = [];
+
+            let iterCount = 0;
+            while (rows.moveToNext()) {
+                if (window.isEngineCancelled) throw new Error("Lectura de GeoPackage cancelada.");
+                if (iterCount++ % 200 === 0) await new Promise(r => setTimeout(r, 0));
+
+                const row = rows.getRow();
+                const geomData = row.getGeometry();
+                if (!geomData) continue;
+
+                let gj = null;
+                try {
+                    // Intento de parseo de geometria v3
+                    if (geomData.geometry) {
+                        gj = geomData.geometry.toGeoJSON();
+                    } else if (geomData.toGeoJSON) {
+                        gj = geomData.toGeoJSON();
+                    }
+                } catch (e) { }
+
+                if (!gj) continue;
+
+                // Extraer propiedades
+                const props = {};
+                const geomColumn = dao.getGeometryColumnName();
+                if (row.values) {
+                    for (const key in row.values) {
+                        if (key !== geomColumn) {
+                            props[key] = row.values[key];
+                        }
+                    }
+                }
+
+                features.push(turf.feature(gj, props));
+            }
+
+            if (gpkg.close) gpkg.close();
+            return turf.featureCollection(features);
+        }
+    });
+
+    registerReader({
+        exts: ['parquet'],
+        label: 'Parquet (GeoParquet-lite)',
+        read: async (file) => {
+            if (window.log) window.log("⏳ Iniciando motor Parquet WASM para Lectura...", "info");
+            try {
+                // Importación dinámica nativa de ESM
+                const parquetWasm = await import('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm.js');
+                await parquetWasm.default('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm_bg.wasm');
+                const arrow = await import('https://cdn.jsdelivr.net/npm/apache-arrow@13.0.0/+esm');
+
+                const buffer = await file.arrayBuffer();
+                const ipc = parquetWasm.readParquet(new Uint8Array(buffer));
+
+                const table = arrow.tableFromIPC(ipc);
+                const rows = table.toArray().map(r => r.toJSON());
+
+                const features = [];
+                for (const r of rows) {
+                    let geom = null;
+                    if (r.geometry && typeof r.geometry === 'string') {
+                        try {
+                            geom = wellknown.parse(r.geometry);
+                            delete r.geometry;
+                        } catch (e) { }
+                    }
+                    features.push(turf.feature(geom, r));
+                }
+
+                if (window.log) window.log("✅ Parquet importado con éxito.", "success");
+                return turf.featureCollection(features);
+            } catch (e) {
+                if (window.log) window.log("⚠️ " + e.message, "err");
+                throw new Error("Lectura Parquet Error: " + e.message);
+            }
+        }
+    });
+
+    // ----------------------------
+    // Funciones Helper para cargar librerías dinámicamente sin bloquear el arranque inicial
+    function loadScript(src, globalVar) {
+        return new Promise((resolve, reject) => {
+            if (window[globalVar]) return resolve(window[globalVar]);
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = () => resolve(window[globalVar]);
+            s.onerror = () => reject(new Error("Error cargando " + src));
+            document.head.appendChild(s);
+        });
+    }
+
+    // ----------------------------
+    // Formatos de Exportación Avanzados (Escritura)
+    // ----------------------------
+    registerWriter({
+        exts: ['gpkg'],
+        label: 'GeoPackage (Experimental)',
+        write: async (data) => {
+            if (window.log) window.log("⏳ Descargando motor GeoPackage desde CDN...", "info");
+            await loadScript('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/geopackage.min.js', 'GeoPackage');
+            const GP = window.GeoPackage;
+            if (!GP || !GP.GeoPackageAPI) throw new Error("Error en motor GeoPackage");
+
+            if (GP.setSqljsWasmLoc) {
+                GP.setSqljsWasmLoc('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/sql-wasm.wasm');
+            }
+
+            if (window.log) window.log("⏳ Creando GeoPackage en memoria...", "info");
+            const gpkg = await GP.GeoPackageAPI.create();
+            const tableName = "jetl_export";
+            const fc = data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
+
+            // Crear tabla e insertar Features
+            await GP.GeoPackageAPI.createFeatureTable(gpkg, tableName, fc.features[0] ? fc.features[0].geometry : null);
+            for (let i = 0; i < fc.features.length; i++) {
+                if (window.isEngineCancelled) throw new Error("Exportación a GeoPackage cancelada.");
+                if (i % 250 === 0) await new Promise(r => setTimeout(r, 0));
+
+                await GP.GeoPackageAPI.addGeoJSONFeatureToGeoPackage(gpkg, fc.features[i], tableName);
+            }
+
+            if (window.log) window.log("⏳ Exportando binario GPKG...", "info");
+            const byteArray = await gpkg.export();
+            const blob = new Blob([byteArray], { type: "application/geopackage+sqlite3" });
+            return { blob, filename: "export.gpkg" };
+        }
+    });
+
+    registerWriter({
+        exts: ['parquet'],
+        label: 'Parquet (GeoParquet-lite)',
+        write: async (data) => {
+            if (window.log) window.log("⏳ Iniciando motor Parquet WASM...", "info");
+            try {
+                // Importamos directamente las dependencias como modulos ES (ESM) para no romper bindings WASM
+                const parquetWasm = await import('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm.js');
+                await parquetWasm.default('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm_bg.wasm');
+                const arrow = await import('https://cdn.jsdelivr.net/npm/apache-arrow@13.0.0/+esm');
+
+                const fc = data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
+                if (window.log) window.log("⏳ Serializando a formato tabular Arrow...", "info");
+
+                const rows = [];
+                for (let i = 0; i < fc.features.length; i++) {
+                    if (window.isEngineCancelled) throw new Error("Exportación a Parquet cancelada.");
+                    if (i % 500 === 0) await new Promise(r => setTimeout(r, 0));
+
+                    const f = fc.features[i];
+                    if (!f.geometry) continue;
+                    try {
+                        let wkt = wellknown.stringify(f.geometry);
+                        const flatProps = {};
+                        if (f.properties) {
+                            Object.keys(f.properties).forEach(k => {
+                                let val = f.properties[k];
+                                if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+                                flatProps[k] = val;
+                            });
+                        }
+                        rows.push({
+                            jetl_id: i,
+                            geometry: wkt,
+                            ...flatProps
+                        });
+                    } catch (e) { }
+                }
+
+                if (rows.length === 0) throw new Error("No hay data válida");
+                // Usamos tableFromJSON de apache-arrow
+                const table = arrow.tableFromJSON(rows);
+                const ipc = arrow.tableToIPC(table, "file");
+
+                // Escribimos a Parquet usando parquet-wasm
+                const buffer = parquetWasm.writeParquet(ipc);
+
+                if (window.log) window.log("✅ Parquet generado éxito.", "success");
+
+                const blob = new Blob([buffer], { type: "application/octet-stream" });
+                return { blob, filename: "export.parquet" };
+            } catch (e) {
+                if (window.log) window.log("⚠️ " + e.message, "err");
+                throw new Error("Parquet Export Error: " + e.message);
+            }
+        }
+    });
+
+    window.JETLFormats = {
+        registerReader,
+        registerWriter,
+        readFile,
+        writeFile,
+        toKML,
+        _registry: registry
+    };
+
+    function _withTimeout(promise, ms, msg) {
+        let timer = null;
+        return new Promise((resolve, reject) => {
+            timer = setTimeout(() => reject(new Error(msg || 'Timeout')), ms);
+            Promise.resolve(promise).then((v) => {
+                clearTimeout(timer);
+                resolve(v);
+            }).catch((e) => {
+                clearTimeout(timer);
+                reject(e);
+            });
+        });
+    }
+})();
+
+window.JETLBootModuleLoaded(1, 14, "readers.js");
+    </script>
+
+    <script defer src="js/nodes/readers.js?v=20260824-4"
+        onload="window.JETLBootModuleLoaded(2, 14, &quot;geometry.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/readers.js&quot;)"></script>
+
+    <script defer src="js/nodes/geometry.js?v=20260824-3"
+        onload="window.JETLBootModuleLoaded(3, 14, &quot;utils.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/geometry.js&quot;)"></script>
+
+    <script defer src="js/nodes/utils.js?v=20260824-2"
+        onload="window.JETLBootModuleLoaded(4, 14, &quot;spatial.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/utils.js&quot;)"></script>
+
+    <script defer src="js/nodes/spatial.js?v=20260824-9"
+        onload="window.JETLBootModuleLoaded(5, 14, &quot;attributes.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/spatial.js&quot;)"></script>
+
+    <script defer src="js/nodes/attributes.js?v=20260824-12"
+        onload="window.JETLBootModuleLoaded(6, 14, &quot;raster.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/attributes.js&quot;)"></script>
+
+    <script defer src="js/nodes/raster.js?v=20260814-7"
+        onload="window.JETLBootModuleLoaded(7, 14, &quot;writers.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/raster.js&quot;)"></script>
+
+    <script defer src="js/nodes/writers.js?v=20260824-1"
+        onload="window.JETLBootModuleLoaded(8, 14, &quot;tools.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/nodes/writers.js&quot;)"></script>
+
+    <script defer src="js/tools.js?v=20260814-6"
+        onload="window.JETLBootModuleLoaded(9, 14, &quot;workerPool.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/tools.js&quot;)"></script>
+
+    <script defer src="js/core/workerPool.js?v=20260824-2"
+        onload="window.JETLBootModuleLoaded(10, 14, &quot;history.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/core/workerPool.js&quot;)"></script>
+
+    <script defer src="js/state/history.js?v=20260814-7"
+        onload="window.JETLBootModuleLoaded(11, 14, &quot;processNode.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/state/history.js&quot;)"></script>
+
+    <script defer src="js/processNode.js?v=20260814-9"
+        onload="window.JETLBootModuleLoaded(12, 14, &quot;engine.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/processNode.js&quot;)"></script>
+
+    <script defer src="js/projectPersistence.js?v=20260825-1"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/projectPersistence.js&quot;)"></script>
+
+    <script defer src="js/engine.js?v=20260825-26"
+        onload="window.JETLBootModuleLoaded(13, 14, &quot;mobile.js&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/engine.js&quot;)"></script>
+
+    <script defer src="js/mobile.js?v=20260814-10"
+        onload="window.JETLBootModuleLoaded(14, 14, &quot;listo&quot;)"
+        onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
+
+    <script>
+        window.__JETL_BOOT.stage = "modules:1/14:next:readers.js";
+        const bootDiagnostic = document.getElementById('boot-diagnostic');
+        if (bootDiagnostic) bootDiagnostic.textContent = "Cargando readers.js (1/14)…";
+
+        window.__JETL_RUNTIME_STATE = 'idle';
+        window.JETLRuntimeReady = new Promise((resolve) => {
+            window.__JETL_RESOLVE_RUNTIME = resolve;
+        });
+        let jetlRuntimeLoadStarted = false;
+
+        // Sólo se cargan módulos de interfaz después del primer render. Los
+        // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
+        // el hilo principal estaba congelando la interacción en Safari móvil.
+        const JETL_EXTRA_SCRIPTS = [
+            'js/modalSystem.js',
+            'js/schemaUI.js',
+            'js/templates.js',
+            'js/packages.js'
+        ];
+        const JETL_EXTRAS_VERSION = '20260825-27';
+
+        const JETL_RUNTIME_SCRIPTS = [
+            'js/vendor/leaflet.js',
+            'js/vendor/turf.min.js',
+            'js/vendor/osmtogeojson.js',
+            'js/vendor/proj4.js',
+            'js/vendor/wellknown.js'
+        ];
+
+        const JETL_DEFERRED_STYLES = [
+            'css/vendor/leaflet.css',
+            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+        ];
+
+        function loadJETLDeferredStyles() {
+            JETL_DEFERRED_STYLES.forEach((href) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = href;
+                document.head.appendChild(link);
+            });
+        }
+
+        const JETL_RUNTIME_VERSION = '20260824-15';
+        const JETL_MOTION_VERSION = '20260824-1';
+        let jetlMotionPromise = null;
+
+        function loadJETLMotion() {
+            if (window.JETLMotion) return Promise.resolve(window.JETLMotion);
+            if (jetlMotionPromise) return jetlMotionPromise;
+            jetlMotionPromise = window.JETLLoadScriptOnce(
+                'js/vendor/anime.min.js?v=' + JETL_MOTION_VERSION,
+                'anime'
+            ).catch((error) => {
+                console.warn('[JETL] Anime.js no disponible; se usará Web Animations', error);
+                return null;
+            }).then(() => window.JETLLoadScriptOnce(
+                'js/motion.js?v=' + JETL_MOTION_VERSION,
+                'JETLMotion'
+            ));
+            return jetlMotionPromise;
+        }
+        window.JETLEnsureMotion = loadJETLMotion;
+
+        function loadJETLScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src + '?v=' + JETL_RUNTIME_VERSION;
+                script.async = true;
+                script.onload = () => resolve(src);
+                script.onerror = () => reject(new Error(`No se pudo descargar ${src}`));
+                document.body.appendChild(script);
+            });
+        }
+
+        async function loadJETLRuntime() {
+            if (jetlRuntimeLoadStarted) return window.JETLRuntimeReady;
+            jetlRuntimeLoadStarted = true;
+            window.__JETL_RUNTIME_STATE = 'loading';
+            try {
+                await loadJETLMotion().catch(() => null);
+                await Promise.all(JETL_RUNTIME_SCRIPTS.map(loadJETLScript));
+                await loadJETLScript('js/visualization.js');
+                window.__JETL_RUNTIME_STATE = 'ready';
+                window.__JETL_RESOLVE_RUNTIME(true);
+            } catch (error) {
+                console.error('[JETL] No se pudo preparar el motor', error);
+                window.__JETL_RUNTIME_STATE = 'error';
+                window.__JETL_RUNTIME_ERROR = error;
+                window.__JETL_RESOLVE_RUNTIME(false);
+            }
+            return window.JETLRuntimeReady;
+        }
+        window.JETLEnsureRuntime = loadJETLRuntime;
+
+        let jetlExtrasPromise = null;
+        function loadJETLExtras() {
+            if (jetlExtrasPromise) return jetlExtrasPromise;
+            jetlExtrasPromise = JETL_EXTRA_SCRIPTS.reduce((chain, src) => chain.then(() => new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = src + '?v=' + JETL_EXTRAS_VERSION;
+                script.onload = () => resolve(true);
+                script.onerror = () => resolve(false);
+                document.body.appendChild(script);
+            })), Promise.resolve()).then(() => true);
+            return jetlExtrasPromise;
+        }
+        window.JETLEnsureExtras = loadJETLExtras;
+
+        window.addEventListener('load', () => {
+            requestAnimationFrame(() => setTimeout(() => {
+                loadJETLDeferredStyles();
+            }, 0));
+            const warmMotion = () => loadJETLMotion().catch((error) => {
+                console.warn('[JETL] La capa de movimiento no pudo prepararse', error);
+            });
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(warmMotion, { timeout: 2200 });
+            } else {
+                window.setTimeout(warmMotion, 1200);
+            }
+        }, { once: true });
     </script>
 </body>
 
 </html>
-
-

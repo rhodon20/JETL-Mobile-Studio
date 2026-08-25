@@ -142,7 +142,7 @@ function createGeoWorker() {
     try {
         const hc = navigator.hardwareConcurrency || 4;
         const size = Math.max(2, Math.min(hc - 1, 6));
-        geoWorkerPool = new GeoWorkerPool('js/geo.worker.js', size);
+        geoWorkerPool = new GeoWorkerPool('js/geo.worker.js?v=20260824-2', size);
         window.geoWorker = geoWorker;
         window.geoWorkerPool = geoWorkerPool;
     } catch (e) {
@@ -158,7 +158,8 @@ function postWorkerTask(payload, timeoutMs = 30000, transfer = null) {
         geoWorkerPool.post(payload, timeoutMs, transfer).then(resolve).catch(reject);
         const load = geoWorkerPool.getLoad();
         const loaderMsg = document.getElementById('loader-msg');
-        if (loaderMsg) loaderMsg.innerText = `Procesando (${load.pending} en curso / ${load.queued} en cola)...`;
+        const liveMonitor = document.getElementById('loader')?.dataset.status === 'running';
+        if (loaderMsg && !liveMonitor) loaderMsg.innerText = `Procesando (${load.pending} en curso / ${load.queued} en cola)...`;
     });
 }
 
@@ -217,11 +218,5 @@ function prewarmGeoWorker(timeoutMs = 15000) {
 }
 
 window.prewarmGeoWorker = prewarmGeoWorker;
-
-if (typeof window !== 'undefined') {
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            try { prewarmGeoWorker(12000); } catch (e) {}
-        }, 250);
-    });
-}
+// El pool se crea bajo demanda al ejecutar una operación espacial. Arrancar
+// varios Workers durante la primera pintura penaliza especialmente a Safari.

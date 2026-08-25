@@ -1,6 +1,699 @@
 ﻿// Cat: geometry
 (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY || {};
+function geometryCloneCompat(value) {
+    if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(value);
+    return JSON.parse(JSON.stringify(value));
+}
+
+function geometryCoordinatesCompat(geometry) {
+    const coordinates = [];
+    const visit = (value) => {
+        if (!Array.isArray(value)) return;
+        if (value.length >= 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+            coordinates.push(value);
+            return;
+        }
+        value.forEach(visit);
+    };
+    if (geometry?.type === 'GeometryCollection') (geometry.geometries || []).forEach((item) => coordinates.push(...geometryCoordinatesCompat(item)));
+    else visit(geometry?.coordinates);
+    return coordinates;
+}
+
+function geometryCrsCompat(collection) {
+    return collection?.metadata?.crs
+        || collection?.crs?.properties?.name
+        || (collection?.features || []).find((feature) => feature?.properties?._crs)?.properties?._crs
+        || null;
+}
+
+function geometryDeaggregateParts(feature) {
+    const geometry = feature?.geometry;
+    if (!geometry) return [geometryCloneCompat(feature)];
+    const props = { ...(feature.properties || {}) };
+    const explode = (part) => {
+        if (!part) return [];
+        if (part.type === 'GeometryCollection') return (part.geometries || []).flatMap(explode);
+        if (part.type === 'MultiPoint') return (part.coordinates || []).map((coordinates) => ({ type: 'Point', coordinates }));
+        if (part.type === 'MultiLineString') return (part.coordinates || []).map((coordinates) => ({ type: 'LineString', coordinates }));
+        if (part.type === 'MultiPolygon') return (part.coordinates || []).map((coordinates) => ({ type: 'Polygon', coordinates }));
+        return [part];
+    };
+    const parts = explode(geometry);
+    if (!geometry.type.startsWith('Multi') && geometry.type !== 'GeometryCollection') return [geometryCloneCompat(feature)];
+    return parts.map((part, index) => ({
+        type: 'Feature',
+        geometry: geometryCloneCompat(part),
+        properties: { ...props, _part_number: String(index) }
+    }));
+}
+
+function geometryReadTransformConfig(dom, defaults) {
+    try { return { ...defaults, ...JSON.parse(dom.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+    catch (error) { return { ...defaults }; }
+}
+
+function geometryMapCoordsCompat(geometry, transform) {
+    if (!geometry) return geometry;
+    if (geometry.type === 'GeometryCollection') {
+        (geometry.geometries || []).forEach((item) => geometryMapCoordsCompat(item, transform));
+        return geometry;
+    }
+    const walk = (coordinates) => {
+        if (!Array.isArray(coordinates)) return coordinates;
+        if (coordinates.length >= 2 && typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number') return transform(coordinates);
+        return coordinates.map(walk);
+    };
+    geometry.coordinates = walk(geometry.coordinates);
+    return geometry;
+}
+
+function geometryNumberFromFeature(feature, config, modeKey, valueKey, fieldKey, fallback) {
+    const mode = String(config[modeKey] || 'fixed');
+    const value = mode === 'field' ? feature?.properties?.[config[fieldKey]] : config[valueKey];
+    const number = Number(value ?? fallback);
+    if (!Number.isFinite(number)) throw new Error(`Valor no numérico: ${value}`);
+    return number;
+}
+
+function geometryRotationOriginCompat(feature, config) {
+    const mode = String(config.origin_mode || 'centroid');
+    if (mode === 'custom') return [Number(config.origin_x || 0), Number(config.origin_y || 0)];
+    if (mode === 'fields') {
+        const x = Number(feature?.properties?.[config.origin_x_field]);
+        const y = Number(feature?.properties?.[config.origin_y_field]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Origen por campos no numérico');
+        return [x, y];
+    }
+    if (mode === 'bbox_center') {
+        const bbox = turf.bbox(feature);
+        return [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
+    }
+    return turf.centroid(feature)?.geometry?.coordinates || [0, 0];
+}
+
+function geometryRotateFeatureCompat(feature, angle, origin) {
+    const output = geometryCloneCompat(feature);
+    const radians = Number(angle) * Math.PI / 180;
+    const cos = Math.cos(radians); const sin = Math.sin(radians);
+    const ox = Number(origin[0] || 0); const oy = Number(origin[1] || 0);
+    geometryMapCoordsCompat(output.geometry, (coordinate) => {
+        const x = Number(coordinate[0] || 0) - ox; const y = Number(coordinate[1] || 0) - oy;
+        const next = coordinate.slice();
+        next[0] = ox + x * cos - y * sin;
+        next[1] = oy + x * sin + y * cos;
+        return next;
+    });
+    return output;
+}
+
+function geometryDensifyLineCompat(coordinates, interval, mode) {
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return geometryCloneCompat(coordinates || []);
+    const step = Number(interval);
+    if (!Number.isFinite(step) || step <= 0) throw new Error('El intervalo debe ser mayor que cero');
+    const output = [coordinates[0].slice()];
+    for (let index = 1; index < coordinates.length; index++) {
+        const start = coordinates[index - 1]; const end = coordinates[index];
+        const distance = Math.hypot(Number(end[0]) - Number(start[0]), Number(end[1]) - Number(start[1]));
+        const parts = mode === 'exact' ? Math.floor(distance / step) : Math.max(1, Math.ceil(distance / step));
+        for (let part = 1; part < (mode === 'exact' ? parts + 1 : parts); part++) {
+            const ratio = mode === 'exact' ? (step * part) / distance : part / parts;
+            if (ratio > 0 && ratio < 1) output.push(start.map((value, axis) => Number(value || 0) + (Number(end[axis] || 0) - Number(value || 0)) * ratio));
+        }
+        output.push(end.slice());
+    }
+    return output;
+}
+
+function geometryDensifyFeatureCompat(feature, interval, mode) {
+    const output = geometryCloneCompat(feature);
+    const visit = (geometry) => {
+        if (!geometry) return;
+        if (geometry.type === 'GeometryCollection') return (geometry.geometries || []).forEach(visit);
+        if (geometry.type === 'LineString') geometry.coordinates = geometryDensifyLineCompat(geometry.coordinates, interval, mode);
+        else if (geometry.type === 'MultiLineString' || geometry.type === 'Polygon') geometry.coordinates = (geometry.coordinates || []).map((line) => geometryDensifyLineCompat(line, interval, mode));
+        else if (geometry.type === 'MultiPolygon') geometry.coordinates = (geometry.coordinates || []).map((polygon) => polygon.map((ring) => geometryDensifyLineCompat(ring, interval, mode)));
+    };
+    visit(output.geometry);
+    return output;
+}
+
+function geometryExtractMeasuresCompat(feature, config) {
+    const output = geometryCloneCompat(feature);
+    output.properties = output.properties || {};
+    const coordinates = geometryCoordinatesCompat(output.geometry);
+    const measure = (coordinate) => coordinate?.length > 2 ? coordinate[2] : null;
+    const type = String(config.measure_type || 'whole');
+    if (!coordinates.length) return output;
+    if (type === 'point') output.properties[config.point_attr || 'measure'] = measure(coordinates[0]);
+    else if (type === 'vertex') {
+        let index = Math.trunc(Number(config.index || 0));
+        if (index < 0) index = coordinates.length + index;
+        output.properties[config.point_attr || 'measure'] = index >= 0 && index < coordinates.length ? measure(coordinates[index]) : null;
+    } else if (type === 'endpoints') {
+        output.properties[config.start_attr || 'measure_start'] = measure(coordinates[0]);
+        output.properties[config.end_attr || 'measure_end'] = measure(coordinates[coordinates.length - 1]);
+    } else output.properties[config.list_attr || 'measures'] = coordinates.map(measure);
+    return output;
+}
+
+function geometryOffsetFeatureCompat(feature, x, y, z) {
+    const output = geometryCloneCompat(feature);
+    geometryMapCoordsCompat(output.geometry, (coordinate) => {
+        const next = coordinate.slice();
+        next[0] = Number(next[0] || 0) + x;
+        next[1] = Number(next[1] || 0) + y;
+        if (next.length > 2 || z) next[2] = Number(next[2] || 0) + z;
+        return next;
+    });
+    return output;
+}
+
+function geometryCoordWithZCompat(coordinate, z) {
+    const output = Array.isArray(coordinate) ? coordinate.slice() : [0, 0];
+    output[2] = Number(z || 0);
+    return output;
+}
+
+function geometryExtrudePointCompat(coordinate, height, baseZ) {
+    return { type: 'LineString', coordinates: [geometryCoordWithZCompat(coordinate, baseZ), geometryCoordWithZCompat(coordinate, baseZ + height)] };
+}
+
+function geometryExtrudeLineCompat(coordinates, height, baseZ) {
+    const list = Array.isArray(coordinates) ? coordinates : [];
+    if (list.length < 2) return geometryExtrudePointCompat(list[0] || [0, 0], height, baseZ);
+    const bottom = list.map((coordinate) => geometryCoordWithZCompat(coordinate, baseZ));
+    const top = list.slice().reverse().map((coordinate) => geometryCoordWithZCompat(coordinate, baseZ + height));
+    return { type: 'Polygon', coordinates: [[...bottom, ...top, bottom[0].slice()]] };
+}
+
+function geometryExtrudeRingFacesCompat(ring, height, baseZ) {
+    const list = Array.isArray(ring) ? ring : [];
+    if (list.length < 4) return [];
+    const isClosed = Number(list[0]?.[0]) === Number(list[list.length - 1]?.[0]) && Number(list[0]?.[1]) === Number(list[list.length - 1]?.[1]);
+    const closed = isClosed ? list : [...list, list[0]];
+    const bottom = closed.map((coordinate) => geometryCoordWithZCompat(coordinate, baseZ));
+    const top = closed.map((coordinate) => geometryCoordWithZCompat(coordinate, baseZ + height));
+    const faces = [[bottom.slice().reverse()], [top]];
+    for (let index = 1; index < closed.length; index++) {
+        const start = closed[index - 1]; const end = closed[index];
+        faces.push([[
+            geometryCoordWithZCompat(start, baseZ), geometryCoordWithZCompat(end, baseZ),
+            geometryCoordWithZCompat(end, baseZ + height), geometryCoordWithZCompat(start, baseZ + height),
+            geometryCoordWithZCompat(start, baseZ)
+        ]]);
+    }
+    return faces;
+}
+
+function geometryExtrudePolygonCompat(rings, height, baseZ) {
+    const polygons = (Array.isArray(rings) ? rings : []).flatMap((ring) => geometryExtrudeRingFacesCompat(ring, height, baseZ));
+    return polygons.length === 1 ? { type: 'Polygon', coordinates: polygons[0] } : { type: 'MultiPolygon', coordinates: polygons };
+}
+
+function geometryExtrudeGeometryCompat(geometry, height, baseZ) {
+    if (!geometry) return geometry;
+    if (geometry.type === 'GeometryCollection') return { type: 'GeometryCollection', geometries: (geometry.geometries || []).map((item) => geometryExtrudeGeometryCompat(item, height, baseZ)) };
+    if (geometry.type === 'Point') return geometryExtrudePointCompat(geometry.coordinates, height, baseZ);
+    if (geometry.type === 'MultiPoint') return { type: 'MultiLineString', coordinates: (geometry.coordinates || []).map((point) => geometryExtrudePointCompat(point, height, baseZ).coordinates) };
+    if (geometry.type === 'LineString') return geometryExtrudeLineCompat(geometry.coordinates, height, baseZ);
+    if (geometry.type === 'MultiLineString') return { type: 'MultiPolygon', coordinates: (geometry.coordinates || []).map((line) => geometryExtrudeLineCompat(line, height, baseZ).coordinates) };
+    if (geometry.type === 'Polygon') return geometryExtrudePolygonCompat(geometry.coordinates, height, baseZ);
+    if (geometry.type === 'MultiPolygon') {
+        const polygons = [];
+        (geometry.coordinates || []).forEach((polygon) => {
+            const extruded = geometryExtrudePolygonCompat(polygon, height, baseZ);
+            if (extruded.type === 'Polygon') polygons.push(extruded.coordinates);
+            else polygons.push(...(extruded.coordinates || []));
+        });
+        return { type: 'MultiPolygon', coordinates: polygons };
+    }
+    return geometryCloneCompat(geometry);
+}
+
+function geometryExtrudeFeatureCompat(feature, height, config) {
+    const output = geometryCloneCompat(feature);
+    const properties = output.properties || {};
+    let baseZ = 0;
+    if (config.base_mode === 'field') {
+        baseZ = Number(properties[config.base_field]);
+        if (!Number.isFinite(baseZ)) throw new Error('Base Z por atributo no numérica');
+    } else if (config.base_mode === 'value') baseZ = Number(config.base_value || 0);
+    output.geometry = geometryExtrudeGeometryCompat(output.geometry, height, baseZ);
+    return output;
+}
+
+function geometryDistanceListCompat(raw) {
+    return (Array.isArray(raw) ? raw : String(raw || '').split(/[,;\n]/))
+        .map(Number).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+}
+
+function geometryDifferenceCompat(outer, inner) {
+    if (!inner) return outer;
+    try { return turf.difference(outer, inner); } catch (error) { return null; }
+}
+
+const GEOMETRY_PROJ4_DEFS_COMPAT = {
+    'EPSG:4326': '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
+    'EPSG:3857': '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +no_defs',
+    'EPSG:25829': '+proj=utm +zone=29 +ellps=GRS80 +units=m +no_defs +type=crs',
+    'EPSG:25830': '+proj=utm +zone=30 +ellps=GRS80 +units=m +no_defs +type=crs',
+    'EPSG:25831': '+proj=utm +zone=31 +ellps=GRS80 +units=m +no_defs +type=crs'
+};
+
+function geometryNormalizeCrsCompat(value) {
+    const crs = String(value || '').trim();
+    return /^\d+$/.test(crs) ? `EPSG:${crs}` : crs.toUpperCase();
+}
+
+function geometryEnsureProj4Compat(value) {
+    const crs = geometryNormalizeCrsCompat(value);
+    if (!crs) return '';
+    if (typeof proj4 === 'undefined') throw new Error('proj4 no disponible para líneas paralelas');
+    if (GEOMETRY_PROJ4_DEFS_COMPAT[crs]) {
+        try { proj4.defs(crs, GEOMETRY_PROJ4_DEFS_COMPAT[crs]); } catch (error) { /* definition already present */ }
+    }
+    return crs;
+}
+
+function geometryTransformCrsCompat(geometry, sourceCrs, targetCrs) {
+    const output = geometryCloneCompat(geometry);
+    return geometryMapCoordsCompat(output, (coordinate) => {
+        if (sourceCrs === targetCrs) return coordinate.slice();
+        const xy = proj4(sourceCrs, targetCrs, [Number(coordinate[0] || 0), Number(coordinate[1] || 0)]);
+        const next = [xy[0], xy[1]];
+        if (coordinate.length > 2) next[2] = coordinate[2];
+        return next;
+    });
+}
+
+function geometryOffsetLineCoordsCompat(coordinates, distance, side) {
+    const list = (coordinates || []).filter((coordinate) => Array.isArray(coordinate) && coordinate.length >= 2);
+    if (list.length < 2) throw new Error('Línea con menos de dos vértices');
+    const sign = side === 'right' ? -1 : 1;
+    const segments = [];
+    for (let index = 1; index < list.length; index++) {
+        const start = list[index - 1]; const end = list[index];
+        const dx = Number(end[0]) - Number(start[0]); const dy = Number(end[1]) - Number(start[1]);
+        const length = Math.hypot(dx, dy);
+        if (!length) continue;
+        const ox = sign * (-dy / length) * distance; const oy = sign * (dx / length) * distance;
+        segments.push({ start: [Number(start[0]) + ox, Number(start[1]) + oy], end: [Number(end[0]) + ox, Number(end[1]) + oy] });
+    }
+    if (!segments.length) throw new Error('Línea sin segmentos válidos');
+    const output = [segments[0].start];
+    for (let index = 1; index < segments.length; index++) output.push([(segments[index - 1].end[0] + segments[index].start[0]) / 2, (segments[index - 1].end[1] + segments[index].start[1]) / 2]);
+    output.push(segments[segments.length - 1].end);
+    return output;
+}
+
+function geometryOffsetLinesCompat(feature, distance, side) {
+    const geometry = feature?.geometry;
+    const properties = { ...(feature?.properties || {}), _multibuffer_distance: distance, _multibuffer_side: side };
+    if (geometry?.type === 'LineString') return [{ type: 'Feature', geometry: { type: 'LineString', coordinates: geometryOffsetLineCoordsCompat(geometry.coordinates, distance, side) }, properties }];
+    if (geometry?.type === 'MultiLineString') return (geometry.coordinates || []).map((line) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: geometryOffsetLineCoordsCompat(line, distance, side) }, properties: { ...properties } }));
+    throw new Error('Las líneas paralelas sólo admiten LineString/MultiLineString');
+}
+
+function geometryLineBuilderCompat(collection, config) {
+    const fields = Array.isArray(config.group_by)
+        ? config.group_by.map(String).map((field) => field.trim()).filter(Boolean)
+        : String(config.group_by || '').split(',').map((field) => field.trim()).filter(Boolean);
+    const readProperty = (properties, field) => {
+        if (Object.prototype.hasOwnProperty.call(properties || {}, field)) return properties[field];
+        const actual = Object.keys(properties || {}).find((key) => key.toLowerCase() === field.toLowerCase());
+        return actual ? properties[actual] : '';
+    };
+    const groups = new Map();
+    (collection?.features || []).forEach((feature) => {
+        const key = fields.map((field) => String(readProperty(feature.properties, field) ?? '')).join('\u001f');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(feature);
+    });
+    const output = [];
+    groups.forEach((features, key) => {
+        const sorted = features.slice().sort((a, b) => String(readProperty(a.properties, config.sort_by || '') ?? '').localeCompare(String(readProperty(b.properties, config.sort_by || '') ?? '')));
+        let coordinates = sorted.filter((feature) => feature.geometry?.type === 'Point').map((feature) => feature.geometry.coordinates);
+        if (config.remove_duplicates) {
+            const seen = new Set();
+            coordinates = coordinates.filter((coordinate) => { const token = JSON.stringify(coordinate); if (seen.has(token)) return false; seen.add(token); return true; });
+        }
+        if (coordinates.length < 2) return;
+        const properties = { ...(sorted[0]?.properties || {}) };
+        if (fields.length === 1) properties[fields[0]] = key;
+        else if (fields.length > 1) properties._group_key = key;
+        output.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: geometryCloneCompat(coordinates) }, properties });
+    });
+    return turf.featureCollection(output);
+}
+
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
+    geo_area_builder: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Area Builder', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
+        help: 'Construye polígonos a partir de linework cerrado.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-draw-polygon"></i><div><strong>Linework → áreas</strong><small>Polygonize</small></div></div>`,
+        run: async (id, inputs) => {
+            const lines = [];
+            for (const feature of inputs[0]?.features || []) {
+                const type = feature?.geometry?.type;
+                if (type === 'LineString' || type === 'MultiLineString') lines.push(geometryCloneCompat(feature));
+                else if (type === 'Polygon' || type === 'MultiPolygon') {
+                    const converted = turf.polygonToLine(feature);
+                    if (converted?.type === 'FeatureCollection') lines.push(...converted.features);
+                    else if (converted) lines.push(converted);
+                }
+            }
+            if (typeof turf.polygonize !== 'function') throw new Error('Area Builder requiere Turf polygonize');
+            const output = turf.polygonize(turf.featureCollection(lines));
+            (output.features || []).forEach((feature) => { feature.properties = { ...(lines[0]?.properties || {}) }; });
+            return output;
+        }
+    },
+
+    geo_centerline_replacer: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Centerline Replacer', icon: 'fa-project-diagram', color: '#2980b9', in: 1, out: 2,
+        help: 'Sustituye áreas por su línea central mediante el backend Geometry de Desktop.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-project-diagram"></i><div><strong data-geom-transform-summary>Centerline · auto</strong><small>Requiere backend</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"centerline","densify_distance":"auto","min_branch_length":"auto","simplify_tolerance":"auto","extend":false,"timeout_seconds":30}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { mode: 'centerline', densify_distance: 'auto', min_branch_length: 'auto', simplify_tolerance: 'auto', extend: false, timeout_seconds: 30 });
+            if (typeof window === 'undefined' || typeof window.JETLBackend?.geometry !== 'function') throw new Error('Centerline Replacer requiere el backend Python de JETL Desktop');
+            const result = await window.JETLBackend.geometry('geo_centerline_replacer', { source: inputs[0] || turf.featureCollection([]) }, config);
+            if (!result?.output_1 || !result?.output_2) throw new Error('Centerline Replacer no devolvió sus dos salidas Desktop');
+            return result;
+        }
+    },
+
+    geo_extruder: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extruder', icon: 'fa-cube', color: '#2980b9', in: 1, out: 2,
+        help: 'Extruye geometría 2D a GeoJSON 3D con altura fija o por atributo.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-cube"></i><div><strong data-geom-transform-summary>Altura 10</strong><small>GeoJSON 3D</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"height_mode":"fixed","height_value":10,"height_field":"","base_mode":"zero","base_value":0,"base_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { height_mode: 'fixed', height_value: 10, base_mode: 'zero', base_value: 0, on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const height = geometryNumberFromFeature(feature, config, 'height_mode', 'height_value', 'height_field', 10);
+                    passed.push(geometryExtrudeFeatureCompat(feature, height, config));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _extruder_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_generalizer: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Generalizer', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
+        help: 'Alias canónico Desktop de Topo Simplify.',
+        tpl: () => ((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY.geo_topo_simplify?.tpl?.() || `<div>Generalizer</div>`),
+        run: async (id, inputs, dom) => {
+            const tool = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY.geo_topo_simplify;
+            if (typeof tool?.run !== 'function') throw new Error('Topo Simplify no disponible');
+            return tool.run(id, inputs, dom);
+        }
+    },
+
+    geo_geometry_coercer: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Geometry Coercer', icon: 'fa-exchange-alt', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Geometría destino</span><select df-target class="node-control"><option value="line">Line</option><option value="point">Point/Centroid</option><option value="polygon">Polygon</option></select></label>`,
+        run: async (id, inputs, dom) => {
+            const collection = inputs[0] || turf.featureCollection([]);
+            const target = dom.querySelector('[df-target]')?.value || 'line';
+            if (target === 'polygon') return geometryCloneCompat(collection);
+            const output = [];
+            for (const feature of collection.features || []) {
+                const type = feature?.geometry?.type || '';
+                if (target === 'point') {
+                    const point = turf.centroid(feature); point.properties = { ...(feature.properties || {}) }; output.push(point);
+                } else if (type.includes('Line')) output.push(geometryCloneCompat(feature));
+                else if (type.includes('Polygon')) {
+                    const lines = turf.polygonToLine(feature);
+                    if (lines?.type === 'FeatureCollection') output.push(...lines.features);
+                    else if (lines) output.push(lines);
+                }
+            }
+            return turf.featureCollection(output);
+        }
+    },
+
+    geo_line_builder: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Line Builder', icon: 'fa-route', color: '#2980b9', in: 1, out: 1,
+        help: 'Construye líneas a partir de puntos agrupados y ordenados.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-route"></i><div><strong data-geom-transform-summary>Job · img</strong><small>Agrupar puntos</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"group_by":"Job","sort_by":"img","remove_duplicates":false}</textarea></div>`,
+        run: async (id, inputs, dom) => geometryLineBuilderCompat(inputs[0], geometryReadTransformConfig(dom, { group_by: 'Job', sort_by: 'img', remove_duplicates: false }))
+    },
+
+    geo_multi_bufferer: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'MultiBufferer', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 2,
+        help: 'Genera bandas de buffer sucesivas para varias distancias.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-layer-group"></i><div><strong data-geom-transform-summary>Buffers 10,20</strong><small>Bandas múltiples</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"output_mode":"polygons","distances":"10,20","unit":"meters","side":"both","projected_crs":"EPSG:25830"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { output_mode: 'polygons', distances: '10,20', unit: 'meters', side: 'both', projected_crs: 'EPSG:25830' });
+            const distances = geometryDistanceListCompat(config.distances);
+            if (!distances.length) throw new Error('MultiBufferer sin distancias válidas');
+            const output = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                let previous = null;
+                for (let index = 0; index < distances.length; index++) {
+                    const distance = distances[index];
+                    try {
+                        if (config.output_mode === 'offset_lines') {
+                            const projectedCrs = geometryEnsureProj4Compat(config.projected_crs);
+                            if (!projectedCrs) throw new Error('CRS proyectado requerido para líneas paralelas');
+                            const sourceCrs = geometryEnsureProj4Compat(feature.properties?._crs || inputs[0]?.metadata?.crs || 'EPSG:4326');
+                            const projected = geometryCloneCompat(feature);
+                            projected.geometry = geometryTransformCrsCompat(projected.geometry, sourceCrs, projectedCrs);
+                            const sides = config.side === 'both' ? ['left', 'right'] : [config.side === 'right' ? 'right' : 'left'];
+                            sides.forEach((side) => geometryOffsetLinesCompat(projected, distance, side).forEach((line) => {
+                                line.geometry = geometryTransformCrsCompat(line.geometry, projectedCrs, sourceCrs);
+                                line.properties = { ...(line.properties || {}), _crs: sourceCrs, _multibuffer_projected_crs: projectedCrs };
+                                output.push(line);
+                            }));
+                            continue;
+                        }
+                        const buffered = turf.buffer(feature, distance, { units: config.unit || 'meters' });
+                        if (!buffered) continue;
+                        buffered.properties = { ...(feature.properties || {}), _multibuffer_distance: distance, _multibuffer_from: index ? distances[index - 1] : 0, _multibuffer_to: distance, _multibuffer_index: index };
+                        const section = previous ? geometryDifferenceCompat(buffered, previous) : buffered;
+                        if (section) { section.properties = { ...buffered.properties }; output.push(section); }
+                        previous = buffered;
+                    } catch (error) {
+                        const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _multibuffer_error: error.message || String(error), _multibuffer_distance: distance }; rejected.push(item);
+                    }
+                }
+            }
+            return { output_1: turf.featureCollection(output), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_offsetter: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Offsetter', icon: 'fa-arrows-alt', color: '#2980b9', in: 1, out: 2,
+        help: 'Desplaza coordenadas X/Y/Z mediante valores fijos o atributos.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-arrows-alt"></i><div><strong data-geom-transform-summary>X 0 · Y 0</strong><small>Offset XYZ</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"x_mode":"fixed","x_value":0,"x_field":"","y_mode":"fixed","y_value":0,"y_field":"","z_mode":"fixed","z_value":0,"z_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { x_mode: 'fixed', x_value: 0, y_mode: 'fixed', y_value: 0, z_mode: 'fixed', z_value: 0, on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const x = geometryNumberFromFeature(feature, config, 'x_mode', 'x_value', 'x_field', 0);
+                    const y = geometryNumberFromFeature(feature, config, 'y_mode', 'y_value', 'y_field', 0);
+                    const z = geometryNumberFromFeature(feature, config, 'z_mode', 'z_value', 'z_field', 0);
+                    passed.push(geometryOffsetFeatureCompat(feature, x, y, z));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _offsetter_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_crs_setter: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate System Setter', icon: 'fa-globe-europe', color: '#2980b9', in: 1, out: 1,
+        help: 'Asigna un CRS sin transformar coordenadas.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-globe-europe"></i><div><strong data-geom-transform-summary>EPSG:4326</strong><small>Asignar CRS</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"crs":"EPSG:4326","overwrite":true}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { crs: 'EPSG:4326', overwrite: true });
+            const crs = String(config.crs || '').trim();
+            if (!crs) throw new Error('Coordinate System Setter requiere un CRS');
+            const output = geometryCloneCompat(inputs[0] || turf.featureCollection([]));
+            output.metadata = { ...(output.metadata || {}), crs };
+            (output.features || []).forEach((feature) => {
+                feature.properties = feature.properties || {};
+                if (config.overwrite !== false || !feature.properties._crs) feature.properties._crs = crs;
+            });
+            return output;
+        }
+    },
+
+    geo_horizontal_angle_calculator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Horizontal Angle Calculator', icon: 'fa-compass', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-compass"></i><div><strong data-geom-transform-summary>Grados</strong><small>Azimut + ángulo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"horizontal_azimuth","angle_type":"feature","unit":"degrees","calculation_model":"auto","azimuth_attr":"_azimuth","angle_attr":"_angle"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { unit: 'degrees', azimuth_attr: '_azimuth', angle_attr: '_angle' });
+            const radians = config.unit === 'radians';
+            const features = (inputs[0]?.features || []).map((feature) => {
+                const output = geometryCloneCompat(feature);
+                const geometry = output.geometry;
+                const coordinates = geometry?.type === 'MultiLineString'
+                    ? (geometry.coordinates?.[0] || [])
+                    : geometry?.type === 'LineString'
+                        ? (geometry.coordinates || [])
+                        : [];
+                if (coordinates.length >= 2) {
+                    const azimuth = (turf.bearing(turf.point(coordinates[0]), turf.point(coordinates[coordinates.length - 1])) + 360) % 360;
+                    const angle = (450 - azimuth) % 360;
+                    output.properties = output.properties || {};
+                    output.properties[config.azimuth_attr || '_azimuth'] = radians ? azimuth * Math.PI / 180 : azimuth;
+                    output.properties[config.angle_attr || '_angle'] = radians ? angle * Math.PI / 180 : angle;
+                }
+                return output;
+            });
+            const result = turf.featureCollection(features);
+            if (inputs[0]?.metadata) result.metadata = { ...inputs[0].metadata };
+            return result;
+        }
+    },
+
+    geo_rotator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Rotator', icon: 'fa-redo-alt', color: '#2980b9', in: 1, out: 2,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-redo-alt"></i><div><strong data-geom-transform-summary>0° · centroide</strong><small>Rotación antihoraria</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"angle_mode":"fixed","angle_value":0,"angle_field":"","origin_mode":"centroid","origin_x":0,"origin_y":0,"origin_x_field":"","origin_y_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { angle_mode: 'fixed', angle_value: 0, origin_mode: 'centroid', on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const angle = geometryNumberFromFeature(feature, config, 'angle_mode', 'angle_value', 'angle_field', 0);
+                    passed.push(geometryRotateFeatureCompat(feature, angle, geometryRotationOriginCompat(feature, config)));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _rotator_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_densifier: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Densifier', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 2,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-grip-lines"></i><div><strong data-geom-transform-summary>Uniforme · 1</strong><small>Añadir vértices</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"uniform","interval_mode":"fixed","interval_value":1,"interval_field":"","on_error":"reject"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { mode: 'uniform', interval_mode: 'fixed', interval_value: 1, on_error: 'reject' });
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0]?.features || []) {
+                try {
+                    const interval = geometryNumberFromFeature(feature, config, 'interval_mode', 'interval_value', 'interval_field', 1);
+                    passed.push(geometryDensifyFeatureCompat(feature, interval, config.mode));
+                } catch (error) {
+                    const item = geometryCloneCompat(feature); item.properties = { ...(item.properties || {}), _densifier_error: error.message || String(error) };
+                    if (config.on_error === 'null') passed.push(item); else rejected.push(item);
+                }
+            }
+            return config.on_error === 'null' ? turf.featureCollection(passed) : { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) };
+        }
+    },
+
+    geo_measure_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'MeasureExtractor', icon: 'fa-ruler-horizontal', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-ruler-horizontal"></i><div><strong data-geom-transform-summary>Lista measures</strong><small>Extraer tercera coordenada</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"measure_type":"whole","index":0,"point_attr":"measure","start_attr":"measure_start","end_attr":"measure_end","list_attr":"measures"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = geometryReadTransformConfig(dom, { measure_type: 'whole', index: 0, point_attr: 'measure', start_attr: 'measure_start', end_attr: 'measure_end', list_attr: 'measures' });
+            return turf.featureCollection((inputs[0]?.features || []).map((feature) => geometryExtractMeasuresCompat(feature, config)));
+        }
+    },
+
+    geo_coordinate_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate Extractor', icon: 'fa-map-marker-alt', color: '#2980b9', in: 1, out: 1,
+        help: 'Extrae una coordenada de la geometría y la guarda como atributos X/Y/Z.',
+        tpl: () => `
+            <div style="display:grid;gap:4px">
+                <label><span style="font-size:0.7em;color:#aaa">Índice (-1 = última)</span><input type="number" df-index class="node-control" value="-1"></label>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">
+                    <input type="text" df-x-attr class="node-control" value="_x" aria-label="Atributo X">
+                    <input type="text" df-y-attr class="node-control" value="_y" aria-label="Atributo Y">
+                    <input type="text" df-z-attr class="node-control" value="_z" aria-label="Atributo Z">
+                </div>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            const index = parseInt(dom.querySelector('[df-index]')?.value || '-1', 10);
+            const xAttr = String(dom.querySelector('[df-x-attr]')?.value || '_x').trim();
+            const yAttr = String(dom.querySelector('[df-y-attr]')?.value || '_y').trim();
+            const zAttr = String(dom.querySelector('[df-z-attr]')?.value || '_z').trim();
+            const features = (inputs[0]?.features || []).map((feature) => {
+                const item = geometryCloneCompat(feature);
+                const coordinates = geometryCoordinatesCompat(item.geometry);
+                if (!coordinates.length) return item;
+                const resolved = index < 0 ? coordinates.length + index : index;
+                const coordinate = coordinates[Math.max(0, Math.min(coordinates.length - 1, resolved))];
+                item.properties = item.properties || {};
+                if (xAttr) item.properties[xAttr] = String(coordinate[0]);
+                if (yAttr) item.properties[yAttr] = String(coordinate[1]);
+                if (zAttr && coordinate.length > 2) item.properties[zAttr] = String(coordinate[2]);
+                return item;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    geo_crs_extractor: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'CRS Extractor', icon: 'fa-globe-americas', color: '#2980b9', in: 1, out: 1,
+        help: 'Extrae el sistema de coordenadas y lo añade como propiedad.',
+        tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Añade crs_code, crs_name y crs_wkt</div>`,
+        run: async (id, inputs) => {
+            const source = inputs[0];
+            if (!source?.features?.length) throw new Error('Sin datos de entrada');
+            const output = geometryCloneCompat(source);
+            const code = geometryCrsCompat(source);
+            output.features.forEach((feature) => {
+                feature.properties = feature.properties || {};
+                feature.properties.crs_code = code;
+                feature.properties.crs_name = code;
+                feature.properties.crs_wkt = null;
+            });
+            return output;
+        }
+    },
+
+    geo_deaggregator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Deaggregator', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Multipart <i class="fas fa-arrow-right"></i> Singlepart + part number</div>`,
+        run: async (id, inputs) => {
+            const source = inputs[0] || turf.featureCollection([]);
+            const crs = geometryCrsCompat(source);
+            const features = (source.features || []).flatMap(geometryDeaggregateParts);
+            if (crs) features.forEach((feature) => {
+                feature.properties = feature.properties || {};
+                if (!feature.properties._crs) feature.properties._crs = crs;
+            });
+            const output = turf.featureCollection(features);
+            if (source.metadata) output.metadata = { ...source.metadata };
+            return output;
+        }
+    },
+
+    geo_hull_creator: {
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Hull Creator', icon: 'fa-circle-notch', color: '#2980b9', in: 1, out: 1,
+        tpl: () => `
+            <label><span style="font-size:0.7em;color:#aaa">Tipo de hull</span><select df-hulltype class="node-control"><option value="convex">Convexo</option><option value="concave">Cóncavo</option></select></label>
+            <label><span style="font-size:0.7em;color:#aaa">K (1–10)</span><input type="number" df-k value="3" min="1" max="10" class="node-control"></label>`,
+        run: async (id, inputs, dom) => {
+            const source = inputs[0];
+            if (!source?.features?.length) throw new Error('Conecta una capa de puntos');
+            if (source.features.length < 4) throw new Error('Hull Creator requiere al menos 4 puntos');
+            const hullType = dom.querySelector('[df-hulltype]')?.value || 'convex';
+            const k = Math.max(1, Math.min(10, parseInt(dom.querySelector('[df-k]')?.value || '3', 10) || 3));
+            let hull;
+            if (hullType === 'concave') {
+                const bbox = turf.bbox(source);
+                const diagonal = turf.distance(turf.point([bbox[0], bbox[1]]), turf.point([bbox[2], bbox[3]]));
+                hull = turf.concave(source, { maxEdge: Math.max(0.1, diagonal * k * 0.1), units: 'kilometers' });
+            } else hull = turf.convex(source);
+            if (!hull) throw new Error('No se pudo crear el hull');
+            return turf.featureCollection([hull]);
+        }
+    },
+
     geo_centroid: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'CenterPoint', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Centroide</div>`,

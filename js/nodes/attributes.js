@@ -51,6 +51,317 @@ function resolveParamText(raw) {
     return String(raw == null ? '' : raw);
 }
 
+function normalizeSubstringIndex(index, length) {
+    const parsed = Number.isFinite(Number(index)) ? parseInt(index, 10) : 0;
+    return parsed < 0 ? length + parsed : parsed;
+}
+
+function extractFmeSubstring(value, start, end) {
+    const text = String(value ?? '');
+    const length = text.length;
+    let from = Math.max(0, normalizeSubstringIndex(start, length));
+    let to = Math.min(length - 1, normalizeSubstringIndex(end, length));
+    if (from > to || from >= length) return '';
+    return text.slice(from, to + 1);
+}
+
+function readNestedListValues(properties, path) {
+    const parts = String(path || '').split(/\{\}\.?/).filter(Boolean);
+    if (parts.length < 2) {
+        const value = properties?.[parts[0] || path];
+        return Array.isArray(value) ? value : [];
+    }
+    const list = properties?.[parts[0]];
+    if (!Array.isArray(list)) return [];
+    const childPath = parts.slice(1);
+    return list.map((entry) => childPath.reduce((value, key) => value?.[key], entry));
+}
+
+function cloneFeatureForAttributeTool(feature) {
+    if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(feature);
+    return JSON.parse(JSON.stringify(feature));
+}
+
+function escapeRegExpLiteral(value) {
+    return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function fmeRegexReplacementToJs(value) {
+    return String(value ?? '').replace(/\\([0-9]+)/g, '$$$1');
+}
+
+function applyStringReplace(text, search, replacement, mode, caseSensitive) {
+    const source = String(text ?? '');
+    const needle = String(search ?? '');
+    if (!needle) return { value: source, matched: false };
+    const flags = `g${caseSensitive ? '' : 'i'}`;
+    const pattern = mode === 'regex' ? needle : escapeRegExpLiteral(needle);
+    const replacementText = mode === 'regex' ? fmeRegexReplacementToJs(replacement) : String(replacement ?? '');
+    const regex = new RegExp(pattern, flags);
+    let matched = false;
+    const value = source.replace(regex, (...args) => {
+        matched = true;
+        if (mode === 'regex') return replacementText.replace(/\$([0-9]+)/g, (_, index) => args[Number(index)] ?? '');
+        return replacementText;
+    });
+    return { value, matched };
+}
+
+function normalizeAttributeManagerRules(raw) {
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw || '[]'); } catch (e) { throw new Error('Configuración inválida del Attribute Manager'); }
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((row) => ({
+        enabled: row?.enabled !== false,
+        action: String(row?.action || 'keep').trim().toLowerCase(),
+        source: String(row?.source || row?.inputAttr || row?.input_attr || '').trim(),
+        target: String(row?.target || row?.outputAttr || row?.output_attr || row?.name || '').trim(),
+        value: String(row?.value ?? ''),
+        cast: String(row?.cast || row?.valueType || row?.value_type || 'string').trim().toLowerCase(),
+        condition: String(row?.condition || '')
+    })).filter((row) => row.enabled);
+}
+
+function castAttributeManagerValue(value, castType) {
+    const kind = String(castType || 'string').toLowerCase();
+    if (value == null) return null;
+    if (['string', 'varchar', 'text', 'datetime'].includes(kind)) return String(value);
+    if (['number', 'real', 'double'].includes(kind)) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) throw new Error(`No se puede convertir a number: ${value}`);
+        return number;
+    }
+    if (['integer', 'int'].includes(kind)) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) throw new Error(`No se puede convertir a integer: ${value}`);
+        return Math.trunc(number);
+    }
+    if (['boolean', 'bool'].includes(kind)) {
+        if (typeof value === 'boolean') return value;
+        const text = String(value).trim().toLowerCase();
+        if (['true', '1', 'yes', 'si', 'y'].includes(text)) return true;
+        if (['false', '0', 'no', 'n', ''].includes(text)) return false;
+        throw new Error(`No se puede convertir a boolean: ${value}`);
+    }
+    if (kind === 'json') return typeof value === 'object' ? value : JSON.parse(String(value));
+    if (kind === 'date') {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) throw new Error(`No se puede convertir a date: ${value}`);
+        return date.toISOString();
+    }
+    return value;
+}
+
+function readKeeperFieldsCompat(dom) {
+    let fields = [];
+    try { fields = JSON.parse(dom?.querySelector?.('[df-ak-fields]')?.value || '[]'); } catch (_) { fields = []; }
+    if (!Array.isArray(fields) || !fields.length) fields = parseCsvFields(dom?.querySelector?.('[df-keep]')?.value || '');
+    return Array.from(new Set((fields || []).map((field) => resolveParamText(field).trim()).filter(Boolean)));
+}
+
+function readCreatorCreationsCompat(dom) {
+    let creations = [];
+    try { creations = JSON.parse(dom?.querySelector?.('[df-ac-creations]')?.value || '[]'); } catch (_) { creations = []; }
+    if (!Array.isArray(creations) || !creations.length) {
+        const outputAttr = resolveParamText(dom?.querySelector?.('[df-name]')?.value || '').trim();
+        const expression = resolveParamText(dom?.querySelector?.('[df-val]')?.value || '');
+        if (outputAttr || expression) creations = [{ enabled: true, outputAttr, expression, defaultValue: dom?.querySelector?.('[df-default]')?.value ?? null, valueType: 'string' }];
+    }
+    return creations.filter((row) => row && row.enabled !== false && String(row.outputAttr || '').trim()).map((row) => ({
+        enabled: row.enabled !== false,
+        outputAttr: resolveParamText(row.outputAttr).trim(),
+        expression: resolveParamText(row.expression ?? ''),
+        defaultValue: row.defaultValue ?? null,
+        valueType: String(row.valueType || 'string').toLowerCase()
+    }));
+}
+
+function evaluateCreatorExpressionCompat(creation, feature) {
+    const expression = String(creation.expression ?? '').trim();
+    if (!expression) return creation.defaultValue ?? null;
+    const properties = feature.properties || {};
+    let value;
+    if (expression.startsWith('=')) {
+        const fn = compileSafeExpression(expression.slice(1), ['f', 'props']);
+        value = fn(feature, properties, Math, turf, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+    } else if (/^@Value\(([^)]+)\)$/.test(expression)) {
+        value = properties[expression.match(/^@Value\(([^)]+)\)$/)[1]] ?? creation.defaultValue ?? null;
+    } else if (/^@(round|floor|ceil)\(([^)]+)\)$/.test(expression)) {
+        const match = expression.match(/^@(round|floor|ceil)\(([^)]+)\)$/); const raw = properties[match[2]] ?? match[2]; value = Math[match[1]](Number(raw));
+    } else if (/^@(upper|lower|trim)\(([^)]+)\)$/.test(expression)) {
+        const match = expression.match(/^@(upper|lower|trim)\(([^)]+)\)$/); const text = String(properties[match[2]] ?? ''); value = match[1] === 'upper' ? text.toUpperCase() : match[1] === 'lower' ? text.toLowerCase() : text.trim();
+    } else if (expression.startsWith('@concat(') && expression.endsWith(')')) {
+        value = expression.slice(8, -1).split(',').map((part) => { const token = part.trim(); const match = token.match(/^@Value\(([^)]+)\)$/); return match ? properties[match[1]] ?? '' : token.replace(/^["']|["']$/g, ''); }).join('');
+    } else value = expression.replace(/^["']|["']$/g, '');
+    return castAttributeManagerValue(value, creation.valueType);
+}
+
+function runAttributeManagerExpression(source, props, feature, originalProps) {
+    const fn = compileSafeExpression(source, ['props', 'feat', 'originalProps']);
+    return fn(props, feature, originalProps, Math, turf, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+}
+
+function resolveAttributeManagerValue(row, feature, props, originalProps) {
+    const raw = String(row.value ?? '').trim();
+    const expression = raw.startsWith('=')
+        ? raw.slice(1)
+        : (raw.includes('@Value(') && /[+\-*/%<>!=]/.test(raw.replace(/@Value\([^)]+\)/g, ''))
+            ? raw.replace(/@Value\(([^)]+)\)/g, (_, name) => `props[${JSON.stringify(String(name).trim())}]`)
+            : null);
+    return expression ? runAttributeManagerExpression(expression, props, feature, originalProps) : row.value;
+}
+
+function runAttributeManagerFeature(feature, rules, preserveOthers) {
+    const clone = cloneFeatureForAttributeTool(feature);
+    const original = { ...(feature.properties || {}) };
+    const props = { ...original };
+    const order = [];
+    const remember = (field) => { const index = order.indexOf(field); if (index >= 0) order.splice(index, 1); if (field) order.push(field); };
+    for (let index = 0; index < rules.length; index++) {
+        const row = rules[index];
+        const source = row.source || row.target;
+        const target = row.target || row.source;
+        if (row.action === 'keep') {
+            if (!source || !Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: campo no encontrado ${source}`);
+            remember(source);
+        } else if (row.action === 'remove') {
+            if (!source) throw new Error(`Fila ${index + 1}: campo vacío`);
+            delete props[source];
+            const position = order.indexOf(source); if (position >= 0) order.splice(position, 1);
+        } else if (row.action === 'rename' || row.action === 'copy') {
+            if (!source || !target) throw new Error(`Fila ${index + 1}: ${row.action} requiere source y target`);
+            if (!Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: campo no encontrado ${source}`);
+            props[target] = props[source];
+            if (row.action === 'rename' && target !== source) delete props[source];
+            remember(target);
+        } else if (row.action === 'create') {
+            if (!target) throw new Error(`Fila ${index + 1}: create requiere target`);
+            props[target] = resolveAttributeManagerValue(row, clone, props, original);
+            remember(target);
+        } else if (row.action === 'formula') {
+            if (!target) throw new Error(`Fila ${index + 1}: formula requiere target`);
+            props[target] = runAttributeManagerExpression(String(row.value || ''), props, clone, original);
+            remember(target);
+        } else if (row.action === 'default') {
+            if (!target) throw new Error(`Fila ${index + 1}: default requiere target`);
+            if (props[target] == null || props[target] === '') props[target] = resolveAttributeManagerValue(row, clone, props, original);
+            remember(target);
+        } else if (row.action === 'cast') {
+            if (!source || !target || !Object.prototype.hasOwnProperty.call(props, source)) throw new Error(`Fila ${index + 1}: cast requiere campo existente`);
+            props[target] = castAttributeManagerValue(props[source], row.cast);
+            remember(target);
+        } else throw new Error(`Fila ${index + 1}: acción no soportada ${row.action}`);
+    }
+    const ordered = {};
+    order.forEach((field) => { if (Object.prototype.hasOwnProperty.call(props, field)) ordered[field] = props[field]; });
+    if (preserveOthers) Object.keys(original).concat(Object.keys(props)).forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(props, field) && !Object.prototype.hasOwnProperty.call(ordered, field)) ordered[field] = props[field];
+    });
+    clone.properties = ordered;
+    return clone;
+}
+
+function splitAttributeFunctionArgs(source) {
+    const args = []; let current = ''; let depth = 0;
+    for (const char of String(source || '')) {
+        if (char === ',' && depth === 0) { args.push(current); current = ''; continue; }
+        if (char === '(') depth++; else if (char === ')') depth--;
+        current += char;
+    }
+    if (current.trim()) args.push(current);
+    return args;
+}
+
+function evaluateAttributeCondition(condition, props) {
+    const operand = (raw) => {
+        const text = String(raw || '').trim();
+        const match = text.match(/^@Value\(([^)]+)\)$/);
+        if (match) return props[match[1].trim()];
+        if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) return text.slice(1, -1);
+        if (/^null$/i.test(text)) return null;
+        if (/^(true|false)$/i.test(text)) return /^true$/i.test(text);
+        if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+        return Object.prototype.hasOwnProperty.call(props, text) ? props[text] : text;
+    };
+    const match = String(condition || '').trim().match(/^(.+?)(==|!=|>=|<=|=|>|<)(.+)$/);
+    if (!match) return Boolean(operand(condition));
+    const left = operand(match[1]); const right = operand(match[3]); const op = match[2];
+    const leftNumber = Number(left); const rightNumber = Number(right);
+    const numeric = left !== '' && right !== '' && Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
+    const a = numeric ? leftNumber : String(left ?? ''); const b = numeric ? rightNumber : String(right ?? '');
+    if (op === '=' || op === '==') return a === b;
+    if (op === '!=') return a !== b;
+    if (op === '>') return a > b; if (op === '>=') return a >= b;
+    if (op === '<') return a < b; return a <= b;
+}
+
+function evaluateAttributeArithmetic(expression, props) {
+    const resolved = String(expression || '').replace(/@Value\(([^)]+)\)/g, (_, name) => {
+        const value = Number(props[String(name).trim()]);
+        return Number.isFinite(value) ? String(value) : '0';
+    });
+    return runAttributeManagerExpression(resolved, props, { properties: props }, props);
+}
+
+function resolveAttributeV2Value(value, props, type) {
+    const source = String(value ?? '').trim();
+    if (/^null$/i.test(source)) return null;
+    const direct = source.match(/^@Value\(([^)]+)\)$/);
+    if (direct) return castAttributeManagerValue(props[direct[1].trim()], type);
+    const math = source.match(/^@(round|floor|ceil)\((.+)\)$/);
+    if (math) return castAttributeManagerValue(Math[math[1]](evaluateAttributeArithmetic(math[2], props)), type);
+    const stringFn = source.match(/^@(upper|lower|trim)\((.+)\)$/);
+    if (stringFn) {
+        const inner = stringFn[2].match(/^@Value\(([^)]+)\)$/);
+        const text = String(inner ? props[inner[1].trim()] ?? '' : stringFn[2]);
+        return stringFn[1] === 'upper' ? text.toUpperCase() : stringFn[1] === 'lower' ? text.toLowerCase() : text.trim();
+    }
+    const concat = source.match(/^@concat\((.+)\)$/);
+    if (concat) return splitAttributeFunctionArgs(concat[1]).map((part) => {
+        const match = part.trim().match(/^@Value\(([^)]+)\)$/);
+        return String(match ? props[match[1].trim()] ?? '' : part.trim());
+    }).join('');
+    const conditional = source.match(/^@if\((.+)\)$/);
+    if (conditional) {
+        const args = splitAttributeFunctionArgs(conditional[1]);
+        if (args.length >= 3) return resolveAttributeV2Value(evaluateAttributeCondition(args[0], props) ? args[1] : args[2], props, type);
+    }
+    if (/[+\-*/%]/.test(source) && source.includes('@Value(')) return castAttributeManagerValue(evaluateAttributeArithmetic(source, props), type);
+    return castAttributeManagerValue(source, type);
+}
+
+function runAttributeManagerV2Feature(feature, rules, preserveOthers) {
+    const clone = cloneFeatureForAttributeTool(feature);
+    const props = { ...(clone.properties || {}) };
+    const managed = [];
+    for (const rule of rules) {
+        if (rule.enabled === false) continue;
+        const action = String(rule.action || 'do_nothing');
+        const source = String(rule.inputAttr || rule.source || '');
+        const target = String(rule.outputAttr || rule.target || '');
+        if (rule.condition && !evaluateAttributeCondition(rule.condition, props)) {
+            if (['set', 'create'].includes(action) && (target || source)) {
+                props[target || source] = null;
+                managed.push(target || source);
+            }
+            continue;
+        }
+        if (action === 'remove') delete props[source];
+        else if (action === 'rename' && source && target && Object.prototype.hasOwnProperty.call(props, source)) { props[target] = props[source]; delete props[source]; managed.push(target); }
+        else if (action === 'set' && (target || source)) { props[target || source] = resolveAttributeV2Value(rule.value, props, rule.valueType); managed.push(target || source); }
+        else if (action === 'create' && target) { props[target] = resolveAttributeV2Value(rule.value, props, rule.valueType); managed.push(target); }
+        else if (action === 'do_nothing' && source) managed.push(source);
+    }
+    if (preserveOthers) clone.properties = props;
+    else {
+        clone.properties = {};
+        managed.forEach((field) => { if (Object.prototype.hasOwnProperty.call(props, field)) clone.properties[field] = props[field]; });
+    }
+    return clone;
+}
+
 function computeBasicStats(values) {
     const nums = values.filter((v) => typeof v === 'number' && !isNaN(v));
     if (!nums.length) return null;
@@ -302,25 +613,16 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_keeper: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Mantiene únicamente los atributos seleccionados. La configuración completa se abre en un modal.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campos a mantener</span>
-                <input type="text" df-keep class="node-control" placeholder="id, name, type">
-                <div style="font-size:0.6em;color:#666;font-style:italic">El resto serÃ¡ borrado</div>
-            </div>
-            <div df-keeper-fields style="max-height:110px; overflow:auto; border:1px solid #333; border-radius:4px; padding:6px; background:#151515; margin-bottom:6px"></div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Compat (continuar)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>`,
+            <div class="node-editor-summary"><i class="fas fa-check-square"></i><div><strong data-ak-count>0 campos</strong><small>Conservar atributos</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="keeper-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-ak-fields class="node-control" tabindex="-1">[]</textarea><input df-on-error value="null" tabindex="-1"></div>`,
         run: async (id, inputs, dom) => {
-            const keepStr = resolveParamText(dom.querySelector('[df-keep]').value);
+            const source = inputs[0]; if (!source?.features) throw new Error('Sin datos');
             const onError = dom.querySelector('[df-on-error]')?.value || 'null';
-            const toKeep = new Set(keepStr.split(',').map(s => s.trim()));
+            const toKeep = new Set(readKeeperFieldsCompat(dom));
             if (!toKeep.size) throw new Error("Define al menos un campo a mantener");
 
             if (typeof postWorkerTask === 'function') {
@@ -328,7 +630,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
                         task: 'attr_keeper',
-                        features: inputs[0],
+                        features: source,
                         keepList: Array.from(toKeep),
                         onError
                     }, 45000);
@@ -341,8 +643,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             const passed = [];
             const rejected = [];
-            inputs[0].features.forEach(f => {
-                if (!f.properties) f.properties = {};
+            source.features.forEach((feature) => {
+                const f = cloneFeatureForAttributeTool(feature); if (!f.properties) f.properties = {};
                 try {
                     let found = 0;
                     const newProps = {};
@@ -377,38 +679,24 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_creator: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Crea varios atributos con valores, referencias o expresiones en orden.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Nuevo Campo</span>
-                <input type="text" df-name class="node-control" value="new_field">
-            </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Valor o FÃ³rmula (=)</span>
-                <input type="text" df-val class="node-control" placeholder="Texto o =f.properties.id*2">
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Asignar null (compat)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>`,
+            <div class="node-editor-summary"><i class="fas fa-plus-square"></i><div><strong data-ac-count>0 atributos</strong><small>Creaciones ordenadas</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="creator-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-ac-creations class="node-control" tabindex="-1">[]</textarea><input df-on-error value="null" tabindex="-1"></div>`,
         run: async (id, inputs, dom) => {
-            const field = resolveParamText(dom.querySelector('[df-name]').value);
-            const exprRaw = resolveParamText(dom.querySelector('[df-val]').value);
-            const onError = dom.querySelector('[df-on-error]')?.value || 'null';
-            const isFormula = exprRaw.startsWith('=');
+            const source = inputs[0]; if (!source?.features) throw new Error('Sin datos');
+            const creations = readCreatorCreationsCompat(dom); const onError = dom.querySelector('[df-on-error]')?.value || 'null';
+            if (!creations.length) throw new Error('Define al menos una creación de atributo');
 
             if (typeof postWorkerTask === 'function') {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
                         task: 'attr_creator',
-                        features: inputs[0],
-                        field,
-                        exprRaw,
-                        isFormula,
+                        features: source,
+                        creations,
                         onError
                     }, 45000);
                     if (wres && wres.status === 'ok') return wres.data;
@@ -418,67 +706,18 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
-            let formulaFn = null;
-            let compileErr = null;
-            if (isFormula) {
-                try {
-                    formulaFn = compileSafeExpression(exprRaw.substring(1), ['f']);
-                } catch (e) {
-                    compileErr = e;
-                    console.warn("Error en fÃ³rmula Creator", e);
-                }
-            }
-
             const passed = [];
             const rejected = [];
-            inputs[0].features.forEach((f) => {
-                if (!f.properties) f.properties = {};
-
-                if (isFormula && !formulaFn) {
-                    if (onError === 'reject') {
-                        const rf = (typeof window.JETLClone === 'function') ? window.JETLClone(f) : f;
-                        if (!rf.properties) rf.properties = {};
-                        rf.properties[field] = null;
-                        rf.properties._creator_error = compileErr && compileErr.message ? compileErr.message : 'Formula invalida';
-                        rejected.push(rf);
-                    } else {
-                        f.properties[field] = null;
-                        passed.push(f);
-                    }
-                    return;
-                }
-
-                if (isFormula && formulaFn) {
-                    try {
-                        f.properties[field] = formulaFn(
-                            f,
-                            Math,
-                            turf,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined
-                        );
-                        passed.push(f);
-                    } catch (e) {
-                        if (onError === 'reject') {
-                            const rf = (typeof window.JETLClone === 'function') ? window.JETLClone(f) : f;
-                            if (!rf.properties) rf.properties = {};
-                            rf.properties[field] = null;
-                            rf.properties._creator_error = e && e.message ? e.message : String(e);
-                            rejected.push(rf);
-                        } else {
-                            f.properties[field] = null;
-                            passed.push(f);
-                        }
-                    }
-                } else {
-                    f.properties[field] = exprRaw;
-                    passed.push(f);
-                }
+            source.features.forEach((feature) => {
+                const f = cloneFeatureForAttributeTool(feature); if (!f.properties) f.properties = {};
+                let failed = null;
+                creations.forEach((creation) => {
+                    if (failed) return;
+                    try { f.properties[creation.outputAttr] = evaluateCreatorExpressionCompat(creation, f); }
+                    catch (error) { f.properties[creation.outputAttr] = creation.defaultValue ?? null; failed = error; }
+                });
+                if (failed && onError === 'reject') { f.properties._creator_error = failed.message || String(failed); rejected.push(f); }
+                else passed.push(f);
             });
             if (onError === 'reject') {
                 return {
@@ -588,47 +827,294 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
 
+    attr_list_concatenator: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Concatenator', icon: 'fa-list', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-list"></i>
+                <div><strong data-attribute-text-summary>_list → concatenated</strong><small>Unir lista con “,”</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="list-concat-open-editor">
+                <i class="fas fa-pen"></i> Configurar
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-list-concat-config class="node-control" tabindex="-1">{"list_attr":"_list","target_attr":"concatenated","delimiter":",","drop_empty":false}</textarea>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            let config = { list_attr: '_list', target_attr: 'concatenated', delimiter: ',', drop_empty: false };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-list-concat-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.list_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de lista y destino');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                let values = readNestedListValues(clone.properties, source)
+                    .map((value) => value == null ? '' : String(value));
+                if (config.drop_empty) values = values.filter((value) => value !== '');
+                clone.properties[target] = values.join(String(config.delimiter ?? ','));
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_substring: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Substring Extractor', icon: 'fa-i-cursor', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-i-cursor"></i>
+                <div><strong data-attribute-text-summary>Fecha → Ano</strong><small>Caracteres 0–3 (inclusivo)</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="substring-open-editor">
+                <i class="fas fa-pen"></i> Configurar
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-substring-config class="node-control" tabindex="-1">{"source_attr":"Fecha","target_attr":"Ano","start":0,"end":3}</textarea>
+            </div>`,
+        run: async (id, inputs, dom) => {
+            let config = { source_attr: 'Fecha', target_attr: 'Ano', start: 0, end: 3 };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-substring-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.source_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de origen y destino');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                clone.properties[target] = extractFmeSubstring(clone.properties[source], config.start, config.end);
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_aggregator: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Aggregator', icon: 'fa-layer-group', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-layer-group"></i><div><strong data-aggregator-summary>MATRICULA</strong><small>Agrupar y producir Multi*</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="aggregator-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-aggregator-config class="node-control" tabindex="-1">{"group_by":"MATRICULA","remove_geometry":false,"produce_multis":true,"preserve_multi_inputs":false}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const defaults = { group_by: 'MATRICULA', remove_geometry: false, produce_multis: true, preserve_multi_inputs: false };
+            let config = defaults;
+            try { config = { ...defaults, ...JSON.parse(dom.querySelector('[df-aggregator-config], [df-g2-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const fields = Array.isArray(config.group_by) ? config.group_by.map(String) : parseCsvFields(config.group_by);
+            const read = (props, field) => {
+                if (Object.prototype.hasOwnProperty.call(props || {}, field)) return props[field];
+                const actual = Object.keys(props || {}).find((key) => key.toLowerCase() === field.toLowerCase());
+                return actual ? props[actual] : '';
+            };
+            const groups = new Map();
+            for (const feature of inputs[0].features) {
+                const key = fields.map((field) => String(read(feature.properties, field) ?? '')).join('\u001f');
+                if (!groups.has(key)) {
+                    const item = cloneFeatureForAttributeTool(feature);
+                    if (config.remove_geometry) item.geometry = null;
+                    groups.set(key, { item, geometries: [] });
+                }
+                const group = groups.get(key);
+                const target = group.item.properties || (group.item.properties = {});
+                Object.entries(feature.properties || {}).forEach(([field, value]) => {
+                    if (value !== null && value !== '' && (target[field] == null || target[field] === '')) target[field] = value;
+                });
+                if (!config.remove_geometry && feature.geometry) group.geometries.push(JSON.parse(JSON.stringify(feature.geometry)));
+            }
+            if (config.produce_multis && !config.remove_geometry) groups.forEach((group) => {
+                const points = []; const lines = []; const polygons = []; const others = [];
+                group.geometries.forEach((geometry) => {
+                    const coordinates = geometry?.coordinates;
+                    if (!coordinates) return;
+                    if (geometry.type === 'Point') points.push(coordinates);
+                    else if (geometry.type === 'MultiPoint') config.preserve_multi_inputs ? others.push(geometry) : points.push(...coordinates);
+                    else if (geometry.type === 'LineString') lines.push(coordinates);
+                    else if (geometry.type === 'MultiLineString') config.preserve_multi_inputs ? others.push(geometry) : lines.push(...coordinates);
+                    else if (geometry.type === 'Polygon') polygons.push(coordinates);
+                    else if (geometry.type === 'MultiPolygon') config.preserve_multi_inputs ? others.push(geometry) : polygons.push(...coordinates);
+                    else others.push(geometry);
+                });
+                const populated = [points.length, lines.length, polygons.length, others.length].filter(Boolean).length;
+                if (populated === 1 && points.length) group.item.geometry = { type: 'MultiPoint', coordinates: points };
+                else if (populated === 1 && lines.length) group.item.geometry = { type: 'MultiLineString', coordinates: lines };
+                else if (populated === 1 && polygons.length) group.item.geometry = { type: 'MultiPolygon', coordinates: polygons };
+                else if (populated) group.item.geometry = { type: 'GeometryCollection', geometries: [
+                    ...(points.length ? [{ type: 'MultiPoint', coordinates: points }] : []),
+                    ...(lines.length ? [{ type: 'MultiLineString', coordinates: lines }] : []),
+                    ...(polygons.length ? [{ type: 'MultiPolygon', coordinates: polygons }] : []), ...others
+                ] };
+                else group.item.geometry = null;
+            });
+            return turf.featureCollection(Array.from(groups.values(), (group) => group.item));
+        }
+    },
+
+    attr_manager: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Manager', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 2, hidden: true,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-table-columns"></i><div><strong data-attr-manager-summary>0 reglas</strong><small>Contrato legado Desktop</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="attr-manager-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-attr-manager-config class="node-control" tabindex="-1">{"rules":[],"preserveOthers":true,"onError":"null"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { rules: [], preserveOthers: true, onError: 'null' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-attr-manager-config]')?.value || '{}') }; } catch (e) { /* legacy fallback */ }
+            if (!config.rules.length) {
+                try { config.rules = JSON.parse(dom.querySelector('[df-rules]')?.value || '[]'); } catch (e) { config.rules = []; }
+            }
+            if (!dom.querySelector('[df-attr-manager-config]')) {
+                const preserve = dom.querySelector('[df-preserve]');
+                if (preserve) config.preserveOthers = !!preserve.checked;
+                config.onError = dom.querySelector('[df-on-error]')?.value || config.onError;
+            }
+            const rules = normalizeAttributeManagerRules(config.rules);
+            if (!rules.length) throw new Error('Define al menos una regla');
+            const passed = []; const rejected = [];
+            for (const feature of inputs[0].features) {
+                try { passed.push(runAttributeManagerFeature(feature, rules, config.preserveOthers !== false)); }
+                catch (error) {
+                    const clone = cloneFeatureForAttributeTool(feature);
+                    clone.properties = { ...(clone.properties || {}), _attr_manager_error: error.message || String(error) };
+                    if (config.onError === 'reject') rejected.push(clone); else passed.push(clone);
+                }
+            }
+            return config.onError === 'reject'
+                ? { output_1: turf.featureCollection(passed), output_2: turf.featureCollection(rejected) }
+                : turf.featureCollection(passed);
+        }
+    },
+
+    attr_manager_v2: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Manager v2', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary"><i class="fas fa-table-columns"></i><div><strong data-attr-manager-summary>0 reglas</strong><small>Reglas estilo FME</small></div></div>
+            <button type="button" class="btn node-editor-open" data-schema-action="attr-manager-v2-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-attr-manager-v2-config class="node-control" tabindex="-1">{"rules":[],"preserveOthers":true}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { rules: [], preserveOthers: true };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-attr-manager-v2-config]')?.value || '{}') }; } catch (e) { /* legacy fallback */ }
+            if (!config.rules.length) {
+                try { config.rules = JSON.parse(dom.querySelector('[df-amv2-rules]')?.value || '[]'); } catch (e) { config.rules = []; }
+            }
+            if (!dom.querySelector('[df-attr-manager-v2-config]')) {
+                const preserve = dom.querySelector('[data-amv2-preserve]');
+                if (preserve) config.preserveOthers = !!preserve.checked;
+            }
+            if (!Array.isArray(config.rules) || !config.rules.length) throw new Error('Define al menos una regla');
+            return turf.featureCollection(inputs[0].features.map((feature) => runAttributeManagerV2Feature(feature, config.rules, config.preserveOthers !== false)));
+        }
+    },
+
+    attr_splitter: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Splitter', icon: 'fa-cut', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-cut"></i>
+                <div><strong data-attribute-text-summary>image → _list</strong><small>Separar por “_”</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="splitter-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-splitter-config class="node-control" tabindex="-1">{"source_attr":"image","target_attr":"_list","delimiter":"_"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { source_attr: 'image', target_attr: '_list', delimiter: '_' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-splitter-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const source = resolveParamText(config.source_attr).trim();
+            const target = resolveParamText(config.target_attr).trim();
+            if (!source || !target) throw new Error('Define los campos de origen y destino');
+            const delimiter = String(config.delimiter ?? '_');
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                const value = clone.properties[source];
+                clone.properties[target] = value == null ? [] : String(value).split(delimiter).filter((part) => part !== '');
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_list_exploder: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Exploder', icon: 'fa-list-ol', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-list-ol"></i>
+                <div><strong data-attribute-text-summary>_list</strong><small>Índice → _element_index</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="list-exploder-open-editor"><i class="fas fa-pen"></i> Configurar</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-list-exploder-config class="node-control" tabindex="-1">{"list_attr":"_list","index_attr":"_element_index"}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { list_attr: '_list', index_attr: '_element_index' };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-list-exploder-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const listAttr = resolveParamText(config.list_attr).trim();
+            const indexAttr = resolveParamText(config.index_attr).trim();
+            if (!listAttr || !indexAttr) throw new Error('Define los atributos de lista e índice');
+            const features = [];
+            for (const feature of inputs[0].features) {
+                const raw = feature.properties?.[listAttr];
+                const values = Array.isArray(raw) ? raw : (raw == null ? [] : [raw]);
+                values.forEach((value, index) => {
+                    const clone = cloneFeatureForAttributeTool(feature);
+                    clone.properties = { ...(clone.properties || {}), [listAttr]: value, [indexAttr]: index };
+                    features.push(clone);
+                });
+            }
+            return turf.featureCollection(features);
+        }
+    },
+
+    attr_string_replacer: {
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Replacer', icon: 'fa-exchange-alt', color: '#27ae60', in: 1, out: 1,
+        tpl: () => `
+            <div class="node-editor-summary">
+                <i class="fas fa-exchange-alt"></i>
+                <div><strong data-strrep-summary>0 reglas</strong><small data-strrep-mode>Texto literal</small></div>
+            </div>
+            <button type="button" class="btn node-editor-open" data-schema-action="strrep-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
+            <div class="node-editor-storage" aria-hidden="true"><textarea df-strrep-config class="node-control" tabindex="-1">{"mode":"text","case_sensitive":true,"no_match_action":"none","no_match_value":"","rules":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            let config = { mode: 'text', case_sensitive: true, no_match_action: 'none', no_match_value: '', rules: [] };
+            try { config = { ...config, ...JSON.parse(dom.querySelector('[df-strrep-config]')?.value || '{}') }; } catch (e) { /* defaults */ }
+            const rules = Array.isArray(config.rules)
+                ? config.rules.filter((rule) => rule && rule.enabled !== false && String(rule.attribute || '').trim())
+                : [];
+            const features = inputs[0].features.map((feature) => {
+                const clone = cloneFeatureForAttributeTool(feature);
+                clone.properties = clone.properties || {};
+                rules.forEach((rule) => {
+                    const attribute = String(rule.attribute).trim();
+                    const replaced = applyStringReplace(clone.properties[attribute], rule.search, rule.replace, config.mode, config.case_sensitive !== false);
+                    if (replaced.matched) clone.properties[attribute] = replaced.value;
+                    else if (config.no_match_action === 'null') clone.properties[attribute] = null;
+                    else if (config.no_match_action === 'set') clone.properties[attribute] = config.no_match_value ?? '';
+                });
+                return clone;
+            });
+            return turf.featureCollection(features);
+        }
+    },
+
     attr_string_formatter: {
         cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Formatter', icon: 'fa-text-width', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campo(s) Objetivo</span>
-                <input type="text" df-field class="node-control" placeholder="Ej: name, type">
+            <div class="node-editor-summary">
+                <i class="fas fa-text-width"></i>
+                <div><strong data-formatter-summary>Sin campos</strong><small data-formatter-operation>Mayúsculas</small></div>
             </div>
-            <div df-formatter-fields style="max-height:110px; overflow:auto; border:1px solid #333; border-radius:4px; padding:6px; background:#151515; margin-bottom:6px"></div>
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">OperaciÃ³n</span>
-                <select df-op class="node-control">
-                    <option value="upper">MayÃºsculas (UPPER)</option>
-                    <option value="lower">MinÃºsculas (lower)</option>
-                    <option value="capitalize">Capitalizar (Titulo)</option>
-                    <option value="trim">Trim (Limpiar espacios)</option>
-                    <option value="replace">Reemplazar (A -> B)</option>
-                    <option value="concat">Concatenar (Suffix)</option>
-                    <option value="pad">Rellenar (PadStart 001)</option>
-                    <option value="template">Plantilla ({campo})</option>
-                </select>
-            </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Argumentos (Sep: | )</span>
-                <input type="text" df-args class="node-control" placeholder="old|new Ã³ 000">
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
-                    <option value="null">Compat (asignar vacio)</option>
-                    <option value="reject">Enviar a output_2</option>
-                </select>
-            </div>
-            <div style="font-size:0.6em;color:#666;margin-top:2px">
-                Para Replace: "buscar|reemplazo"<br>
-                Para Template: "ID_{id}_zona"
+            <button type="button" class="btn node-editor-open" data-schema-action="formatter-open-editor">
+                <i class="fas fa-pen"></i> Abrir editor
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <textarea df-config class="node-control" tabindex="-1">{"fields":[],"operation":"upper","arguments":"","onError":"null"}</textarea>
             </div>`,
         run: async (id, inputs, dom) => {
-            const fieldRaw = resolveParamText(dom.querySelector('[df-field]').value);
-            const op = resolveParamText(dom.querySelector('[df-op]').value) || 'upper';
-            const argsRaw = resolveParamText(dom.querySelector('[df-args]').value || '');
-            const onError = dom.querySelector('[df-on-error]')?.value || 'null';
+            let config = null;
+            const configRaw = dom.querySelector('[df-config]')?.value;
+            if (configRaw) {
+                try { config = JSON.parse(configRaw); } catch (e) { config = null; }
+            }
+            const legacyField = dom.querySelector('[df-field]')?.value || '';
+            const fieldRaw = resolveParamText(config
+                ? (Array.isArray(config.fields) ? config.fields.join(',') : config.fields || '')
+                : legacyField);
+            const op = resolveParamText(config?.operation || dom.querySelector('[df-op]')?.value || 'upper');
+            const argsRaw = resolveParamText(config?.arguments || dom.querySelector('[df-args]')?.value || '');
+            const onError = config?.onError || dom.querySelector('[df-on-error]')?.value || 'null';
             const fields = fieldRaw.split(',').map((s) => s.trim()).filter(Boolean);
             if (!fields.length) throw new Error("Campo objetivo vacio");
 
@@ -837,7 +1323,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_join_adv: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Join', icon: 'fa-link', color: '#27ae60', in: 2, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'FeatureJoiner', icon: 'fa-link', color: '#27ae60', in: 2, out: 3,
         help: 'Join tabular por claves (left/inner).',
         tpl: () => `
             <div style="margin-bottom:4px">
@@ -865,7 +1351,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <span style="font-size:0.7em;color:#aaa">Prefijo</span>
                 <input type="text" df-prefix class="node-control" value="j_">
             </div>
-            <div style="font-size:0.6em;color:#888">Out 1: Join | Out 2: Sin Match</div>`,
+            <div style="font-size:0.6em;color:#888">Out 1: Joined | Out 2: Unjoined Left | Out 3: Unused Right</div>`,
         run: async (id, inputs, dom) => {
             const mapStr = resolveParamText(dom.querySelector('[df-map]').value);
             const joinType = resolveParamText(dom.querySelector('[df-join]').value) || 'left';
@@ -898,53 +1384,55 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const index = new Map();
             right.forEach(f => {
                 const key = getKey(f.properties || {}, rightKeys);
-                if (!index.has(key)) index.set(key, f);
+                if (!index.has(key)) index.set(key, []);
+                index.get(key).push(f);
             });
             const joined = [];
             const unmatched = [];
+            const rightUsed = new Set();
             left.forEach(f => {
                 if (!f.properties) f.properties = {};
                 const key = getKey(f.properties || {}, leftKeys);
-                const match = index.get(key);
-                if (match) {
-                    const nf = JETLClone(f);
-                    Object.keys(match.properties || {}).forEach(k => nf.properties[prefix + k] = match.properties[k]);
-                    joined.push(nf);
+                const matches = index.get(key) || [];
+                if (matches.length) {
+                    matches.forEach((match) => {
+                        rightUsed.add(match);
+                        const nf = JETLClone(f);
+                        Object.keys(match.properties || {}).forEach(k => nf.properties[prefix + k] = match.properties[k]);
+                        joined.push(nf);
+                    });
                 } else {
                     if (joinType === 'left') joined.push(f);
                     unmatched.push(f);
                 }
             });
-            return { output_1: turf.featureCollection(joined), output_2: turf.featureCollection(unmatched) };
+            const unusedRight = right.filter((feature) => !rightUsed.has(feature));
+            return {
+                output_1: turf.featureCollection(joined),
+                output_2: turf.featureCollection(unmatched),
+                output_3: turf.featureCollection(unusedRight)
+            };
         }
     },
     attr_calc_pro: {
         cat: '2.3 VECTOR - ATTRIBUTES', label: 'Field Calculator Pro', icon: 'fa-keyboard', color: '#27ae60', in: 1, out: 2,
         help: 'Expresiones JS con helpers: props, feat, Math, turf.',
         tpl: () => `
-            <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Campo destino</span>
-                <input type="text" df-name class="node-control" value="new_field">
+            <div class="node-editor-summary">
+                <i class="fas fa-keyboard"></i>
+                <div><strong data-calc-summary>new_field</strong><small>Configura una expresión por elemento</small></div>
             </div>
-            <div>
-                <span style="font-size:0.7em;color:#aaa">Expresion</span>
-                <textarea df-expr class="node-control" style="height:60px" placeholder="props.a + props.b"></textarea>
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">On Error</span>
-                <select df-on-error class="node-control">
+            <button type="button" class="btn node-editor-open" data-schema-action="calc-open-editor">
+                <i class="fas fa-pen"></i> Abrir editor
+            </button>
+            <div class="node-editor-storage" aria-hidden="true">
+                <input type="text" df-name class="node-control" value="new_field" tabindex="-1">
+                <textarea df-expr class="node-control" tabindex="-1"></textarea>
+                <select df-on-error class="node-control" tabindex="-1">
                     <option value="null">Asignar null (compat)</option>
                     <option value="reject">Enviar a output_2</option>
                 </select>
-            </div>
-            <div style="margin-top:4px">
-                <span style="font-size:0.7em;color:#aaa">Campos disponibles</span>
-                <div style="display:flex; gap:4px; margin-top:2px">
-                    <select class="node-control" df-source-field style="flex:1"></select>
-                    <button class="btn" style="padding:4px 8px" data-schema-action="calc-insert" title="Insertar campo en expresion">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                </div>
+                <select df-source-field class="node-control" tabindex="-1"></select>
             </div>`,
         run: async (id, inputs, dom) => {
             const field = resolveParamText(dom.querySelector('[df-name]').value);
@@ -1051,7 +1539,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                         multiplier,
                         onError
                     }, 45000);
-                    if (wres && wres.status === 'ok') return wres.data;
+                    if (wres && wres.status === 'ok' && wres.data?.output_3) return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
                     console.warn("Worker Area Calc fallo, fallback local:", e);

@@ -208,7 +208,6 @@
         }
 
         if (typeof window !== 'undefined') {
-            window.addEventListener('load', () => setTimeout(ensureSmokeApiLoaded, 120));
             window.ensureSmokeApiLoaded = ensureSmokeApiLoaded;
             window.ensureSmokeApiLoadedAsync = ensureSmokeApiLoadedAsync;
         }

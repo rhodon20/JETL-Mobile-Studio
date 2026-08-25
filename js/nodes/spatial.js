@@ -1,6 +1,329 @@
 // Cat: spatial
 (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY || {};
+
+function spatialCloneCompat(feature) {
+    if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(feature);
+    return JSON.parse(JSON.stringify(feature));
+}
+
+function spatialOverlayPropertiesCompat(source, overlay, prefix, index, count) {
+    const properties = { ...(source || {}) };
+    Object.entries(overlay || {}).forEach(([key, value]) => { properties[`${prefix}${key}`] = value; });
+    properties._overlayer_match_index = index;
+    properties._overlayer_match_count = count;
+    return properties;
+}
+
+function spatialPointKeyCompat(feature) {
+    const coordinates = feature?.geometry?.coordinates;
+    return Array.isArray(coordinates) && coordinates.length >= 2 ? `${Number(coordinates[0]).toFixed(8)},${Number(coordinates[1]).toFixed(8)}` : '';
+}
+
+function spatialOverlayerResultCompat(matched, unmatched) {
+    return { output_1: turf.featureCollection(matched), output_2: turf.featureCollection(unmatched) };
+}
+
+function spatialRequireOverlayInputsCompat(source, overlay) {
+    if (!source?.features?.length) throw new Error('Input 1 vacío');
+    if (!overlay?.features?.length) throw new Error('Input 2 vacío');
+}
+
+function spatialPointPointOverlayerCompat(source, overlay, prefix) {
+    spatialRequireOverlayInputsCompat(source, overlay);
+    const index = new Map();
+    (overlay.features || []).forEach((feature) => {
+        const key = spatialPointKeyCompat(feature);
+        if (!key) return;
+        if (!index.has(key)) index.set(key, []);
+        index.get(key).push(feature);
+    });
+    const matched = []; const unmatched = [];
+    (source.features || []).forEach((feature) => {
+        const hits = index.get(spatialPointKeyCompat(feature)) || [];
+        if (!hits.length) return unmatched.push(feature);
+        hits.forEach((hit, position) => {
+            const output = spatialCloneCompat(feature);
+            output.properties = spatialOverlayPropertiesCompat(feature.properties, hit.properties, prefix, position + 1, hits.length);
+            matched.push(output);
+        });
+    });
+    return spatialOverlayerResultCompat(matched, unmatched);
+}
+
+function spatialPointPredicateOverlayerCompat(source, overlay, prefix, predicate) {
+    spatialRequireOverlayInputsCompat(source, overlay);
+    const matched = []; const unmatched = [];
+    (source.features || []).forEach((feature) => {
+        const hits = (overlay.features || []).filter((candidate) => {
+            try { return predicate(feature, candidate); } catch (error) { return false; }
+        });
+        if (!hits.length) return unmatched.push(feature);
+        hits.forEach((hit, position) => {
+            const output = spatialCloneCompat(feature);
+            output.properties = spatialOverlayPropertiesCompat(feature.properties, hit.properties, prefix, position + 1, hits.length);
+            matched.push(output);
+        });
+    });
+    return spatialOverlayerResultCompat(matched, unmatched);
+}
+
+function spatialAreaAreaOverlayerCompat(source, overlay, prefix) {
+    spatialRequireOverlayInputsCompat(source, overlay);
+    const matched = []; const unmatched = [];
+    (source.features || []).forEach((feature) => {
+        const hits = [];
+        (overlay.features || []).forEach((candidate) => {
+            try { const intersection = turf.intersect(feature, candidate); if (intersection) hits.push({ candidate, intersection }); } catch (error) { /* non-overlapping */ }
+        });
+        if (!hits.length) return unmatched.push(feature);
+        hits.forEach((hit, position) => {
+            hit.intersection.properties = spatialOverlayPropertiesCompat(feature.properties, hit.candidate.properties, prefix, position + 1, hits.length);
+            matched.push(hit.intersection);
+        });
+    });
+    return spatialOverlayerResultCompat(matched, unmatched);
+}
+
+function spatialLineLineOverlayerCompat(source, overlay, prefix) {
+    return spatialPointPredicateOverlayerCompat(source, overlay, prefix, (feature, candidate) => (
+        turf.booleanIntersects(feature, candidate)
+        || turf.booleanEqual?.(feature, candidate)
+        || turf.booleanOverlap?.(feature, candidate)
+        || turf.booleanWithin?.(feature, candidate)
+        || turf.booleanContains?.(feature, candidate)
+    ));
+}
+
+function spatialLineAreaOverlayerCompat(source, overlay, prefix) {
+    spatialRequireOverlayInputsCompat(source, overlay);
+    const matched = []; const unmatched = [];
+    (source.features || []).forEach((feature) => {
+        let segments = [spatialCloneCompat(feature)];
+        (overlay.features || []).forEach((area) => {
+            let boundary;
+            try { boundary = turf.polygonToLine(area); } catch (error) { return; }
+            const boundaries = boundary?.type === 'FeatureCollection' ? boundary.features : [boundary];
+            boundaries.filter(Boolean).forEach((line) => {
+                segments = segments.flatMap((segment) => {
+                    try { const split = turf.lineSplit(segment, line); return split?.features?.length ? split.features : [segment]; }
+                    catch (error) { return [segment]; }
+                });
+            });
+        });
+        segments.forEach((segment) => {
+            let probe;
+            try {
+                const length = turf.length(segment, { units: 'kilometers' });
+                probe = length > 0 ? turf.along(segment, length / 2, { units: 'kilometers' }) : turf.point(segment.geometry.coordinates[0]);
+            } catch (error) { probe = turf.point(segment.geometry?.coordinates?.[0] || [0, 0]); }
+            const hits = (overlay.features || []).filter((area) => { try { return turf.booleanPointInPolygon(probe, area); } catch (error) { return false; } });
+            if (!hits.length) { segment.properties = { ...(feature.properties || {}) }; unmatched.push(segment); return; }
+            hits.forEach((hit, position) => {
+                const output = spatialCloneCompat(segment);
+                output.properties = spatialOverlayPropertiesCompat(feature.properties, hit.properties, prefix, position + 1, hits.length);
+                matched.push(output);
+            });
+        });
+    });
+    return spatialOverlayerResultCompat(matched, unmatched);
+}
+
+function spatialReadConfigCompat(dom, defaults) {
+    try { return { ...defaults, ...JSON.parse(dom.querySelector('[df-geom-transform-config]')?.value || '{}') }; }
+    catch (error) { return { ...defaults }; }
+}
+
+function spatialRelationCompat(requestor, supplier, mode) {
+    try {
+        if (mode === 'contains') return turf.booleanContains(requestor, supplier);
+        if (mode === 'within') return turf.booleanWithin(requestor, supplier);
+        if (mode === 'crosses') return turf.booleanCrosses(requestor, supplier);
+        if (mode === 'touches') return turf.booleanTouches(requestor, supplier);
+        if (mode === 'equal' || mode === 'equals') return turf.booleanEqual(requestor, supplier);
+        if (mode === 'disjoint') return turf.booleanDisjoint(requestor, supplier);
+        if (mode === 'overlap' || mode === 'overlaps') return turf.booleanOverlap(requestor, supplier);
+        return turf.booleanIntersects(requestor, supplier);
+    } catch (error) { return false; }
+}
+
+function spatialFieldsCompat(raw) {
+    if (Array.isArray(raw)) return raw.map(String).map((field) => field.trim()).filter(Boolean);
+    try { const parsed = JSON.parse(String(raw || '[]')); if (Array.isArray(parsed)) return parsed.map(String).map((field) => field.trim()).filter(Boolean); }
+    catch (error) { /* comma-separated fallback */ }
+    return String(raw || '').split(',').map((field) => field.trim()).filter(Boolean);
+}
+
+function spatialSupplierIdCompat(feature, fallback) {
+    for (const key of ['OBJECTID', 'FID', 'fid', 'id', 'ID']) {
+        const value = feature?.properties?.[key];
+        if (value !== undefined && value !== null && value !== '') return value;
+    }
+    return feature?.id ?? fallback;
+}
+
+function spatialMergeSupplierCompat(properties, supplier, config, index) {
+    if (!config.merge_attrs) return;
+    Object.entries(supplier?.properties || {}).forEach(([key, value]) => {
+        if (['OBJECTID', 'FID', 'fid', 'id', 'ID'].includes(key)) return;
+        if (config.merge_mode === 'merge') {
+            if (properties[key] === undefined || properties[key] === null || properties[key] === '') properties[key] = value;
+            else properties[`${key}_${index + 1}`] = value;
+        } else properties[`${config.prefix || 'supplier_'}${key}`] = value;
+    });
+}
+
+function spatialRelatorCompat(source, suppliers, config) {
+    const countAttr = String(config.count_attr || 'related_suppliers').trim() || 'related_suppliers';
+    const listName = String(config.list_name || '_relations').trim() || '_relations';
+    const groupFields = spatialFieldsCompat(config.group_by);
+    const output = (source.features || []).map((requestor) => {
+        const item = spatialCloneCompat(requestor);
+        const requestorProperties = item.properties || {};
+        const matches = (suppliers.features || []).map((supplier, index) => ({ supplier, index })).filter(({ supplier }) => (
+            groupFields.every((field) => Object.prototype.hasOwnProperty.call(requestorProperties, field) && Object.prototype.hasOwnProperty.call(supplier.properties || {}, field) && String(requestorProperties[field]) === String(supplier.properties[field]))
+            && spatialRelationCompat(requestor, supplier, config.mode || 'intersects')
+        ));
+        requestorProperties[countAttr] = matches.length;
+        requestorProperties.Join_Count = matches.length;
+        if (matches.length) {
+            const selected = config.supplier_selection === 'last' ? matches[matches.length - 1] : matches[0];
+            requestorProperties.TARGET_FID = spatialSupplierIdCompat(selected.supplier, selected.index);
+            spatialMergeSupplierCompat(requestorProperties, selected.supplier, config, selected.index);
+        }
+        if (config.generate_list) requestorProperties[listName] = matches.map(({ supplier, index }) => {
+            const entry = { supplier_index: index, supplier_id: spatialSupplierIdCompat(supplier, index), relation: config.mode || 'intersects' };
+            if (config.list_attrs !== false) entry.attributes = { ...(supplier.properties || {}) };
+            return entry;
+        });
+        item.properties = requestorProperties;
+        return item;
+    });
+    return { output_1: turf.featureCollection(output) };
+}
+
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
+    sp_anchored_snapper: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Anchored Snapper', icon: 'fa-anchor', color: '#8e44ad', in: 2, out: 4,
+        help: 'Desplaza candidatos del input 2 hacia anchors del input 1.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-anchor"></i><div><strong data-geom-transform-summary>Segment · 10 m</strong><small>4 salidas Desktop</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"snapping_type":"segment","distance":10,"unit":"meters","group_by":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { snapping_type: 'segment', distance: 10, unit: 'meters', group_by: [] });
+            const distanceLimit = Number(config.distance);
+            if (!Number.isFinite(distanceLimit) || distanceLimit < 0) throw new Error('Distancia inválida');
+            const anchors = inputs[0]; const candidates = inputs[1];
+            if (!anchors?.features) throw new Error('Input 1 vacío');
+            if (!candidates?.features) throw new Error('Input 2 vacío');
+            const anchorPoints = turf.explode(anchors);
+            const snapped = []; const untouched = [];
+            const thresholdKm = config.unit === 'meters' ? distanceLimit / 1000 : config.unit === 'miles' ? distanceLimit * 1.60934 : distanceLimit;
+            (candidates.features || []).forEach((feature) => {
+                if (!feature?.geometry || !anchorPoints.features?.length) { untouched.push(feature); return; }
+                const output = spatialCloneCompat(feature); let changed = false;
+                turf.coordEach(output, (coordinate) => {
+                    const current = turf.point(coordinate);
+                    const nearest = turf.nearestPoint(current, anchorPoints);
+                    if (nearest && turf.distance(current, nearest, { units: 'kilometers' }) <= thresholdKm) {
+                        const [x, y] = nearest.geometry.coordinates;
+                        if (coordinate[0] !== x || coordinate[1] !== y) { coordinate[0] = x; coordinate[1] = y; changed = true; }
+                    }
+                });
+                if (changed) snapped.push(output); else untouched.push(feature);
+            });
+            return { output_1: turf.featureCollection(snapped), output_2: turf.featureCollection(untouched), output_3: turf.featureCollection([]), output_4: turf.featureCollection((anchors.features || []).slice()) };
+        }
+    },
+
+    sp_neighbor_finder: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Neighbor Finder', icon: 'fa-crosshairs', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca el candidato más próximo para cada feature fuente.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-crosshairs"></i><div><strong data-geom-transform-summary>Sin límite</strong><small>Vecino más próximo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"max_distance":"","distance_factor":"","merge_attrs":false}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { max_distance: '', distance_factor: '', merge_attrs: false });
+            const source = inputs[0]; const candidates = inputs[1];
+            if (!source?.features?.length) throw new Error('Input 1 vacío');
+            if (!candidates?.features?.length) throw new Error('Input 2 vacío');
+            const maxDistance = String(config.max_distance ?? '').trim() ? Number(config.max_distance) : null;
+            const matched = []; const unmatched = [];
+            (source.features || []).forEach((feature) => {
+                let best = null; let bestDistance = Infinity;
+                (candidates.features || []).forEach((candidate) => {
+                    try {
+                        const distance = turf.distance(turf.centroid(feature), turf.centroid(candidate), { units: 'meters' });
+                        if (distance < bestDistance) { best = candidate; bestDistance = distance; }
+                    } catch (error) { /* invalid candidate */ }
+                });
+                if (!best || (Number.isFinite(maxDistance) && bestDistance > maxDistance)) { unmatched.push(feature); return; }
+                const output = spatialCloneCompat(feature); output.properties = { ...(output.properties || {}), _distance: bestDistance };
+                if (config.merge_attrs) Object.entries(best.properties || {}).forEach(([key, value]) => { if (!(key in output.properties)) output.properties[key] = value; });
+                matched.push(output);
+            });
+            return spatialOverlayerResultCompat(matched, unmatched);
+        }
+    },
+
+    sp_spatial_relator: {
+        cat: '2.2 VECTOR - SPATIAL', label: 'Spatial Relator', icon: 'fa-project-diagram', color: '#8e44ad', in: 2, out: 1,
+        help: 'Cuenta y describe Suppliers relacionados para cada Requestor.',
+        tpl: () => `<div class="node-editor-summary"><i class="fas fa-project-diagram"></i><div><strong data-geom-transform-summary>Intersects · related_suppliers</strong><small>Requestors + Suppliers</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"intersects","count_attr":"related_suppliers","merge_attrs":false,"merge_mode":"prefix","supplier_selection":"first","prefix":"supplier_","generate_list":false,"list_name":"_relations","list_attrs":true,"group_by":[]}</textarea></div>`,
+        run: async (id, inputs, dom) => {
+            const config = spatialReadConfigCompat(dom, { mode: 'intersects', count_attr: 'related_suppliers', merge_attrs: false, merge_mode: 'prefix', supplier_selection: 'first', prefix: 'supplier_', generate_list: false, list_name: '_relations', list_attrs: true, group_by: [] });
+            const source = inputs[0]; const suppliers = inputs[1];
+            if (source?.features?.length === 0) return { output_1: turf.featureCollection([]) };
+            if (!source?.features) throw new Error('Input 1 vacío');
+            if (!suppliers?.features) throw new Error('Input 2 vacío');
+            if (source.features.length + suppliers.features.length >= 15000) {
+                if (typeof window !== 'undefined' && typeof window.JETLBackend?.spatial === 'function') {
+                    const result = await window.JETLBackend.spatial('spatial_relator', { source, join: suppliers }, config);
+                    if (result) return result;
+                }
+                throw new Error('Spatial Relator grande requiere backend Python para no bloquear la interfaz');
+            }
+            return spatialRelatorCompat(source, suppliers, config);
+        }
+    },
+
+    sp_point_point_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnPoint Overlayer', icon: 'fa-bullseye', color: '#8e44ad', in: 2, out: 2,
+        help: 'Replica puntos coincidentes y añade atributos del overlay.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo overlay</span><input type="text" df-prefix class="node-control" value="pt_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
+        run: async (id, inputs, dom) => spatialPointPointOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'pt_'))
+    },
+
+    sp_point_line_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnLine Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
+        help: 'Replica puntos situados sobre líneas y añade atributos del overlay.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo línea</span><input type="text" df-prefix class="node-control" value="line_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
+        run: async (id, inputs, dom) => spatialPointPredicateOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'line_'), (point, line) => turf.booleanPointOnLine(point, line))
+    },
+
+    sp_point_area_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnArea Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
+        help: 'Replica puntos contenidos en áreas y añade atributos del overlay.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
+        run: async (id, inputs, dom) => spatialPointPredicateOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'), (point, area) => turf.booleanPointInPolygon(point, area))
+    },
+
+    sp_area_area_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'AreaOnArea Overlayer', icon: 'fa-object-group', color: '#8e44ad', in: 2, out: 2,
+        help: 'Genera una geometría por cada intersección área-área.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
+        run: async (id, inputs, dom) => spatialAreaAreaOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'))
+    },
+
+    sp_line_area_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'LineOnArea Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
+        help: 'Divide líneas y separa tramos interiores y exteriores.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 inside · Out 2 outside</div>`,
+        run: async (id, inputs, dom) => spatialLineAreaOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'))
+    },
+
+    sp_line_line_overlayer: {
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'LineOnLine Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
+        help: 'Replica líneas fuente por cada línea overlay relacionada.',
+        tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo línea</span><input type="text" df-prefix class="node-control" value="line_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
+        run: async (id, inputs, dom) => spatialLineLineOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'line_'))
+    },
+
     geo_kink_remover: {
         cat: '2.2 VECTOR - SPATIAL', label: 'Kink Remover', icon: 'fa-band-aid', color: '#8e44ad', in: 1, out: 1,
         tpl: () => `
@@ -291,7 +614,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_snap: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Snapper', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 1,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Snapper', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 3,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Distancia de Atracción</span>
@@ -305,7 +628,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 </div>
             </div>
             <div style="font-size:0.6em;color:#888;margin-top:2px">
-                Input 1 (Data) se mueve hacia Input 2 (Ancla).
+                Out 1: Snapped | Out 2: Untouched | Out 3: Collapsed
             </div>`,
         run: async (id, inputs, dom) => {
             const val = parseFloat(dom.querySelector('[df-dist]').value);
@@ -336,7 +659,17 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
                     // Tiempo extendido (60s) para snapping masivo
                     const wres = await postWorkerTask(payload, 60000);
-                    if (wres && wres.status === 'ok') return wres.data;
+                    if (wres && wres.status === 'ok') {
+                        const data = wres.data;
+                        if (data?.output_1) return data;
+                        if (data?.type === 'FeatureCollection') {
+                            return {
+                                output_1: data,
+                                output_2: turf.featureCollection([]),
+                                output_3: turf.featureCollection([])
+                            };
+                        }
+                    }
 
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
@@ -368,7 +701,11 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             });
 
-            return sourceClone;
+            return {
+                output_1: sourceClone,
+                output_2: turf.featureCollection([]),
+                output_3: turf.featureCollection([])
+            };
         }
     },
 
@@ -777,8 +1114,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_clip: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Clipper (Robust)', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 1,
-        tpl: () => `<div>Data &#8745; Mask</div>`,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Clipper (Robust)', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 2,
+        tpl: () => `<div>Out 1: Inside | Out 2: Outside</div>`,
         run: async (id, i) => {
             if (!i[0] || !i[1] || !i[1].features.length) throw new Error("Faltan datos");
             if (!i[0].features || i[0].features.length === 0) throw new Error("Data vacía");
@@ -802,7 +1139,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     const payload = { task: 'clip', features: { type: 'FeatureCollection', features }, mask, chunk: CHUNK };
                     const wres = await postWorkerTask(payload, 30000);
                     if (wres && (wres.status === 'ok' || wres.status === 'partial')) {
-                        return normalizeResult(wres.data || wres.result || wres);
+                        const workerResult = normalizeResult(wres.data || wres.result || wres);
+                        if (workerResult?.output_1 && workerResult?.output_2) return workerResult;
                     }
                 }
             } catch (e) {
@@ -811,18 +1149,29 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             }
 
             // Fallback Main Thread
-            const res = [];
+            const inside = [];
+            const outside = [];
             for (let idx = 0; idx < features.length; idx++) {
                 if (typeof window.JETLThrowIfCancelled === 'function') window.JETLThrowIfCancelled();
                 if (idx % 50 === 0 && typeof window.JETLNextTick === 'function') await window.JETLNextTick();
                 const f = features[idx];
                 try {
-                    if (!turf.booleanIntersects(f, mask)) continue;
+                    if (!turf.booleanIntersects(f, mask)) {
+                        outside.push(f);
+                        continue;
+                    }
                     const clipped = turf.intersect(f, mask);
-                    if (clipped) { clipped.properties = f.properties; res.push(clipped); }
-                } catch (e) { }
+                    if (clipped) { clipped.properties = f.properties; inside.push(clipped); }
+                    const remainder = turf.difference(f, mask);
+                    if (remainder) { remainder.properties = f.properties; outside.push(remainder); }
+                } catch (e) {
+                    outside.push(f);
+                }
             }
-            return turf.featureCollection(res);
+            return {
+                output_1: turf.featureCollection(inside),
+                output_2: turf.featureCollection(outside)
+            };
         }
     }
 });

@@ -1,5 +1,10 @@
 // Cat: raster
 (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY || {};
+async function ensureRasterLibraries() {
+    if (typeof window.JETLLoadScriptOnce !== 'function') return;
+    await window.JETLLoadScriptOnce('js/vendor/geotiff.js', 'GeoTIFF');
+    await window.JETLLoadScriptOnce('js/vendor/geoblaze.web.min.js', 'geoblaze');
+}
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     sp_point_sampling: {
         cat: '4. RASTER', label: 'Multi-Band Sampler', icon: 'fa-crosshairs', color: '#8e44ad',
@@ -95,7 +100,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
-            // 4. Parseo geoblaze
+            // 4. Parseo local bajo demanda si el Worker no está disponible.
+            await ensureRasterLibraries();
             const georaster = await geoblaze.parse(buffer);
             let outputFeatures = [];
             let hits = 0;
@@ -246,6 +252,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
+            await ensureRasterLibraries();
             const georaster = await geoblaze.parse(buffer);
             const out = [];
 

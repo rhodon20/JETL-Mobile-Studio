@@ -56,11 +56,18 @@ async function processNode(id, allNodes) {
     if (!isDirty && executionData[id] && executionData[id]._contentHash === currentContentHash && executionData[id].data) {
         // HIT DE CACHÉ
 
+        const alreadyProcessedInRun = executionData[id]._runId === currentRunTimestamp;
+
         // --- CORRECCIÓN CACHÉ VERDE ---
         // Actualizamos el timestamp del dato cachedo al tiempo actual
         // para que el sistema sepa que es "válido en esta tirada"
         executionData[id]._runId = currentRunTimestamp;
         executionData[id]._ms = executionData[id]._ms || 0;
+
+        window.JETLRunTrace?.node(id, {
+            status: alreadyProcessedInRun ? 'ok' : 'cached',
+            ms: alreadyProcessedInRun ? executionData[id]._ms : 0
+        });
 
         if (dom) dom.style.opacity = '1';
         return executionData[id].data;
@@ -74,6 +81,7 @@ async function processNode(id, allNodes) {
 
     let result = null;
     const t0 = performance.now();
+    window.JETLRunTrace?.node(id, { status: 'running', ms: 0, error: null });
     try {
         if (window.isEngineCancelled) throw new Error("Operación cancelada por el usuario.");
 
@@ -95,15 +103,18 @@ async function processNode(id, allNodes) {
         result = await tool.run(id, safeInputs, dom);
         result = normalizeResult(result);
 
-        anim_NodeSuccess(id);
-        anim_CableFlow(id);
-
     } catch (e) {
+        const cancelled = !!window.isEngineCancelled || e?.cancelled || e?.name === 'CancelledError';
+        window.JETLRunTrace?.node(id, {
+            status: cancelled ? 'cancelled' : 'error',
+            ms: Math.max(0, Math.round(performance.now() - t0)),
+            error: e && e.message ? e.message : String(e)
+        });
         log(`[${tool.label}] ERROR: ${e.message}`, "err");
         if (dom) {
             dom.style.boxShadow = "0 0 0 2px #c0392b";
             dom.style.opacity = '1';
-            anim_NodeError(id);
+            if (typeof anim_NodeError === 'function') anim_NodeError(id);
         }
         throw e;
     }
@@ -118,6 +129,7 @@ async function processNode(id, allNodes) {
         _contentHash: currentContentHash,
         _ms: Math.max(0, Math.round(t1 - t0))
     };
+    window.JETLRunTrace?.node(id, { status: 'ok', ms: executionData[id]._ms, error: null });
     if (hasDirtyApi && typeof window.JETLDirty.clearNodeDirty === 'function') {
         window.JETLDirty.clearNodeDirty(String(id));
     }

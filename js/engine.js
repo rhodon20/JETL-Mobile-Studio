@@ -5,6 +5,69 @@ let editor, map, mapLayers = {}, executionData = {};
 window.executionData = executionData;
 window.lastRunReport = null;
 let dirtyNodeMap = {};
+let selectedCanvasConnection = null;
+const LOCAL_DRAFT_KEY = 'jetl_flow_optimized';
+
+function hasLocalDraft() {
+    return !!SafeStorage.load(LOCAL_DRAFT_KEY);
+}
+
+function updateLocalDraftUI() {
+    const button = document.querySelector('[data-ui-action="restore-draft"]');
+    const available = hasLocalDraft();
+    if (button) {
+        button.disabled = !available;
+        button.setAttribute('aria-disabled', String(!available));
+        button.title = available ? 'Restaurar el borrador guardado en este navegador' : 'No hay borrador local';
+    }
+    window.__JETL_HAS_LOCAL_DRAFT = available;
+}
+
+function resetEditorState() {
+    editor.clear();
+    clearAllRuntimeCaches();
+    executionData = {};
+    window.executionData = executionData;
+    clearAllDirty();
+    if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
+    currentRunTimestamp = 0;
+    window.JETLMobile?.fitFlowToViewport();
+}
+
+function startNewProject() {
+    const graph = _getGraphDataSafe();
+    if (Object.keys(graph).length > 0 && !window.confirm('¿Crear un proyecto nuevo y borrar el flujo actual?')) return;
+    resetEditorState();
+    SafeStorage.clear(LOCAL_DRAFT_KEY);
+    updateLocalDraftUI();
+    if (typeof window.showToast === 'function') window.showToast('Proyecto nuevo', 'success');
+}
+
+function restoreLocalDraft() {
+    const saved = SafeStorage.load(LOCAL_DRAFT_KEY);
+    if (!saved) {
+        updateLocalDraftUI();
+        if (typeof window.showToast === 'function') window.showToast('No hay borrador local', 'warning');
+        return false;
+    }
+    try {
+        const flow = JSON.parse(saved);
+        resetEditorState();
+        editor.import(flow);
+        invalidateAllNodes('draft_restored');
+        window.JETLMobile?.fitFlowToViewport();
+        if (typeof window.showToast === 'function') window.showToast('Borrador restaurado', 'success');
+        return true;
+    } catch (error) {
+        console.error('[JETL] Borrador local inválido', error);
+        SafeStorage.clear(LOCAL_DRAFT_KEY);
+        updateLocalDraftUI();
+        if (typeof window.showToast === 'function') window.showToast('El borrador local estaba dañado', 'error');
+        return false;
+    }
+}
+
+window.JETLProjects = { startNew: startNewProject, restoreDraft: restoreLocalDraft, hasDraft: hasLocalDraft };
 
 function _getGraphDataSafe() {
     try {
@@ -135,7 +198,46 @@ function resolvePort(parentRes, parentPort) {
 // WORKER SETUP (POOL) is now handled via js/core/workerPool.js
 
 
-window.onload = function () {
+let jetlAppInitialized = false;
+
+function setJETLStartupStatus(state, message) {
+    const dot = document.getElementById('sys-status');
+    if (!dot) return;
+    const colors = { loading: '#f1c40f', ready: '#2ecc71', error: '#e74c3c' };
+    dot.style.background = colors[state] || colors.loading;
+    dot.title = message || 'JETL Studio';
+    dot.setAttribute('aria-label', message || 'JETL Studio');
+}
+
+function ensureJETLMap() {
+    if (map) return map;
+    const mapElement = document.getElementById('map');
+    if (!mapElement) throw new Error('No se encontró el contenedor del mapa');
+    if (typeof L === 'undefined') throw new Error('Leaflet no está disponible');
+
+    map = L.map(mapElement, { renderer: L.canvas() }).setView([40.416, -3.703], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM contributors'
+    }).addTo(map);
+    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
+    return map;
+}
+window.ensureJETLMap = ensureJETLMap;
+
+function initializeJETLApp() {
+    if (jetlAppInitialized) return;
+    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'initializing-editor';
+    jetlAppInitialized = true;
+    setJETLStartupStatus('loading', 'Iniciando JETL Studio');
+
+    try {
+        // El catálogo es independiente del mapa y debe estar disponible de inmediato.
+        renderSidebar('');
+
+        if (typeof Drawflow === 'undefined') throw new Error('Drawflow no está disponible');
+        const drawflowElement = document.getElementById('drawflow');
+        if (!drawflowElement) throw new Error('No se encontró el lienzo de flujo');
+
     try {
         const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
         Object.defineProperty(HTMLInputElement.prototype, 'value', {
@@ -146,21 +248,51 @@ window.onload = function () {
         });
     } catch (e) { console.warn("No se pudo aplicar el parche de input file", e); }
 
-    map = L.map('map', { renderer: L.canvas() }).setView([40.416, -3.703], 6);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM contributors' }).addTo(map);
-    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
-
-    editor = new Drawflow(document.getElementById("drawflow"));
+    editor = new Drawflow(drawflowElement);
+    window.JETLEditor = editor;
+    // En pantallas táctiles, los controles del nodo deben editarse y no iniciar
+    // el arrastre del nodo. Drawflow excluye input/textarea/select con este modo.
+    editor.draggable_inputs = false;
     editor.reroute = true;
     editor.reroute_fix_curvature = true;
     editor.start();
 
-    const saved = SafeStorage.load('jetl_flow_optimized');
-    if (saved) {
-        try { editor.import(JSON.parse(saved)); } catch (e) { console.error("Error importando flujo guardado:", e); }
-    }
+    // Drawflow mueve y escala su lienzo interno, pero la cuadrícula pertenece
+    // al contenedor. Sin sincronizarla, un flujo vacío parece inmóvil aunque
+    // los gestos funcionen. Mantener ambos en el mismo sistema de coordenadas
+    // da feedback visible inmediato para paneo y pinch-to-zoom.
+    const syncCanvasViewport = () => {
+        const zoom = Number.isFinite(editor.zoom) ? editor.zoom : 1;
+        const x = Number.isFinite(editor.canvas_x) ? editor.canvas_x : 0;
+        const y = Number.isFinite(editor.canvas_y) ? editor.canvas_y : 0;
+        drawflowElement.style.backgroundPosition = x + 'px ' + y + 'px';
+        drawflowElement.style.backgroundSize = (25 * zoom) + 'px ' + (25 * zoom) + 'px';
+        drawflowElement.dataset.viewport = Math.round(x) + ',' + Math.round(y) + ',' + zoom.toFixed(2);
+    };
+    const scheduleCanvasViewportSync = () => window.requestAnimationFrame(syncCanvasViewport);
+    editor.on('translate', scheduleCanvasViewportSync);
+    editor.on('zoom', scheduleCanvasViewportSync);
+    syncCanvasViewport();
+    window.JETLSyncCanvasViewport = syncCanvasViewport;
 
-    ['nodeCreated', 'nodeRemoved', 'connectionCreated', 'connectionRemoved'].forEach(ev => {
+    editor.on('connectionSelected', (connection) => {
+        selectedCanvasConnection = connection ? {
+            output_id: String(connection.output_id),
+            input_id: String(connection.input_id),
+            output_class: String(connection.output_class),
+            input_class: String(connection.input_class)
+        } : null;
+        if (selectedCanvasConnection && typeof showToast === 'function') {
+            showToast('Conexión seleccionada · añade un nodo para insertarlo', 'info');
+        }
+    });
+    editor.on('connectionUnselected', () => { selectedCanvasConnection = null; });
+
+    // El borrador local no se restaura silenciosamente. El usuario puede
+    // recuperarlo desde Proyecto > Restaurar.
+    updateLocalDraftUI();
+
+    ['nodeCreated', 'nodeRemoved', 'nodeMoved', 'connectionCreated', 'connectionRemoved'].forEach(ev => {
         editor.on(ev, (payload) => {
             if (ev === 'nodeRemoved') {
                 const removedId = String(payload);
@@ -177,8 +309,13 @@ window.onload = function () {
                 if (srcId) invalidateNodeAndDownstream(srcId, ev);
                 if (dstId) invalidateNodeAndDownstream(dstId, ev);
                 if (!srcId && !dstId) invalidateAllNodes(ev);
+                if (ev === 'connectionRemoved' && selectedCanvasConnection &&
+                    srcId === selectedCanvasConnection.output_id && dstId === selectedCanvasConnection.input_id) {
+                    selectedCanvasConnection = null;
+                }
             }
-            SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
+            SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+            updateLocalDraftUI();
             if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
                 setTimeout(() => JETLSchemaUI.refreshAll(), 0);
             }
@@ -186,6 +323,8 @@ window.onload = function () {
     });
     editor.on('nodeDataChanged', (nodeId) => {
         invalidateNodeAndDownstream(String(nodeId), 'node_data_changed');
+        SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+        updateLocalDraftUI();
     });
 
     editor.on('click', (e) => {
@@ -205,26 +344,76 @@ window.onload = function () {
         }
     });
 
-    renderSidebar('');
-    document.getElementById('sys-status').style.background = '#2ecc71';
-    createGeoWorker();
-    initQuickSearch();
+    setJETLStartupStatus('ready', 'Sistema listo');
+    if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
+    const bootDiagnostic = document.getElementById('boot-diagnostic');
+    if (bootDiagnostic) bootDiagnostic.remove();
 
-    // --- CORRECCIÓN: Inicialización de Módulos Faltantes ---
-    initHistory();
-    initContextMenu();
-    initEngineDelegation();
-
-    const filterInput = document.getElementById('table-filter');
-    if (filterInput) {
-        filterInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') applyTableFilter();
+    // El editor ya es utilizable. Los listeners auxiliares se conectan en el
+    // siguiente fotograma para garantizar que Safari pueda pintar la interfaz.
+    requestAnimationFrame(() => setTimeout(() => {
+        const initializers = [
+            ['controles principales', initEngineDelegation],
+            ['historial', initHistory],
+            ['menú contextual', initContextMenu],
+            ['navegador de flujo', initFlowNavigator],
+            ['búsqueda rápida', initQuickSearch]
+        ];
+        initializers.forEach(([label, initializer]) => {
+            try {
+                initializer();
+            } catch (optionalError) {
+                console.error(`[JETL] Error inicializando ${label}`, optionalError);
+            }
         });
+
+        try {
+            const filterInput = document.getElementById('table-filter');
+            if (filterInput) {
+                filterInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') applyTableFilter();
+                });
+            }
+            if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
+                JETLSchemaUI.refreshAll();
+            }
+        } catch (optionalError) {
+            console.error('[JETL] Error inicializando tabla o esquema', optionalError);
+        }
+    }, 0));
+    } catch (error) {
+        jetlAppInitialized = false;
+        const errorMessage = error && error.message ? error.message : String(error || 'Error desconocido');
+        setJETLStartupStatus('error', `Error de inicio: ${errorMessage}`);
+        if (window.__JETL_BOOT) {
+            window.__JETL_BOOT.stage = 'error';
+            window.__JETL_BOOT.error = errorMessage;
+        }
+        const bootDiagnostic = document.getElementById('boot-diagnostic');
+        if (bootDiagnostic) {
+            bootDiagnostic.textContent = `No se pudo iniciar JETL Studio: ${errorMessage}`;
+            bootDiagnostic.style.color = '#ff8a80';
+        }
+        console.error('[JETL] Error durante la inicialización', error);
+        if (typeof window.showToast === 'function') {
+            window.showToast(`No se pudo iniciar JETL Studio: ${errorMessage}`, 'error');
+        }
     }
-    if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
-        setTimeout(() => JETLSchemaUI.refreshAll(), 0);
-    }
-};
+}
+
+// Los scripts de arranque se sirven con `defer`. Durante su ejecución el
+// documento ya puede estar en `interactive`, aunque DOMContentLoaded todavía
+// no se haya emitido y queden módulos posteriores por ejecutar.
+if (document.readyState === 'loading' || document.readyState === 'interactive') {
+    document.addEventListener('DOMContentLoaded', initializeJETLApp, { once: true });
+} else {
+    queueMicrotask(initializeJETLApp);
+}
+
+// Permite reintentar el arranque si una dependencia esencial llegó tarde.
+window.addEventListener('load', () => {
+    if (!jetlAppInitialized) initializeJETLApp();
+}, { once: true });
 
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');
@@ -255,8 +444,9 @@ function renderSidebar(filter) {
             title.classList.add('active');
         }
 
+        const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
-            itemsDiv.innerHTML += `<div class="node-item" draggable="true" data-k="${t.k}">
+            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}">
                 <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
             </div>`;
         });
@@ -268,6 +458,194 @@ function renderSidebar(filter) {
 }
 function filterTools(val) { renderSidebar(val); }
 
+function createTouchIntentTracker(threshold = 10) {
+    let intent = null;
+    return {
+        start(target, x, y) { intent = target ? { target, x, y, moved: false } : null; },
+        move(x, y) {
+            if (!intent) return;
+            if (Math.hypot(x - intent.x, y - intent.y) > threshold) intent.moved = true;
+        },
+        end() {
+            const target = intent && !intent.moved ? intent.target : null;
+            intent = null;
+            return target;
+        },
+        cancel() { intent = null; }
+    };
+}
+window.JETLCreateTouchIntentTracker = createTouchIntentTracker;
+
+function buildFlowNavigatorEntries(flowData, registry, query = '') {
+    const data = flowData && flowData.drawflow && flowData.drawflow.Home
+        ? flowData.drawflow.Home.data || {}
+        : {};
+    const needle = String(query || '').trim().toLocaleLowerCase('es');
+    return Object.entries(data).map(([id, node]) => {
+        const tool = registry[node.name] || {};
+        const label = tool.label || node.name || `Nodo ${id}`;
+        const category = tool.cat || 'Sin categoría';
+        const searchable = [id, node.name, label, category, JSON.stringify(node.data || {})]
+            .join(' ')
+            .toLocaleLowerCase('es');
+        const inputs = Object.values(node.inputs || {}).reduce((total, input) => total + (input.connections || []).length, 0);
+        const outputs = Object.values(node.outputs || {}).reduce((total, output) => total + (output.connections || []).length, 0);
+        return {
+            id: String(id), name: node.name || '', label, category,
+            icon: tool.icon || 'fa-cube', color: tool.color || '#888',
+            inputs, outputs, searchable
+        };
+    }).filter((entry) => !needle || entry.searchable.includes(needle))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+}
+window.buildFlowNavigatorEntries = buildFlowNavigatorEntries;
+
+function escapeFlowNavigatorHTML(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function getFlowNavigatorSummary(flowData) {
+    const data = flowData && flowData.drawflow && flowData.drawflow.Home
+        ? flowData.drawflow.Home.data || {}
+        : {};
+    const nodes = Object.values(data);
+    const connections = nodes.reduce((total, node) => total + Object.values(node.outputs || {})
+        .reduce((sum, output) => sum + (output.connections || []).length, 0), 0);
+    const categories = new Set(nodes.map((node) => TOOL_REGISTRY[node.name]?.cat).filter(Boolean)).size;
+    return { nodes: nodes.length, connections, categories };
+}
+
+function renderFlowNavigator(query = '') {
+    const list = document.getElementById('flow-navigator-list');
+    const summary = document.getElementById('flow-navigator-summary');
+    if (!list || !summary || !editor) return;
+    const flowData = editor.export();
+    const entries = buildFlowNavigatorEntries(flowData, TOOL_REGISTRY, query);
+    const totals = getFlowNavigatorSummary(flowData);
+    summary.innerHTML = `
+        <span><strong>${totals.nodes}</strong> nodos</span>
+        <span><strong>${totals.connections}</strong> conexiones</span>
+        <span><strong>${totals.categories}</strong> categorías</span>`;
+
+    if (!entries.length) {
+        list.innerHTML = `<div class="flow-navigator-empty">
+            <i class="fas fa-search"></i>
+            <strong>${totals.nodes ? 'No hay coincidencias' : 'El flujo está vacío'}</strong>
+            <span>${totals.nodes ? 'Prueba con otro nombre, atributo o ID.' : 'Añade nodos desde el catálogo para empezar.'}</span>
+        </div>`;
+        return;
+    }
+
+    list.innerHTML = entries.map((entry) => {
+        const id = escapeFlowNavigatorHTML(entry.id);
+        const label = escapeFlowNavigatorHTML(entry.label);
+        const category = escapeFlowNavigatorHTML(entry.category);
+        const color = /^#[0-9a-f]{3,8}$/i.test(entry.color) ? entry.color : '#888';
+        const icon = String(entry.icon).split(/\s+/).filter((token) => /^fa[\w-]*$/.test(token)).join(' ');
+        return `
+        <button type="button" class="flow-navigator-item" data-flow-node-id="${id}">
+            <span class="flow-navigator-icon" style="--node-accent:${color}"><i class="fas ${icon}"></i></span>
+            <span class="flow-navigator-copy">
+                <strong>${label}</strong>
+                <small>#${id} · ${category}</small>
+            </span>
+            <span class="flow-navigator-ports" aria-label="${entry.inputs} entradas y ${entry.outputs} salidas">
+                <span><i class="fas fa-arrow-right-to-bracket"></i>${entry.inputs}</span>
+                <span><i class="fas fa-arrow-right-from-bracket"></i>${entry.outputs}</span>
+            </span>
+            <i class="fas fa-crosshairs flow-navigator-target" aria-hidden="true"></i>
+        </button>`;
+    }).join('');
+}
+
+function closeFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal.is-open')) document.body.classList.remove('modal-open');
+}
+window.JETLCloseFlowNavigator = closeFlowNavigator;
+
+function openFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    const input = document.getElementById('flow-navigator-filter');
+    if (!modal) return false;
+    initFlowNavigator();
+    window.JETLNativeNav?.('flow');
+    if (input) input.value = '';
+    renderFlowNavigator('');
+    modal.style.display = 'flex';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    setTimeout(() => input?.focus(), 0);
+    return true;
+}
+window.JETLOpenFlowNavigator = openFlowNavigator;
+
+function focusFlowNode(nodeId) {
+    const id = String(nodeId || '');
+    const node = document.getElementById('node-' + id);
+    const viewport = document.getElementById('drawflow');
+    if (!node || !viewport || !editor?.precanvas) return false;
+
+    const zoom = Math.min(1, Math.max(editor.zoom_min || 0.5, window.innerWidth <= 768 ? 0.88 : (editor.zoom || 1)));
+    const centerX = node.offsetLeft + node.offsetWidth / 2;
+    const centerY = node.offsetTop + node.offsetHeight / 2;
+    const x = viewport.clientWidth / 2 - centerX * zoom;
+    const y = viewport.clientHeight / 2 - centerY * zoom;
+
+    editor.canvas_x = x;
+    editor.canvas_y = y;
+    editor.zoom = zoom;
+    editor.zoom_last_value = zoom;
+    editor.precanvas.style.transformOrigin = '0 0';
+    editor.precanvas.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    document.querySelectorAll('.drawflow-node').forEach((element) => element.classList.remove('selected'));
+    node.classList.add('selected');
+    editor.node_selected = node;
+    currentNodeId = id;
+    editor.dispatch?.('nodeSelected', id);
+    if (executionData[id]?.data && typeof buildTable === 'function') buildTable(executionData[id].data);
+    window.JETLSyncCanvasViewport?.();
+    node.animate?.([
+        { boxShadow: '0 0 0 3px rgba(52,152,219,.5)' },
+        { boxShadow: '0 0 0 3px rgba(52,152,219,.24)' }
+    ], { duration: 420, easing: 'ease-out' });
+    return true;
+}
+window.JETLFocusFlowNode = focusFlowNode;
+
+function initFlowNavigator() {
+    const modal = document.getElementById('flow-navigator-modal');
+    const input = document.getElementById('flow-navigator-filter');
+    const list = document.getElementById('flow-navigator-list');
+    if (!modal || !input || !list || modal.dataset.ready === 'true') return;
+    modal.dataset.ready = 'true';
+    input.addEventListener('input', () => renderFlowNavigator(input.value));
+    list.addEventListener('click', (event) => {
+        const item = event.target.closest('[data-flow-node-id]');
+        if (!item) return;
+        const id = item.getAttribute('data-flow-node-id');
+        closeFlowNavigator();
+        window.JETLNativeNav?.('flow');
+        requestAnimationFrame(() => focusFlowNode(id));
+    });
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeFlowNavigator();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) closeFlowNavigator();
+    });
+}
+
 let qsMousePos = { x: 0, y: 0 };
 
 function initQuickSearch() {
@@ -275,6 +653,10 @@ function initQuickSearch() {
     const input = document.getElementById('qs-input');
     const results = document.getElementById('qs-results');
     const workspace = document.getElementById('workspace');
+
+    if (!qs || !input || !results || !workspace || qs.dataset.ready === 'true') return;
+    qs.dataset.ready = 'true';
+    const isMobileSearch = () => window.matchMedia('(max-width: 768px)').matches;
 
     workspace.addEventListener('mousemove', (e) => {
         if (qs.style.display !== 'block') {
@@ -285,14 +667,14 @@ function initQuickSearch() {
     document.addEventListener('keydown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-        if (e.key.length === 1 && e.key.match(/[a-z0-9]/i)) {
+        if (!isMobileSearch() && e.key.length === 1 && e.key.match(/[a-z0-9]/i)) {
             if (qs.style.display !== 'block') {
                 qs.style.top = Math.min(qsMousePos.y, window.innerHeight - 300) + 'px';
                 qs.style.left = Math.min(qsMousePos.x, window.innerWidth - 300) + 'px';
                 qs.style.display = 'block';
-                anime({ targets: qs, opacity: [0, 1], scale: [0.8, 1], duration: 200, easing: 'easeOutQuad' });
                 input.value = '';
                 input.focus();
+                renderMatches('');
             }
         }
         if (e.key === 'Escape') closeQS();
@@ -301,7 +683,11 @@ function initQuickSearch() {
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const sel = results.querySelector('.selected');
-            if (sel) { addNode(sel.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top)); closeQS(); }
+            if (sel) {
+                if (isMobileSearch()) addNodeClick(sel.dataset.k);
+                else addNode(sel.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
+                closeQS();
+            }
         } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             const current = results.querySelector('.selected');
@@ -315,9 +701,8 @@ function initQuickSearch() {
         }
     });
 
-    input.addEventListener('keyup', (e) => {
-        if (['ArrowUp', 'ArrowDown', 'Enter'].includes(e.key)) return;
-        const val = input.value.toLowerCase();
+    function renderMatches(value) {
+        const val = String(value || '').trim().toLocaleLowerCase('es');
         results.innerHTML = '';
         const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => t.label.toLowerCase().includes(val) || t.cat.toLowerCase().includes(val));
 
@@ -329,18 +714,33 @@ function initQuickSearch() {
             results.appendChild(item);
         });
 
-        anime({ targets: '.qs-item', opacity: [0, 1], translateX: [10, 0], delay: anime.stagger(30), duration: 300, easing: 'easeOutQuad' });
+        window.JETLMotion?.staggerIn(results.querySelectorAll('.qs-item'));
+
+        qs.classList.toggle('has-results', matches.length > 0);
+    }
+
+    input.addEventListener('input', () => renderMatches(input.value));
+    input.addEventListener('focus', () => {
+        if (isMobileSearch()) renderMatches(input.value);
     });
 
     function closeQS() {
-        anime({ targets: qs, opacity: 0, scale: 0.9, duration: 150, easing: 'easeInQuad', complete: () => { qs.style.display = 'none'; input.value = ''; document.activeElement.blur(); } });
+        qs.classList.remove('has-results');
+        results.innerHTML = '';
+        input.value = '';
+        input.blur();
+        if (!isMobileSearch()) qs.style.display = 'none';
     }
 
-    document.addEventListener('click', (e) => { if (qs.style.display === 'block' && !qs.contains(e.target)) closeQS(); });
+    document.addEventListener('click', (e) => {
+        const open = qs.style.display === 'block' || (isMobileSearch() && qs.classList.contains('has-results'));
+        if (open && !qs.contains(e.target)) closeQS();
+    });
     results.addEventListener('click', (e) => {
         const item = e.target.closest('.qs-item');
         if (!item) return;
-        addNode(item.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
+        if (isMobileSearch()) addNodeClick(item.dataset.k);
+        else addNode(item.dataset.k, parseInt(qs.style.left), parseInt(qs.style.top));
         closeQS();
     });
 }
@@ -382,37 +782,290 @@ function countOutputsFromResult(data) {
     return out;
 }
 
+let activeRunTrace = null;
+let activeRunMonitor = null;
+
+const RUN_NODE_CLASSES = ['jetl-run-pending', 'jetl-run-running', 'jetl-run-ok', 'jetl-run-cached', 'jetl-run-error', 'jetl-run-cancelled'];
+
+function formatLiveDuration(ms) {
+    const value = Math.max(0, Number(ms || 0));
+    return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)} s` : `${Math.round(value)} ms`;
+}
+
+function setCanvasNodeRunState(nodeId, status) {
+    const node = document.getElementById('node-' + nodeId);
+    if (!node) return;
+    node.classList.remove(...RUN_NODE_CLASSES);
+    if (status) {
+        node.classList.add(`jetl-run-${status}`);
+        node.dataset.runState = status;
+    } else {
+        delete node.dataset.runState;
+    }
+}
+
+function updateRunMonitorClock() {
+    if (!activeRunMonitor) return;
+    const elapsed = document.getElementById('loader-elapsed');
+    const nodeTime = document.getElementById('loader-node-time');
+    if (elapsed) elapsed.textContent = formatLiveDuration(Date.now() - activeRunMonitor.startedAt);
+    if (nodeTime) nodeTime.textContent = activeRunMonitor.currentStartedAt
+        ? `Nodo actual: ${formatLiveDuration(Date.now() - activeRunMonitor.currentStartedAt)}` : '';
+}
+
+function renderRunMonitor() {
+    if (!activeRunMonitor) return;
+    const total = activeRunMonitor.plannedIds.length;
+    const done = activeRunMonitor.completedIds.size;
+    const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    const progressText = document.getElementById('loader-progress-text');
+    const progressBar = document.getElementById('loader-progress-bar');
+    if (progressText) progressText.textContent = `${done}/${total} nodos · ${progress}%`;
+    if (progressBar) progressBar.style.width = `${progress}%`;
+    updateRunMonitorClock();
+}
+
+function startRunMonitor(label, plannedIds) {
+    if (activeRunMonitor?.timer) clearInterval(activeRunMonitor.timer);
+    if (activeRunMonitor?.closeTimer) clearTimeout(activeRunMonitor.closeTimer);
+    const ids = (plannedIds || []).map(String);
+    document.querySelectorAll('.drawflow-node').forEach((node) => {
+        node.classList.remove(...RUN_NODE_CLASSES);
+        delete node.dataset.runState;
+    });
+    ids.forEach((id) => setCanvasNodeRunState(id, 'pending'));
+    activeRunMonitor = { label, plannedIds: ids, completedIds: new Set(), startedAt: Date.now(), currentNodeId: null, currentStartedAt: null, errorNodeId: null, timer: null, closeTimer: null };
+    const loader = document.getElementById('loader');
+    const title = document.getElementById('loader-title');
+    const message = document.getElementById('loader-msg');
+    const cancel = document.getElementById('loader-cancel');
+    const close = document.getElementById('loader-close');
+    const focusError = document.getElementById('loader-focus-error');
+    if (loader) { loader.style.display = 'flex'; loader.dataset.status = 'running'; }
+    if (title) title.textContent = label;
+    if (message) message.textContent = 'Preparando flujo…';
+    if (cancel) cancel.hidden = false;
+    if (close) close.hidden = true;
+    if (focusError) focusError.hidden = true;
+    renderRunMonitor();
+    activeRunMonitor.timer = setInterval(updateRunMonitorClock, 100);
+}
+
+function updateRunMonitorNode(nodeId, patch) {
+    if (!activeRunMonitor || !patch?.status) return;
+    const id = String(nodeId);
+    const graphNode = _getGraphDataSafe()[id];
+    const tool = graphNode?.name ? window.TOOL_REGISTRY?.[graphNode.name] : null;
+    const label = tool?.label || graphNode?.name || `Nodo #${id}`;
+    const terminal = ['ok', 'cached', 'error', 'cancelled'].includes(patch.status);
+    if (patch.status === 'running') {
+        activeRunMonitor.currentNodeId = id;
+        activeRunMonitor.currentStartedAt = Date.now();
+    }
+    if (terminal) {
+        activeRunMonitor.completedIds.add(id);
+        if (activeRunMonitor.currentNodeId === id) activeRunMonitor.currentStartedAt = null;
+    }
+    if (patch.status === 'error') activeRunMonitor.errorNodeId = id;
+    setCanvasNodeRunState(id, patch.status);
+    const message = document.getElementById('loader-msg');
+    if (message) {
+        if (patch.status === 'running') message.textContent = `Ejecutando ${label} (#${id})`;
+        else if (patch.status === 'cached') message.textContent = `${label} recuperado de caché`;
+        else if (patch.status === 'error') message.textContent = `Error en ${label}: ${patch.error || 'error desconocido'}`;
+        else if (patch.status === 'ok') message.textContent = `${label} completado en ${formatLiveDuration(patch.ms)}`;
+    }
+    renderRunMonitor();
+}
+
+function finishRunMonitor(status, errorNodeId = null) {
+    if (!activeRunMonitor) return;
+    if (activeRunMonitor.timer) clearInterval(activeRunMonitor.timer);
+    activeRunMonitor.timer = null;
+    if (status === 'cancelled') {
+        activeRunMonitor.plannedIds.forEach((id) => {
+            if (!activeRunMonitor.completedIds.has(id)) setCanvasNodeRunState(id, 'cancelled');
+        });
+    }
+    const loader = document.getElementById('loader');
+    const message = document.getElementById('loader-msg');
+    const cancel = document.getElementById('loader-cancel');
+    const close = document.getElementById('loader-close');
+    const focusError = document.getElementById('loader-focus-error');
+    const resolvedErrorId = errorNodeId || activeRunMonitor.errorNodeId;
+    if (loader) loader.dataset.status = status;
+    if (cancel) cancel.hidden = true;
+    if (close) close.hidden = status !== 'error';
+    if (focusError) {
+        focusError.hidden = status !== 'error' || !resolvedErrorId;
+        focusError.dataset.nodeId = resolvedErrorId || '';
+    }
+    if (message) {
+        if (status === 'ok') message.textContent = 'Flujo completado';
+        else if (status === 'cancelled') message.textContent = 'Ejecución cancelada';
+        else if (status === 'error' && !resolvedErrorId) message.textContent = 'La ejecución terminó con error';
+    }
+    renderRunMonitor();
+    if (status !== 'error') {
+        const monitor = activeRunMonitor;
+        monitor.closeTimer = setTimeout(() => {
+            if (activeRunMonitor === monitor) closeRunMonitor();
+        }, status === 'ok' ? 700 : 1200);
+    }
+}
+
+function closeRunMonitor() {
+    if (activeRunMonitor?.timer) clearInterval(activeRunMonitor.timer);
+    if (activeRunMonitor?.closeTimer) clearTimeout(activeRunMonitor.closeTimer);
+    const loader = document.getElementById('loader');
+    if (loader) loader.style.display = 'none';
+    activeRunMonitor = null;
+}
+
+function getRunErrorNodeId() {
+    if (!activeRunTrace) return null;
+    for (const [id, event] of activeRunTrace.nodes.entries()) if (event.status === 'error') return id;
+    return null;
+}
+
+function buildExecutionPlan(graphData) {
+    const data = graphData || {};
+    const ids = Object.keys(data).map(String);
+    const indegree = new Map(ids.map((id) => [id, 0]));
+    const children = new Map(ids.map((id) => [id, []]));
+    ids.forEach((id) => {
+        const inputs = data[id]?.inputs || {};
+        Object.values(inputs).forEach((input) => {
+            (input.connections || []).forEach((connection) => {
+                const parentId = String(connection.node);
+                if (!indegree.has(parentId)) return;
+                indegree.set(id, indegree.get(id) + 1);
+                children.get(parentId).push(id);
+            });
+        });
+    });
+
+    let frontier = ids.filter((id) => indegree.get(id) === 0);
+    const levels = [];
+    const order = [];
+    while (frontier.length) {
+        const level = frontier.slice().sort((a, b) => Number(a) - Number(b));
+        levels.push(level);
+        order.push(...level);
+        const next = [];
+        level.forEach((id) => {
+            children.get(id).forEach((childId) => {
+                indegree.set(childId, indegree.get(childId) - 1);
+                if (indegree.get(childId) === 0) next.push(childId);
+            });
+        });
+        frontier = next;
+    }
+    if (order.length !== ids.length) {
+        const cyclicIds = ids.filter((id) => !order.includes(id));
+        throw new Error(`El flujo contiene un ciclo entre los nodos ${cyclicIds.map((id) => '#' + id).join(', ')}`);
+    }
+    return { order, levels };
+}
+window.JETLBuildExecutionPlan = buildExecutionPlan;
+
+function collectRequiredNodeIds(targetId, graphData) {
+    const data = graphData || {};
+    const required = new Set();
+    const visit = (id) => {
+        const key = String(id);
+        if (required.has(key) || !data[key]) return;
+        required.add(key);
+        Object.values(data[key].inputs || {}).forEach((input) => {
+            (input.connections || []).forEach((connection) => visit(connection.node));
+        });
+    };
+    visit(targetId);
+    return [...required];
+}
+
+function beginRunTrace(label, scope, plannedIds) {
+    activeRunTrace = {
+        label,
+        scope,
+        startedAt: Date.now(),
+        finishedAt: null,
+        plannedIds: (plannedIds || []).map(String),
+        nodes: new Map()
+    };
+    startRunMonitor(label, activeRunTrace.plannedIds);
+    return activeRunTrace;
+}
+
+function markRunTraceNode(nodeId, patch) {
+    if (!activeRunTrace) return;
+    const id = String(nodeId);
+    const previous = activeRunTrace.nodes.get(id) || { id, started_at: new Date().toISOString() };
+    if (['ok', 'cached'].includes(previous.status) && ['ok', 'cached'].includes(patch?.status)) return;
+    const now = new Date().toISOString();
+    const nextPatch = { ...(patch || {}) };
+    if (nextPatch.status === 'running') nextPatch.started_at = previous.started_at || now;
+    if (['ok', 'cached', 'error', 'cancelled'].includes(nextPatch.status)) nextPatch.finished_at = now;
+    activeRunTrace.nodes.set(id, { ...previous, ...nextPatch, id });
+    updateRunMonitorNode(id, nextPatch);
+}
+
+function finishRunTrace() {
+    if (activeRunTrace && !activeRunTrace.finishedAt) activeRunTrace.finishedAt = Date.now();
+}
+
+window.JETLRunTrace = { node: markRunTraceNode };
+
 function buildRunReport(label, status, errorMessage) {
     const exportData = (editor && typeof editor.export === 'function')
         ? (((editor.export() || {}).drawflow || {}).Home || {}).data || {}
         : {};
-    const entries = Object.entries(executionData || {});
-    const nodes = entries.map(([id, meta]) => {
-        const node = exportData[id];
+    finishRunTrace();
+    const trace = activeRunTrace;
+    const nodes = Object.entries(exportData).map(([id, node]) => {
+        const meta = executionData ? executionData[id] : null;
+        const event = trace?.nodes?.get(String(id)) || null;
         const nodeName = node ? node.name : '';
         const tool = nodeName && window.TOOL_REGISTRY ? window.TOOL_REGISTRY[nodeName] : null;
         return {
             id: String(id),
             node: nodeName || 'unknown',
             label: tool ? tool.label : nodeName || 'unknown',
-            ms: (meta && meta._ms) || 0,
-            count: countFeaturesFromResult(meta ? meta.data : null),
-            outputs: countOutputsFromResult(meta ? meta.data : null),
-            cached: !!(meta && meta._runId !== currentRunTimestamp)
+            category: tool?.cat || '',
+            status: event?.status || 'not_run',
+            ms: event ? Number(event?.ms ?? (meta && meta._ms) ?? 0) : 0,
+            count: event ? countFeaturesFromResult(meta ? meta.data : null) : 0,
+            outputs: event ? countOutputsFromResult(meta ? meta.data : null) : {},
+            cached: event?.status === 'cached',
+            error: event?.error || null,
+            started_at: event?.started_at || null,
+            finished_at: event?.finished_at || null
         };
     }).sort((a, b) => b.ms - a.ms);
 
     const totalMs = nodes.reduce((acc, n) => acc + (n.ms || 0), 0);
     const totalFeatures = nodes.reduce((acc, n) => acc + (n.count || 0), 0);
+    const startedAt = trace?.startedAt || currentRunTimestamp || Date.now();
+    const finishedAt = trace?.finishedAt || Date.now();
     return {
-        version: '1.0',
+        version: '2.0',
         generated_at: new Date().toISOString(),
         run_id: currentRunTimestamp || Date.now(),
         label: label || 'Run',
+        scope: trace?.scope || 'manual',
+        started_at: new Date(startedAt).toISOString(),
+        finished_at: new Date(finishedAt).toISOString(),
+        duration_ms: Math.max(0, finishedAt - startedAt),
         status: status || 'ok',
         error: errorMessage || null,
         summary: {
             nodes: nodes.length,
+            planned_nodes: trace?.plannedIds?.length || nodes.length,
+            processed_nodes: nodes.filter((node) => !['not_run', 'pending'].includes(node.status)).length,
+            executed_nodes: nodes.filter((node) => node.status === 'ok').length,
+            cached_nodes: nodes.filter((node) => node.status === 'cached').length,
+            error_nodes: nodes.filter((node) => node.status === 'error').length,
+            cancelled_nodes: nodes.filter((node) => node.status === 'cancelled').length,
             total_ms: totalMs,
             total_features: totalFeatures
         },
@@ -420,8 +1073,192 @@ function buildRunReport(label, status, errorMessage) {
     };
 }
 
-function downloadRunReport(format = 'json') {
-    const report = window.lastRunReport || buildRunReport('Manual', 'unknown', null);
+const RUN_HISTORY_KEY = 'jetl_run_history_v1';
+const RUN_HISTORY_LIMIT = 30;
+let selectedRunHistoryId = null;
+let runHistoryNodeFilter = '';
+
+function loadRunHistory() {
+    try {
+        const raw = SafeStorage.load(RUN_HISTORY_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed.map((report, index) => ({
+            ...report,
+            history_id: report?.history_id || `legacy_${report?.run_id || report?.generated_at || index}_${index}`
+        })) : [];
+    } catch (error) {
+        console.warn('[JETL] No se pudo leer el historial de ejecuciones', error);
+        return [];
+    }
+}
+
+function publishRunReport(report) {
+    const entry = {
+        ...report,
+        history_id: report?.history_id || `run_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        captured_at: new Date().toISOString()
+    };
+    window.lastRunReport = entry;
+    try {
+        const history = loadRunHistory();
+        history.unshift(entry);
+        SafeStorage.save(RUN_HISTORY_KEY, JSON.stringify(history.slice(0, RUN_HISTORY_LIMIT)));
+        selectedRunHistoryId = entry.history_id;
+    } catch (error) {
+        console.warn('[JETL] No se pudo guardar el historial de ejecuciones', error);
+    }
+    return entry;
+}
+
+function formatRunDuration(ms) {
+    const value = Number(ms || 0);
+    return value >= 1000 ? `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)} s` : `${Math.round(value)} ms`;
+}
+
+function renderRunHistory() {
+    const list = document.getElementById('run-history-list');
+    const detail = document.getElementById('run-history-detail');
+    const count = document.getElementById('run-history-count');
+    if (!list || !detail) return;
+    const history = loadRunHistory();
+    if (count) count.textContent = `${history.length} ejecución${history.length === 1 ? '' : 'es'}`;
+    if (!history.length) {
+        list.innerHTML = '';
+        detail.innerHTML = `<div class="run-history-empty"><i class="fas fa-clock-rotate-left"></i><strong>Todavía no hay ejecuciones</strong><span>Las ejecuciones completas y parciales aparecerán aquí.</span></div>`;
+        return;
+    }
+    if (!selectedRunHistoryId || !history.some((report) => report.history_id === selectedRunHistoryId)) {
+        selectedRunHistoryId = history[0].history_id;
+    }
+    const statusLabels = { ok: 'Completada', error: 'Error', cancelled: 'Cancelada', unknown: 'Sin estado' };
+    list.innerHTML = history.map((report) => {
+        const date = new Date(report.generated_at || report.run_id || Date.now());
+        const summary = report.summary || {};
+        const active = report.history_id === selectedRunHistoryId;
+        return `<button type="button" class="run-history-item run-status-${escapeFlowNavigatorHTML(report.status || 'unknown')}${active ? ' active' : ''}" data-run-history-id="${escapeFlowNavigatorHTML(report.history_id)}">
+            <span class="run-history-status" aria-hidden="true"></span>
+            <div class="run-history-copy">
+                <strong>${escapeFlowNavigatorHTML(report.label || 'Ejecución')}</strong>
+                <small>${escapeFlowNavigatorHTML(date.toLocaleString('es-ES'))} · ${summary.processed_nodes ?? summary.nodes ?? 0}/${summary.planned_nodes ?? summary.nodes ?? 0} nodos</small>
+            </div>
+            <span class="run-history-badge">${escapeFlowNavigatorHTML(statusLabels[report.status] || report.status || 'Sin estado')}</span>
+            <strong class="run-history-duration">${formatRunDuration(report.duration_ms ?? summary.total_ms)}</strong>
+        </button>`;
+    }).join('');
+
+    const selected = history.find((report) => report.history_id === selectedRunHistoryId) || history[0];
+    const summary = selected.summary || {};
+    const needle = runHistoryNodeFilter.trim().toLocaleLowerCase('es');
+    const nodes = (selected.nodes || []).filter((node) => !needle || [node.id, node.label, node.node, node.category, node.status]
+        .join(' ').toLocaleLowerCase('es').includes(needle));
+    const nodeRows = nodes.map((node) => {
+        const outputs = Object.entries(node.outputs || {}).map(([port, value]) => `${port}: ${value}`).join(' · ') || '—';
+        const state = node.status === 'ok' ? 'Ejecutado' : node.status === 'cached' ? 'Caché' : node.status === 'error' ? 'Error' : node.status === 'cancelled' ? 'Cancelado' : 'No ejecutado';
+        return `<tr data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">
+            <td><button type="button" class="run-history-node-link" data-run-node-id="${escapeFlowNavigatorHTML(node.id)}">${escapeFlowNavigatorHTML(node.label)} <small>#${escapeFlowNavigatorHTML(node.id)}</small></button>${node.error ? `<span class="run-history-node-error">${escapeFlowNavigatorHTML(node.error)}</span>` : ''}</td>
+            <td><span class="run-node-state run-node-${escapeFlowNavigatorHTML(node.status)}">${state}</span></td>
+            <td>${node.count || 0}<small>${escapeFlowNavigatorHTML(outputs)}</small></td>
+            <td>${formatRunDuration(node.ms)}</td>
+        </tr>`;
+    }).join('');
+    detail.innerHTML = `<div class="run-history-detail-head">
+        <div><strong>${escapeFlowNavigatorHTML(selected.label || 'Ejecución')}</strong><small>${escapeFlowNavigatorHTML(new Date(selected.started_at || selected.generated_at).toLocaleString('es-ES'))}</small></div>
+        <span class="run-history-badge">${escapeFlowNavigatorHTML(statusLabels[selected.status] || selected.status || 'Sin estado')}</span>
+    </div>
+    <div class="run-history-kpis">
+        <div><span>Duración</span><strong>${formatRunDuration(selected.duration_ms ?? summary.total_ms)}</strong></div>
+        <div><span>Procesados</span><strong>${summary.processed_nodes ?? summary.nodes ?? 0}/${summary.planned_nodes ?? summary.nodes ?? 0}</strong></div>
+        <div><span>Ejecutados</span><strong>${summary.executed_nodes ?? 0}</strong></div>
+        <div><span>Caché</span><strong>${summary.cached_nodes ?? 0}</strong></div>
+        <div><span>Features</span><strong>${summary.total_features ?? 0}</strong></div>
+        <div><span>Errores</span><strong>${summary.error_nodes ?? (selected.status === 'error' ? 1 : 0)}</strong></div>
+        <div><span>Cancelados</span><strong>${summary.cancelled_nodes ?? 0}</strong></div>
+    </div>
+    ${selected.error ? `<div class="run-history-error"><i class="fas fa-triangle-exclamation"></i>${escapeFlowNavigatorHTML(selected.error)}</div>` : ''}
+    <label class="run-history-filter"><i class="fas fa-filter"></i><input id="run-history-node-filter" type="search" value="${escapeFlowNavigatorHTML(runHistoryNodeFilter)}" placeholder="Filtrar nodos…"><span>${nodes.length}/${(selected.nodes || []).length}</span></label>
+    <div class="run-history-table-wrap"><table class="run-history-node-table"><thead><tr><th>Nodo</th><th>Estado</th><th>Features / salidas</th><th>Tiempo</th></tr></thead><tbody>${nodeRows || '<tr><td colspan="4">Sin nodos coincidentes</td></tr>'}</tbody></table></div>`;
+}
+
+function closeRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal.is-open')) document.body.classList.remove('modal-open');
+}
+
+function initRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal || modal.dataset.ready === 'true') return;
+    modal.dataset.ready = 'true';
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal || event.target.closest('[data-run-history-close]')) closeRunHistory();
+        const clear = event.target.closest('[data-run-history-clear]');
+        if (clear) {
+            SafeStorage.clear(RUN_HISTORY_KEY);
+            selectedRunHistoryId = null;
+            runHistoryNodeFilter = '';
+            renderRunHistory();
+            showToast('Historial borrado', 'success');
+        }
+        const historyItem = event.target.closest('[data-run-history-id]');
+        if (historyItem) {
+            selectedRunHistoryId = historyItem.getAttribute('data-run-history-id');
+            runHistoryNodeFilter = '';
+            renderRunHistory();
+        }
+        const exportButton = event.target.closest('[data-run-history-export]');
+        if (exportButton) {
+            const selected = loadRunHistory().find((report) => report.history_id === selectedRunHistoryId) || loadRunHistory()[0];
+            if (selected) downloadRunReport(exportButton.getAttribute('data-run-history-export'), selected);
+        }
+        const focus = event.target.closest('[data-run-node-id]');
+        if (focus) {
+            const id = focus.getAttribute('data-run-node-id');
+            closeRunHistory();
+            window.JETLNativeNav?.('flow');
+            requestAnimationFrame(() => focusFlowNode(id));
+        }
+    });
+    modal.addEventListener('input', (event) => {
+        if (event.target?.id !== 'run-history-node-filter') return;
+        runHistoryNodeFilter = event.target.value || '';
+        renderRunHistory();
+        requestAnimationFrame(() => {
+            const input = document.getElementById('run-history-node-filter');
+            if (input) {
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+        });
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) closeRunHistory();
+    });
+}
+
+function openRunHistory() {
+    const modal = document.getElementById('run-history-modal');
+    if (!modal) return false;
+    initRunHistory();
+    window.JETLNativeNav?.('flow');
+    selectedRunHistoryId = loadRunHistory()[0]?.history_id || null;
+    runHistoryNodeFilter = '';
+    renderRunHistory();
+    modal.style.display = 'flex';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    return true;
+}
+
+window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render: renderRunHistory };
+window.JETLOpenRunHistory = openRunHistory;
+window.JETLCloseRunHistory = closeRunHistory;
+
+function downloadRunReport(format = 'json', reportOverride = null) {
+    const report = reportOverride || window.lastRunReport || buildRunReport('Manual', 'unknown', null);
     if (!report) {
         if (typeof showToast === 'function') showToast('Sin run report disponible', 'warn');
         return;
@@ -432,11 +1269,14 @@ function downloadRunReport(format = 'json') {
     if (format === 'csv') {
         mime = 'text/csv';
         filename = filename.replace(/\.json$/, '.csv');
-        const head = 'id,node,label,ms,count,output_1,output_2,output_3,cached';
+        const head = 'id,node,label,category,status,error,ms,count,output_1,output_2,output_3,cached';
         const rows = (report.nodes || []).map(n => [
             n.id,
             `"${String(n.node || '').replace(/"/g, '""')}"`,
             `"${String(n.label || '').replace(/"/g, '""')}"`,
+            `"${String(n.category || '').replace(/"/g, '""')}"`,
+            n.status || 'unknown',
+            `"${String(n.error || '').replace(/"/g, '""')}"`,
             n.ms || 0,
             n.count || 0,
             (n.outputs && n.outputs.output_1) || 0,
@@ -468,10 +1308,159 @@ function drag(e) { e.dataTransfer.setData("node", e.target.dataset.k); }
 function drop(e) { e.preventDefault(); const k = e.dataTransfer.getData("node"); if (k) addNode(k, e.clientX, e.clientY); }
 function allowDrop(e) { e.preventDefault(); }
 
+function getSingleSelectedCanvasNodeId() {
+    const selected = Array.from(document.querySelectorAll('.drawflow-node.selected'));
+    if (selected.length === 1 && selected[0].id) return selected[0].id.replace('node-', '');
+    const editorSelection = editor?.node_selected?.id;
+    return editorSelection ? String(editorSelection).replace('node-', '') : null;
+}
+
+function getSelectedCanvasConnection() {
+    return selectedCanvasConnection ? { ...selectedCanvasConnection } : null;
+}
+
+function getConnectionNodePlacement(connection, fallbackRect) {
+    const data = _getGraphDataSafe();
+    const source = data[String(connection?.output_id)];
+    const target = data[String(connection?.input_id)];
+    if (!source || !target || !editor?.precanvas) {
+        return { x: fallbackRect.width / 2 + fallbackRect.left, y: fallbackRect.height / 2 + fallbackRect.top };
+    }
+    const canvasRect = editor.precanvas.getBoundingClientRect();
+    const zoom = Number(editor.zoom || 1);
+    return {
+        x: canvasRect.left + ((Number(source.pos_x || 0) + Number(target.pos_x || 0)) / 2) * zoom,
+        y: canvasRect.top + ((Number(source.pos_y || 0) + Number(target.pos_y || 0)) / 2) * zoom
+    };
+}
+
+function graphHasConnection(sourceId, targetId, outputPort, inputPort) {
+    const source = _getGraphDataSafe()[String(sourceId)];
+    return !!source?.outputs?.[outputPort]?.connections?.some((connection) =>
+        String(connection.node) === String(targetId) && connection.output === inputPort);
+}
+
+function replaceConnectionWithNode(connection, nodeId) {
+    if (!connection || !nodeId || typeof editor?.removeSingleConnection !== 'function' ||
+        typeof editor?.addConnection !== 'function') return false;
+    const data = _getGraphDataSafe();
+    const sourceId = String(connection.output_id);
+    const targetId = String(connection.input_id);
+    const newId = String(nodeId);
+    const source = data[sourceId];
+    const target = data[targetId];
+    const inserted = data[newId];
+    const sourcePort = connection.output_class;
+    const targetPort = connection.input_class;
+    const insertedInput = Object.keys(inserted?.inputs || {})[0];
+    const insertedOutput = Object.keys(inserted?.outputs || {})[0];
+    if (!source?.outputs?.[sourcePort] || !target?.inputs?.[targetPort] || !insertedInput || !insertedOutput) return false;
+    if (!graphHasConnection(sourceId, targetId, sourcePort, targetPort)) return false;
+
+    const removed = editor.removeSingleConnection(sourceId, targetId, sourcePort, targetPort);
+    if (!removed) return false;
+    try {
+        editor.addConnection(sourceId, newId, sourcePort, insertedInput);
+        if (!graphHasConnection(sourceId, newId, sourcePort, insertedInput)) throw new Error('No se creó la conexión de entrada');
+        editor.addConnection(newId, targetId, insertedOutput, targetPort);
+        if (!graphHasConnection(newId, targetId, insertedOutput, targetPort)) throw new Error('No se creó la conexión de salida');
+        selectedCanvasConnection = null;
+        return true;
+    } catch (error) {
+        editor.removeSingleConnection(sourceId, newId, sourcePort, insertedInput);
+        editor.removeSingleConnection(newId, targetId, insertedOutput, targetPort);
+        if (!graphHasConnection(sourceId, targetId, sourcePort, targetPort)) {
+            editor.addConnection(sourceId, targetId, sourcePort, targetPort);
+        }
+        console.warn('[JETL] No se pudo insertar el nodo en la conexión', error);
+        return false;
+    }
+}
+window.JETLReplaceConnectionWithNode = replaceConnectionWithNode;
+
+function getConnectedNodePlacement(sourceId, fallbackRect) {
+    const source = _getGraphDataSafe()[String(sourceId)];
+    if (!source || !editor?.precanvas) {
+        return { x: fallbackRect.width / 2 + fallbackRect.left, y: fallbackRect.height / 2 + fallbackRect.top };
+    }
+    const canvasRect = editor.precanvas.getBoundingClientRect();
+    const zoom = Number(editor.zoom || 1);
+    return {
+        x: canvasRect.left + (Number(source.pos_x || 0) + 300) * zoom,
+        y: canvasRect.top + Number(source.pos_y || 0) * zoom
+    };
+}
+
+function connectNewNodeFromSelection(sourceId, targetId) {
+    if (!sourceId || !targetId || typeof editor?.addConnection !== 'function') return false;
+    const data = _getGraphDataSafe();
+    const source = data[String(sourceId)];
+    const target = data[String(targetId)];
+    if (!source || !target) return false;
+    const outputPort = Object.keys(source.outputs || {})[0];
+    const inputPort = Object.keys(target.inputs || {}).find((port) => !(target.inputs[port].connections || []).length);
+    if (!outputPort || !inputPort) return false;
+    try {
+        editor.addConnection(String(sourceId), String(targetId), outputPort, inputPort);
+        return true;
+    } catch (error) {
+        console.warn('[JETL] No se pudo autoconectar el nodo nuevo', error);
+        return false;
+    }
+}
+window.JETLConnectNewNodeFromSelection = connectNewNodeFromSelection;
+
+function selectCanvasNode(nodeId) {
+    const node = document.getElementById('node-' + nodeId);
+    if (!node) return;
+    document.querySelectorAll('.drawflow-node.selected').forEach((element) => element.classList.remove('selected'));
+    node.classList.add('selected');
+    editor.node_selected = node;
+    editor.dispatch?.('nodeSelected', String(nodeId));
+}
+
 function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
-    addNode(k, rect.width / 2 + rect.left, rect.height / 2 + rect.top);
-    if (window.innerWidth < 768) toggleSidebar();
+    const connection = getSelectedCanvasConnection();
+    const tool = TOOL_REGISTRY[k];
+    if (connection && (!tool || Number(tool.in || 0) < 1 || Number(tool.out || 0) < 1)) {
+        if (typeof showToast === 'function') showToast('Ese nodo no puede insertarse: necesita entrada y salida', 'warning');
+        return null;
+    }
+    const sourceId = connection ? null : getSingleSelectedCanvasNodeId();
+    const placement = connection ? getConnectionNodePlacement(connection, rect) : sourceId ? getConnectedNodePlacement(sourceId, rect) : {
+        x: rect.width / 2 + rect.left,
+        y: rect.height / 2 + rect.top
+    };
+    let id = null;
+    let connected = false;
+    let inserted = false;
+    const mutation = () => {
+        id = addNode(k, placement.x, placement.y);
+        if (connection) {
+            inserted = replaceConnectionWithNode(connection, id);
+            if (!inserted) {
+                editor.removeNodeId('node-' + id);
+                id = null;
+            }
+        } else {
+            connected = sourceId ? connectNewNodeFromSelection(sourceId, id) : false;
+        }
+    };
+    if (connection && typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
+    else mutation();
+    if (!id) {
+        if (typeof showToast === 'function') showToast('No se pudo insertar el nodo en esa conexión', 'error');
+        return null;
+    }
+    selectCanvasNode(id);
+    if (inserted && typeof showToast === 'function') showToast('Nodo insertado en la conexión', 'success');
+    else if (connected && typeof showToast === 'function') showToast('Nodo añadido y conectado', 'success');
+    if (window.innerWidth < 768) {
+        window.JETLNativeNav?.('flow');
+        window.JETLMobile?.fitFlowToViewport();
+    }
+    return id;
 }
 
 function addNode(k, x, y) {
@@ -506,9 +1495,8 @@ function addNode(k, x, y) {
 
     // 1. ACTUALIZACIÓN VISUAL (DOM)
     const el = document.getElementById('node-' + id);
-    if (el) {
-        anim_NodeEnter(el);
-    }
+    if (el && window.JETLMotion) window.JETLMotion.enterNode(el);
+    else if (el && typeof anim_NodeEnter === 'function') anim_NodeEnter(el);
     if (window.JETLSchemaUI && typeof JETLSchemaUI.updateNode === 'function') {
         setTimeout(() => JETLSchemaUI.updateNode(id), 0);
     }
@@ -517,15 +1505,47 @@ function addNode(k, x, y) {
 
 function initEngineDelegation() {
     document.addEventListener('click', (e) => {
+        const schemaActionEl = e.target.closest('[data-schema-action]');
+        if (schemaActionEl && !window.JETLSchemaUI) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (schemaActionEl.dataset.schemaLoading === '1') return;
+            schemaActionEl.dataset.schemaLoading = '1';
+            const extrasReady = typeof window.JETLEnsureExtras === 'function'
+                ? window.JETLEnsureExtras()
+                : Promise.reject(new Error('El cargador de editores no está disponible'));
+            Promise.resolve(extrasReady).then(() => {
+                if (!window.JETLSchemaUI) throw new Error('No se pudo preparar el editor del nodo');
+                delete schemaActionEl.dataset.schemaLoading;
+                schemaActionEl.click();
+            }).catch((error) => {
+                delete schemaActionEl.dataset.schemaLoading;
+                console.error('[JETL] Error abriendo editor de nodo', error);
+                if (typeof showToast === 'function') showToast('No se pudo abrir el editor del nodo', 'error');
+            });
+            return;
+        }
+
         const actionEl = e.target.closest('[data-ui-action]');
         if (!actionEl) return;
         const action = actionEl.getAttribute('data-ui-action');
 
         if (action === 'cancel-run') cancelEngineRun();
+        else if (action === 'close-run-monitor') closeRunMonitor();
+        else if (action === 'focus-run-error') {
+            const nodeId = actionEl.dataset.nodeId;
+            closeRunMonitor();
+            window.JETLNativeNav?.('flow');
+            if (nodeId) requestAnimationFrame(() => focusFlowNode(nodeId));
+        }
         else if (action === 'toggle-sidebar') toggleSidebar();
         else if (action === 'undo' && typeof undo === 'function') undo();
         else if (action === 'redo' && typeof redo === 'function') redo();
         else if (action === 'clear-canvas') clearCanvas();
+        else if (action === 'new-project') startNewProject();
+        else if (action === 'restore-draft') restoreLocalDraft();
+        else if (action === 'open-flow-navigator') openFlowNavigator();
+        else if (action === 'close-flow-navigator') closeFlowNavigator();
         else if (action === 'save-project') saveProject();
         else if (action === 'open-project') {
             const upload = document.getElementById('upload-jetl');
@@ -533,7 +1553,14 @@ function initEngineDelegation() {
         }
         else if (action === 'export-run-report') downloadRunReport('json');
         else if (action === 'export-run-report-csv') downloadRunReport('csv');
-        else if (action === 'open-templates' && typeof openTemplatesModal === 'function') openTemplatesModal();
+        else if (action === 'open-templates') {
+            if (typeof openTemplatesModal === 'function') openTemplatesModal();
+            else window.JETLEnsureExtras?.().then(() => window.openTemplatesModal?.());
+        }
+        else if (action === 'open-packages') {
+            if (typeof openPackagesModal === 'function') openPackagesModal();
+            else window.JETLEnsureExtras?.().then(() => window.openPackagesModal?.());
+        }
         else if (action === 'apply-template-demo' && typeof applyTemplate === 'function') applyTemplate('demo');
         else if (action === 'zoom-all') zoomToAllLayers();
         else if (action === 'tab-map') switchTab('map', e);
@@ -563,7 +1590,9 @@ function initEngineDelegation() {
 
     const sidebar = document.getElementById('sidebar-content');
     if (sidebar) {
-        sidebar.addEventListener('click', (e) => {
+        let lastTouchSelection = 0;
+        const touchIntent = createTouchIntentTracker(10);
+        const activateSidebarItem = (e) => {
             const catTitle = e.target.closest('.cat-title[data-cat-toggle]');
             if (catTitle) {
                 const itemsDiv = catTitle.nextElementSibling;
@@ -571,13 +1600,41 @@ function initEngineDelegation() {
                     itemsDiv.classList.toggle('open');
                     catTitle.classList.toggle('active');
                 }
-                return;
+                return true;
             }
 
             const item = e.target.closest('.node-item');
-            if (!item) return;
+            if (!item) return false;
             const k = item.dataset.k;
             if (k) addNodeClick(k);
+            return true;
+        };
+
+        sidebar.addEventListener('touchstart', (e) => {
+            const touch = e.touches && e.touches[0];
+            const target = e.target.closest('.node-item, .cat-title[data-cat-toggle]');
+            touchIntent.start(target, touch?.clientX || 0, touch?.clientY || 0);
+        }, { passive: true });
+
+        sidebar.addEventListener('touchmove', (e) => {
+            const touch = e.touches && e.touches[0];
+            if (!touch) return;
+            touchIntent.move(touch.clientX, touch.clientY);
+        }, { passive: true });
+
+        sidebar.addEventListener('touchend', (e) => {
+            const target = touchIntent.end();
+            if (!target || !target.isConnected) return;
+            if (!activateSidebarItem({ target })) return;
+            lastTouchSelection = Date.now();
+            e.preventDefault();
+        }, { passive: false });
+
+        sidebar.addEventListener('touchcancel', () => touchIntent.cancel(), { passive: true });
+
+        sidebar.addEventListener('click', (e) => {
+            if (Date.now() - lastTouchSelection < 700) return;
+            activateSidebarItem(e);
         });
 
         sidebar.addEventListener('dragstart', (e) => {
@@ -625,13 +1682,22 @@ function initEngineDelegation() {
 
 async function runEngine() {
     window.isEngineCancelled = false;
-    const loader = document.getElementById('loader');
-    const cancelBtn = document.getElementById('loader-cancel');
-    loader.style.display = 'flex';
-    if (cancelBtn) cancelBtn.style.display = 'block';
+    currentRunTimestamp = Date.now();
+    const initialGraph = _getGraphDataSafe();
+    beginRunTrace('Ejecución Total', 'full', Object.keys(initialGraph));
     log("--- INICIANDO EJECUCIÓN TOTAL ---");
 
-    currentRunTimestamp = Date.now();
+    const runtime = typeof window.JETLEnsureRuntime === 'function'
+        ? window.JETLEnsureRuntime()
+        : window.JETLRuntimeReady;
+    if (runtime && !(await runtime)) {
+        const runtimeError = window.__JETL_RUNTIME_ERROR;
+        publishRunReport(buildRunReport('Ejecución Total', 'error', runtimeError?.message || 'El motor no pudo cargarse'));
+        log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
+        showToast("No se pudo preparar el motor", "error");
+        finishRunMonitor('error');
+        return;
+    }
 
     document.querySelectorAll('.count-badge').forEach(b => b.style.display = 'none');
     document.querySelectorAll('.eye-btn').forEach(b => b.classList.remove('active'));
@@ -642,31 +1708,47 @@ async function runEngine() {
     const nodes = Object.values(exportData);
     const roots = nodes.filter(n => TOOL_REGISTRY[n.name].in === 0);
 
-    if (roots.length === 0) { log("Error: Añade un Reader", "err"); loader.style.display = 'none'; if (cancelBtn) cancelBtn.style.display = 'none'; return; }
+    if (roots.length === 0) {
+        publishRunReport(buildRunReport('Ejecución Total', 'error', 'Añade un Reader para ejecutar el flujo'));
+        log("Error: Añade un Reader", "err");
+        showToast("Añade un Reader", "warning");
+        finishRunMonitor('error');
+        return;
+    }
 
     try {
-        for (const r of roots) await processNode(r.id, exportData);
+        const plan = buildExecutionPlan(exportData);
+        for (let levelIndex = 0; levelIndex < plan.levels.length; levelIndex += 1) {
+            const level = plan.levels[levelIndex];
+            const loaderMsg = document.getElementById('loader-msg');
+            if (loaderMsg) loaderMsg.innerText = `Ejecutando nivel ${levelIndex + 1}/${plan.levels.length}…`;
+            for (const nodeId of level) {
+                if (window.isEngineCancelled) throw new Error("Ejecución cancelada por el usuario.");
+                await processNode(nodeId, exportData);
+            }
+        }
         if (window.isEngineCancelled) throw new Error("Ejecución cancelada por el usuario.");
         log("--- FIN EXITOSO ---");
         if (typeof logRunSummary === 'function') logRunSummary('Ejecución Total');
-        window.lastRunReport = buildRunReport('Ejecución Total', 'ok', null);
+        publishRunReport(buildRunReport('Ejecución Total', 'ok', null));
+        finishRunMonitor('ok');
         showToast("Proceso completado", "success");
         updateBadges();
         if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
     } catch (e) {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
-            window.lastRunReport = buildRunReport('Ejecución Total', 'cancelled', null);
+            publishRunReport(buildRunReport('Ejecución Total', 'cancelled', null));
+            finishRunMonitor('cancelled');
             log("Ejecución cancelada por el usuario.", "warn");
             showToast("Ejecución cancelada", "warning");
         } else {
-            window.lastRunReport = buildRunReport('Ejecución Total', 'error', e && e.message ? e.message : String(e));
+            publishRunReport(buildRunReport('Ejecución Total', 'error', e && e.message ? e.message : String(e)));
+            finishRunMonitor('error', getRunErrorNodeId());
             log("FATAL: " + e.message, "err");
             showToast("Error en ejecución", "error");
         }
     }
-    loader.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function cancelEngineRun() {
@@ -678,19 +1760,28 @@ function cancelEngineRun() {
     const loaderMsg = document.getElementById('loader-msg');
     if (loaderMsg) loaderMsg.innerText = "Deteniendo...";
     const cancelBtn = document.getElementById('loader-cancel');
-    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.hidden = true;
 }
 
 async function runEnginePartial(targetId) {
     window.isEngineCancelled = false;
-    const loader = document.getElementById('loader');
-    const cancelBtn = document.getElementById('loader-cancel');
-    loader.style.display = 'flex';
-    if (cancelBtn) cancelBtn.style.display = 'block';
+    currentRunTimestamp = Date.now();
+    const initialGraph = _getGraphDataSafe();
+    beginRunTrace(`Parcial #${targetId}`, 'partial', collectRequiredNodeIds(targetId, initialGraph));
+
+    const runtime = typeof window.JETLEnsureRuntime === 'function'
+        ? window.JETLEnsureRuntime()
+        : window.JETLRuntimeReady;
+    if (runtime && !(await runtime)) {
+        const runtimeError = window.__JETL_RUNTIME_ERROR;
+        publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', runtimeError?.message || 'El motor no pudo cargarse'));
+        log("FATAL: " + (runtimeError?.message || 'El motor no pudo cargarse'), "err");
+        showToast("No se pudo preparar el motor", "error");
+        finishRunMonitor('error');
+        return;
+    }
 
     log(`--- Ejecución Parcial hasta nodo #${targetId} ---`);
-
-    currentRunTimestamp = Date.now();
 
     try {
         const exportData = editor.export().drawflow.Home.data;
@@ -704,7 +1795,8 @@ async function runEnginePartial(targetId) {
 
         log("--- Parcial Completado ---");
         if (typeof logRunSummary === 'function') logRunSummary(`Parcial #${targetId}`);
-        window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'ok', null);
+        publishRunReport(buildRunReport(`Parcial #${targetId}`, 'ok', null));
+        finishRunMonitor('ok');
         showToast("Nodo actualizado", "success");
 
         updateBadges();
@@ -727,33 +1819,34 @@ async function runEnginePartial(targetId) {
     } catch (e) {
         const isCancelled = window.isEngineCancelled || (e && (e.cancelled || e.name === 'CancelledError'));
         if (isCancelled) {
-            window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'cancelled', null);
+            publishRunReport(buildRunReport(`Parcial #${targetId}`, 'cancelled', null));
+            finishRunMonitor('cancelled');
             log("Ejecución parcial cancelada por el usuario.", "warn");
             showToast("Ejecución parcial cancelada", "warning");
         } else {
-            window.lastRunReport = buildRunReport(`Parcial #${targetId}`, 'error', e && e.message ? e.message : String(e));
+            publishRunReport(buildRunReport(`Parcial #${targetId}`, 'error', e && e.message ? e.message : String(e)));
+            finishRunMonitor('error', getRunErrorNodeId());
             log("Error Parcial: " + e.message, "err");
             showToast("Error en ejecución parcial", "error");
         }
     }
-    loader.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function saveProject() {
     const exportData = editor.export();
-    const project = {
-        version: "2026.03.05",
-        timestamp: Date.now(),
-        flow: exportData
-    };
+    const project = window.JETLProjectPersistence?.createProject
+        ? window.JETLProjectPersistence.createProject(exportData, document)
+        : { version: "2026.03.05", timestamp: Date.now(), flow: exportData };
+    const workingCopyCount = Object.keys(project.reader_working_copies || {}).length;
     const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `flujo_jetl_${new Date().toISOString().slice(0, 10)}.jetl`;
     a.click();
-    showToast("Proyecto guardado correctamente", "success");
+    showToast(workingCopyCount
+        ? `Proyecto guardado con ${workingCopyCount} ${workingCopyCount === 1 ? 'copia de trabajo' : 'copias de trabajo'}`
+        : "Proyecto guardado correctamente", "success");
 }
 
 function loadProject(input) {
@@ -764,7 +1857,10 @@ function loadProject(input) {
     reader.onload = function (e) {
         try {
             const json = JSON.parse(e.target.result);
-            const flowData = json.flow ? json.flow : json;
+            const parsedProject = window.JETLProjectPersistence?.parseProject
+                ? window.JETLProjectPersistence.parseProject(json)
+                : { flow: json.flow ? json.flow : json, readerWorkingCopies: {} };
+            const flowData = parsedProject.flow;
 
             // No se requiere auto-reparación de HTML porque los nodos ahora usan delegación
             // y no incrustan su propio ID en el template.
@@ -796,9 +1892,19 @@ function loadProject(input) {
             // Importamos los datos ya saneados
             editor.import(flowData);
 
+            const restoreReport = window.JETLProjectPersistence?.restoreReaderWorkingCopies
+                ? window.JETLProjectPersistence.restoreReaderWorkingCopies(document, parsedProject.readerWorkingCopies)
+                : { restored: 0, skipped: 0 };
+
             SafeStorage.save('jetl_flow_optimized', JSON.stringify(flowData));
             if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
-            showToast("Proyecto cargado y reparado", "success");
+            if (restoreReport.skipped) {
+                showToast(`Proyecto cargado; ${restoreReport.skipped} copias de trabajo no eran válidas`, "warning");
+            } else if (restoreReport.restored) {
+                showToast(`Proyecto cargado con ${restoreReport.restored} ${restoreReport.restored === 1 ? 'copia de trabajo' : 'copias de trabajo'}`, "success");
+            } else {
+                showToast("Proyecto cargado y reparado", "success");
+            }
         } catch (err) {
             console.error(err);
             showToast("Error al leer el archivo .jetl", "error");

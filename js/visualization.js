@@ -78,8 +78,8 @@ window.resetNodeDisplayPorts = function (nodeId) {
 
 function ensurePortInspectorUI() {
     if (portInspectorReady) return;
-    const tabs = document.getElementById('panel-tabs');
-    if (!tabs) return;
+    const contextBar = document.getElementById('results-context-bar');
+    if (!contextBar) return;
     if (document.getElementById('port-inspector')) {
         portInspectorReady = true;
         return;
@@ -96,7 +96,7 @@ function ensurePortInspectorUI() {
         <span style="font-size:11px;color:#9aa0a6">Puerto</span>
         <select id="port-inspector-select" class="node-control" style="height:28px; min-width:92px; background:#111; color:#eee; border:1px solid #444; padding:2px 6px"></select>
     `;
-    tabs.insertBefore(wrap, tabs.lastElementChild);
+    contextBar.appendChild(wrap);
 
     const sel = wrap.querySelector('#port-inspector-select');
     if (sel) {
@@ -203,8 +203,8 @@ window.openFeatureCacheEntry = openFeatureCacheEntry;
 
 function ensureFeatureCacheBrowserUI() {
     if (featureCacheBrowserReady) return;
-    const tabs = document.getElementById('panel-tabs');
-    if (!tabs) return;
+    const contextBar = document.getElementById('results-context-bar');
+    if (!contextBar) return;
     if (document.getElementById('feature-cache-browser')) {
         featureCacheBrowserReady = true;
         return;
@@ -225,7 +225,7 @@ function ensureFeatureCacheBrowserUI() {
             <i class="fas fa-database"></i>
         </button>
     `;
-    tabs.insertBefore(wrap, tabs.lastElementChild);
+    contextBar.appendChild(wrap);
 
     const nodeSel = wrap.querySelector('#feature-cache-node');
     const portSel = wrap.querySelector('#feature-cache-port');
@@ -473,6 +473,7 @@ function resolveNodeDisplayData(nodeId, preferredPort = null) {
 window.resolveNodeDisplayData = resolveNodeDisplayData;
 
 async function showOnMap(id, preferredPort = null, askPort = false) {
+    if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
     setMapPerfIndicator(null);
     let meta = executionData[id];
     if (!meta || !meta.data) { showToast("Nodo sin datos procesados", "error"); return; }
@@ -987,10 +988,31 @@ function toggleSidebar() {
 
 function togglePanelHeight() {
     if (mapPanelExpanded) return;
-    const p = document.getElementById('bottom-panel');
-    const isMin = p.offsetHeight < 100;
-    p.style.height = isMin ? '45vh' : '36px';
-    setTimeout(() => map.invalidateSize(), 350);
+    const body = document.body;
+    const button = document.getElementById('btn-panel-collapse');
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+    if (isMobile) {
+        body.classList.remove('mobile-results-open');
+        if (window.JETLMobile) window.JETLMobile.closeTransientViews();
+        document.querySelectorAll('[data-mobile-view]').forEach((item) => {
+            item.classList.toggle('active', item.dataset.mobileView === 'flow');
+        });
+        return;
+    }
+
+    const collapsed = body.classList.toggle('panel-collapsed');
+    if (button) {
+        button.setAttribute('aria-expanded', String(!collapsed));
+        button.setAttribute('aria-label', collapsed ? 'Mostrar visor' : 'Ocultar visor');
+        button.title = collapsed ? 'Mostrar visor' : 'Ocultar visor';
+        button.innerHTML = collapsed
+            ? '<i class="fas fa-chevron-up"></i><span class="panel-action-label">Mostrar</span>'
+            : '<i class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span>';
+    }
+    setTimeout(() => {
+        if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
+    }, 350);
 }
 
 function updateMapExpandButton() {
@@ -1027,12 +1049,12 @@ function toggleMapPanelExpand(forceState) {
 window.toggleMapPanelExpand = toggleMapPanelExpand;
 
 function switchTab(t) {
-    const evt = arguments[1] || window.event;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    if (evt && evt.target) {
-        const btn = evt.target.closest('button');
-        if (btn) btn.classList.add('active');
-    }
+    if (!['map', 'table', 'logs'].includes(t)) return false;
+    document.querySelectorAll('#panel-tabs [data-results-view]').forEach((button) => {
+        const active = button.getAttribute('data-results-view') === t;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
 
     ['map', 'logs', 'table-container'].forEach(x => {
         const el = document.getElementById(x);
@@ -1043,12 +1065,12 @@ function switchTab(t) {
     const toShow = document.getElementById(showId);
     if (toShow) toShow.style.display = 'block';
 
-    const p = document.getElementById('bottom-panel');
-    if (p.offsetHeight < 100) togglePanelHeight();
+    if (document.body.classList.contains('panel-collapsed')) togglePanelHeight();
 
     if (t === 'map') {
+        if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
         setTimeout(() => {
-            map.invalidateSize();
+            if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
             if (selectedFeatureIndex !== null && currentNodeId) syncMapFocus(currentNodeId);
         }, 300);
         const panel = document.getElementById('symbology-panel');
@@ -1063,7 +1085,9 @@ function switchTab(t) {
         const panel = document.getElementById('symbology-panel');
         if (panel) panel.style.display = 'none';
     }
+    return true;
 }
+window.switchTab = switchTab;
 
 // Sincronización
 function syncMapFocus(nodeId) {
@@ -1306,21 +1330,17 @@ function clearCanvas() {
     log("Canvas limpio.", "warn");
 }
 
-function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [0, 1], opacity: [0, 1], duration: 800, easing: 'easeOutElastic(1, .6)' }); }
+function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [.97, 1], translateY: [8, 0], opacity: [0, 1], duration: 220, easing: 'easeOutCubic' }); }
 function anim_NodeError(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, translateX: [-10, 10, -5, 5, 0], duration: 500, easing: 'easeInOutQuad' }); }
 function anim_NodeSuccess(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, scale: [1, 1.1, 1], boxShadow: ['0 0 0 0px rgba(46, 204, 113, 0.7)', '0 0 0 10px rgba(46, 204, 113, 0)'], duration: 600, easing: 'easeOutQuad' }); }
 function anim_CableFlow(nodeId) {
     const selector = `.drawflow .connection.node_in_node-${nodeId} .main-path`;
     const cables = document.querySelectorAll(selector);
-    if (cables.length === 0) return;
-    cables.forEach(c => { c.style.strokeDasharray = ''; c.style.strokeDashoffset = ''; });
-    anime({
-        targets: cables,
-        stroke: [{ value: '#00ffcc', duration: 200, easing: 'linear' }, { value: '#777', duration: 500, delay: 1000, easing: 'easeInQuad' }],
-        strokeWidth: [{ value: 5, duration: 200 }, { value: 3, duration: 500, delay: 1000 }],
-        strokeDasharray: [{ value: '20 10', duration: 100 }],
-        strokeDashoffset: [{ value: [200, 0], duration: 1200, easing: 'linear' }],
-        complete: function (anim) { cables.forEach(c => { c.style.stroke = ''; c.style.strokeWidth = ''; c.style.strokeDasharray = ''; c.style.strokeDashoffset = ''; }); }
+    cables.forEach((c) => {
+        c.style.stroke = '';
+        c.style.strokeWidth = '';
+        c.style.strokeDasharray = '';
+        c.style.strokeDashoffset = '';
     });
 }
 
