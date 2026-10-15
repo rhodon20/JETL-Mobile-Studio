@@ -281,6 +281,7 @@
         exts: ['zip'],
         label: 'Shapefile ZIP',
         read: async (file) => {
+            await window.JETLLoadScriptOnce('js/vendor/shp.js', 'shp');
             const buffer = await file.arrayBuffer();
             const result = await shp(buffer);
             return Array.isArray(result) ? turf.featureCollection(result.flatMap(r => r.features)) : result;
