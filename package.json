@@ -5,13 +5,16 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "inline": "node scripts/inline-assets.mjs",
-    "check": "node scripts/inline-assets.mjs --check",
+    "check": "node scripts/inline-assets.mjs --check && node tests/check-graph.mjs",
     "test:unit": "node --test tests/*.test.mjs",
     "test:smoke": "node tests/run-smoke.mjs",
     "test:extended": "node tests/run-smoke.mjs --extended",
     "test": "npm run check && npm run test:unit && npm run test:smoke && node tests/basemap.mjs"
   },
   "devDependencies": {
+    "acorn": "8.15.0",
+    "acorn-walk": "8.3.4",
+    "eslint-scope": "8.4.0",
     "playwright": "1.56.1"
   }
 }
