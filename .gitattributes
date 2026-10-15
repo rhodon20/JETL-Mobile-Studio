@@ -1,0 +1,7 @@
+* text=auto eol=lf
+# Vendored third-party files are kept byte-for-byte as published.
+js/vendor/** -text
+css/vendor/** -text
+*.png binary
+*.woff2 binary
+*.ttf binary
