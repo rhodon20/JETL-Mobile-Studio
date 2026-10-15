@@ -77,6 +77,15 @@
         }
         window.JETLNextTick = JETLNextTick;
 
+        // Escaping for text interpolated into HTML: anything from data files, HTTP
+        // responses or imported JSON (packages, templates) must go through it.
+        function JETLEscapeHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+            ));
+        }
+        window.JETLEscapeHtml = JETLEscapeHtml;
+
         // =============================================
         // 1.b PARAMETROS GLOBALES DE WORKSPACE
         // =============================================

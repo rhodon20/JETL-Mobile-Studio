@@ -534,7 +534,7 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     const customStyle = data._custom_style || null;
     const baseColor = (customStyle && customStyle.color) ? customStyle.color : (tool.color || '#3388ff');
     const portLabel = activePort ? ` [${activePort}]` : '';
-    const layerName = `<span style="color:${baseColor}">■</span> ${tool.label} (#${id})${portLabel}`;
+    const layerName = `<span style="color:${JETLEscapeHtml(baseColor)}">■</span> ${JETLEscapeHtml(tool.label)} (#${id})${portLabel}`;
     currentSymbologyNode = id;
     setupSymbologyPanel(id, data);
     setMapPerfIndicator(perfSampleInfo);
@@ -608,7 +608,7 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
                         if (k.startsWith('_')) continue;
                         let val = feature.properties[k];
                         if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(4);
-                        table += `<tr><td><b>${k}</b></td><td>${val}</td></tr>`;
+                        table += `<tr><td><b>${JETLEscapeHtml(k)}</b></td><td>${JETLEscapeHtml(val)}</td></tr>`;
                     }
                     table += '</table>';
                     layer.bindPopup(table);
@@ -775,7 +775,7 @@ function buildTable(data) {
             if (currentSortDir === -1) icon = ' <i class="fas fa-sort-down" style="color:#fff"></i>';
         }
         // Añadimos onclick al header
-        html += `<th data-table-sort="${encodeURIComponent(h)}" style="cursor:pointer; user-select:none;">${h}${icon}</th>`;
+        html += `<th data-table-sort="${encodeURIComponent(h)}" style="cursor:pointer; user-select:none;">${JETLEscapeHtml(h)}${icon}</th>`;
     });
     html += '</tr></thead><tbody>';
 
@@ -1118,9 +1118,14 @@ function log(m, t) {
     if (!l) return;
     const ts = new Date().toLocaleTimeString();
     const color = t === 'err' ? '#e74c3c' : (t === 'success' ? '#2ecc71' : (t === 'warn' ? '#f1c40f' : '#bbb'));
-    l.innerHTML += `<div style="color:${color};margin-bottom:4px;font-family:monospace;font-size:0.9em">
-                        <span style="opacity:0.5;margin-right:5px">[${ts}]</span>${m}
-                    </div>`;
+    // Messages carry file/network content (errors, WKT): text only, never HTML.
+    const row = document.createElement('div');
+    row.style.cssText = `color:${color};margin-bottom:4px;font-family:monospace;font-size:0.9em`;
+    const stamp = document.createElement('span');
+    stamp.style.cssText = 'opacity:0.5;margin-right:5px';
+    stamp.textContent = `[${ts}]`;
+    row.append(stamp, String(m));
+    l.appendChild(row);
     l.scrollTop = l.scrollHeight;
 }
 

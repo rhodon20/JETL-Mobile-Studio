@@ -1114,6 +1114,31 @@
         }
     }
 
+    // Untrusted text (file data, imported packages) must never become markup.
+    async function testHtmlEscaping() {
+        const pkgId = `smoke_xss_${Date.now()}`;
+        try {
+            window.log('<img id="xss-log" src="x">', 'info');
+            window.JETLPackages.addFromObject({
+                id: pkgId,
+                title: '<img id="xss-pkg-title" src="x">',
+                transformers: [{ id: 't', base: 'attr_renamer', label: '<img id="xss-pkg-label" src="x">', icon: 'x" onmouseover="alert(1)', color: 'red;background:url(x)' }]
+            });
+            const tool = window.TOOL_REGISTRY[`cpkg__${pkgId}__t`];
+            buildTable(turf.featureCollection([turf.point([0, 0], { '<img id="xss-th" src="x">': 1 })]));
+            const injected = ['xss-log', 'xss-pkg-title', 'xss-pkg-label', 'xss-th'].filter(id => document.getElementById(id));
+            // Invalid icon/color fall back to the base tool's (attr_renamer).
+            const base = window.TOOL_REGISTRY.attr_renamer;
+            const attrsClean = !!tool && tool.icon === base.icon && tool.color === base.color;
+            const ok = injected.length === 0 && attrsClean;
+            return { ok, name: 'html_escaping', detail: ok ? 'log/paleta/tabla escapan texto no confiable' : `inyectado: ${injected.join(',') || '-'} icon=${tool && tool.icon} color=${tool && tool.color}` };
+        } catch (e) {
+            return { ok: false, name: 'html_escaping', detail: e && e.message ? e.message : String(e) };
+        } finally {
+            window.JETLPackages.remove(pkgId);
+        }
+    }
+
     async function testRasterWorkerHealth() {
         if (typeof location !== 'undefined' && location.protocol === 'file:') {
             return { ok: true, name: 'raster_worker_health', detail: 'omitido (file:// bloquea Web Worker)' };
@@ -1651,6 +1676,7 @@
         extra.push(await testAttrKeeperRejects());
         extra.push(await testRasterZonalStats());
         extra.push(await testIntersectorLineSplit());
+        extra.push(await testHtmlEscaping());
         extra.push(await runWithTimeout('attr_aux_workers', () => testAttrAuxWorkers(), 45000, true));
         extra.push(await runWithTimeout('attr_formula_workers', () => testAttrFormulaWorkers(), 45000, true));
         extra.push(await testWorkspaceParams());
@@ -1731,6 +1757,7 @@
         extra.push(await testAttrKeeperRejects());
         extra.push(await testRasterZonalStats());
         extra.push(await testIntersectorLineSplit());
+        extra.push(await testHtmlEscaping());
         extra.push(await testWorkspaceParams());
         extra.push(await testWorkspaceParamsIO());
         extra.push(await testUndoRedoCore());

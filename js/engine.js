@@ -435,7 +435,7 @@ function renderSidebar(filter) {
         const title = document.createElement('div');
         title.className = 'cat-title';
         title.setAttribute('data-cat-toggle', '1');
-        title.innerHTML = `<span>${c}</span> <i class="fas fa-chevron-down"></i>`;
+        title.innerHTML = `<span>${JETLEscapeHtml(c)}</span> <i class="fas fa-chevron-down"></i>`;
 
         const itemsDiv = document.createElement('div');
         itemsDiv.className = 'cat-items';
@@ -447,8 +447,8 @@ function renderSidebar(filter) {
 
         const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
-            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${t.k}">
-                <i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label}
+            itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${JETLEscapeHtml(t.k)}">
+                <i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> ${JETLEscapeHtml(t.label)}
             </div>`;
         });
 
@@ -711,7 +711,7 @@ function initQuickSearch() {
             const item = document.createElement('div');
             item.className = 'qs-item' + (i === 0 ? ' selected' : '');
             item.dataset.k = k;
-            item.innerHTML = `<i class="fas ${t.icon}" style="color:${t.color}"></i> ${t.label} <span style="font-size:0.7em;opacity:0.5;margin-left:auto">${t.cat}</span>`;
+            item.innerHTML = `<i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> ${JETLEscapeHtml(t.label)} <span style="font-size:0.7em;opacity:0.5;margin-left:auto">${JETLEscapeHtml(t.cat)}</span>`;
             results.appendChild(item);
         });
 
@@ -1476,10 +1476,10 @@ function addNode(k, x, y) {
     const isJunc = k === 'util_junction';
     const helpIcon = t.help ? `<i class="fas fa-circle-info node-help" title="${t.help}"></i>` : '';
     const html = isJunc ? `<div class="junction-point"></div>` :
-        `<div class="node-head" style="border-bottom:3px solid ${t.color}">
+        `<div class="node-head" style="border-bottom:3px solid ${JETLEscapeHtml(t.color)}">
             <div style="display:flex;align-items:center;">
                 <span class="count-badge node-badge-count">0</span>
-                <span><i class="fas ${t.icon}"></i> ${t.label}</span>
+                <span><i class="fas ${JETLEscapeHtml(t.icon)}"></i> ${JETLEscapeHtml(t.label)}</span>
                 <span class="time-badge node-badge-time"></span>
             </div>
             <div class="node-actions">

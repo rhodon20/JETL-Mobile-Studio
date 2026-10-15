@@ -48,8 +48,9 @@
             base,
             label: String(raw.label || '').trim(),
             cat: String(raw.cat || '').trim(),
-            icon: String(raw.icon || '').trim(),
-            color: String(raw.color || '').trim(),
+            // Rendered as class/style values: accept only plain tokens, else fall back to the base tool's.
+            icon: /^fa-[a-z0-9-]+$/.test(String(raw.icon || '').trim()) ? String(raw.icon).trim() : '',
+            color: /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+)$/.test(String(raw.color || '').trim()) ? String(raw.color).trim() : '',
             help: String(raw.help || '').trim()
         };
     }
