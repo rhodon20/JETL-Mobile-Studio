@@ -261,9 +261,10 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const f = polyInput.features[i];
                 const nf = JETLClone(f);
                 try {
-                    const stats = await geoblaze.zonalStats(georaster, f, ['min', 'max', 'mean', 'sum']);
+                    // geoblaze has no zonalStats(); stats() returns one object per band.
+                    const stats = await geoblaze.stats(georaster, f);
                     if (Array.isArray(stats) && stats[0]) {
-                        Object.keys(stats[0]).forEach(k => nf.properties[`${prefix}_${k}`] = stats[0][k]);
+                        ['min', 'max', 'mean', 'sum'].forEach(k => nf.properties[`${prefix}_${k}`] = stats[0][k]);
                     }
                 } catch (e) {
                     nf.properties[`${prefix}_err`] = true;

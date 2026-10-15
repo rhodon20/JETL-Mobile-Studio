@@ -1052,6 +1052,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 // Cálculo costoso global
                 const intersections = turf.lineIntersect(source, target);
                 if (intersections && intersections.features) outPoints.push(...intersections.features);
+                // turf.lineSplit rejects FeatureCollection splitters; a MultiPoint is accepted.
+                const splitter = turf.multiPoint(intersections.features.map(p => p.geometry.coordinates));
 
                 // Split Input 1
                 const sourceLines = turf.flatten(source).features;
@@ -1062,7 +1064,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     let splitResult = [line];
                     try {
                         if (intersections.features.length > 0) {
-                            const split = turf.lineSplit(line, intersections);
+                            const split = turf.lineSplit(line, splitter);
                             if (split && split.features.length > 0) splitResult = split.features;
                         }
                     } catch (e) { }
@@ -1078,7 +1080,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     let splitResult = [line];
                     try {
                         if (intersections.features.length > 0) {
-                            const split = turf.lineSplit(line, intersections);
+                            const split = turf.lineSplit(line, splitter);
                             if (split && split.features.length > 0) splitResult = split.features;
                         }
                     } catch (e) { }

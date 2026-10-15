@@ -519,7 +519,9 @@
                 task: 'attr_creator',
                 features: src,
                 field: 'x',
-                exprRaw: '=f.properties.a * 2',
+                // Must throw for the feature without `a` (reject happens on exceptions only,
+                // same contract as attr_creator_rejects on the main thread).
+                exprRaw: '=f.properties.a.toFixed(1)',
                 isFormula: true,
                 onError: 'reject'
             }, 30000);
@@ -536,7 +538,7 @@
                 task: 'attr_calc_pro',
                 features: src,
                 field: 'y',
-                exprRaw: 'props.a + 1',
+                exprRaw: 'props.a.toFixed(1)',
                 onError: 'reject'
             }, 30000);
             if (!wCalc || wCalc.status !== 'ok' || !wCalc.data || !wCalc.data.output_1 || !wCalc.data.output_2) {
@@ -1038,6 +1040,80 @@
         }
     }
 
+    // 4x4 single-band raster (values 0..15, row-major from the top-left at 0,4) and a
+    // polygon covering the bottom-left 2x2 block -> pixels 8,9,12,13.
+    async function _zonalStatsFixture(refId) {
+        // Raster libraries load on demand, as the raster nodes do.
+        await ensureRasterLibraries();
+        const vals = new Uint8Array(16).map((_, i) => i);
+        const buffer = await GeoTIFF.writeArrayBuffer(vals, {
+            width: 4, height: 4,
+            ModelPixelScale: [1, 1, 0], ModelTiepoint: [0, 0, 0, 0, 4, 0],
+            GeographicTypeGeoKey: 4326, GeogCitationGeoKey: 'WGS 84'
+        });
+        window._tiff_cache = window._tiff_cache || {};
+        window._tiff_cache[refId] = buffer;
+        const raster = turf.featureCollection([turf.point([2, 2], { _raster_ref_id: refId })]);
+        const polys = turf.featureCollection([turf.polygon([[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]], { id: 1 })]);
+        return { buffer, raster, polys };
+    }
+
+    function _checkZonalProps(p) {
+        const ok = p && p.zs_min === 8 && p.zs_max === 13 && p.zs_mean === 10.5 && p.zs_sum === 42 && !p.zs_err;
+        return { ok, detail: ok ? 'min/max/mean/sum OK' : `props inesperadas ${JSON.stringify(p)}` };
+    }
+
+    async function testRasterZonalStats() {
+        const node = window.TOOL_REGISTRY && window.TOOL_REGISTRY.sp_zonal_stats;
+        if (!node) return { ok: false, name: 'raster_zonal_stats', detail: 'nodo sp_zonal_stats no disponible' };
+        const refId = 'smoke_zonal_main';
+        try {
+            const { raster, polys } = await _zonalStatsFixture(refId);
+            const dom = document.createElement('div');
+            dom.innerHTML = '<input df-prefix value="zs">';
+            const out = await _withWorkerBypass(() => node.run('smoke_zonal', [raster, polys], dom));
+            const r = _checkZonalProps(out && out.features && out.features[0] && out.features[0].properties);
+            return { ok: r.ok, name: 'raster_zonal_stats', detail: r.detail };
+        } catch (e) {
+            return { ok: false, name: 'raster_zonal_stats', detail: e && e.message ? e.message : String(e) };
+        } finally {
+            delete window._tiff_cache[refId];
+        }
+    }
+
+    async function testRasterZonalStatsWorker() {
+        if (typeof postWorkerTask !== 'function') {
+            return { ok: true, name: 'raster_zonal_stats_worker', detail: 'omitido (postWorkerTask no disponible)' };
+        }
+        try {
+            if (typeof createGeoWorker === 'function' && !window.geoWorker) createGeoWorker();
+            const { buffer, polys } = await _zonalStatsFixture('smoke_zonal_worker');
+            delete window._tiff_cache.smoke_zonal_worker;
+            const wres = await postWorkerTask({ task: 'raster_zonal_stats', rasterBuffer: buffer, polygonsFC: polys, prefix: 'zs' }, 30000);
+            if (!wres || wres.status !== 'ok') return { ok: false, name: 'raster_zonal_stats_worker', detail: 'respuesta invalida' };
+            const r = _checkZonalProps(wres.data.features[0] && wres.data.features[0].properties);
+            return { ok: r.ok, name: 'raster_zonal_stats_worker', detail: r.detail };
+        } catch (e) {
+            return { ok: false, name: 'raster_zonal_stats_worker', detail: e && e.message ? e.message : String(e) };
+        }
+    }
+
+    async function testIntersectorLineSplit() {
+        const node = window.TOOL_REGISTRY && window.TOOL_REGISTRY.sp_intersector;
+        if (!node) return { ok: false, name: 'intersector_line_split', detail: 'nodo no disponible' };
+        try {
+            const lA = turf.featureCollection([turf.lineString([[0, 0], [2, 2]], { a: 1 })]);
+            const lB = turf.featureCollection([turf.lineString([[0, 2], [2, 0]], { b: 1 })]);
+            const out = await _withWorkerBypass(() => node.run('smoke_inter', [lA, lB], document.createElement('div')));
+            const segs = out && out.output_1 ? out.output_1.features.length : -1;
+            const pts = out && out.output_2 ? out.output_2.features.length : -1;
+            const ok = segs === 4 && pts === 1;
+            return { ok, name: 'intersector_line_split', detail: ok ? '2 lineas cruzadas -> 4 segmentos, 1 punto' : `segmentos=${segs} puntos=${pts}` };
+        } catch (e) {
+            return { ok: false, name: 'intersector_line_split', detail: e && e.message ? e.message : String(e) };
+        }
+    }
+
     async function testRasterWorkerHealth() {
         if (typeof location !== 'undefined' && location.protocol === 'file:') {
             return { ok: true, name: 'raster_worker_health', detail: 'omitido (file:// bloquea Web Worker)' };
@@ -1283,6 +1359,10 @@
             const interPts = (wInter.data.output_2.features || []).length;
             if (interPts < 1) {
                 return { ok: false, name: 'spatial_geom_workers', detail: 'intersector sin puntos de corte' };
+            }
+            const interSegs = (wInter.data.output_1.features || []).length;
+            if (interSegs !== 4) {
+                return { ok: false, name: 'spatial_geom_workers', detail: `intersector: ${interSegs} segmentos (esperado 4)` };
             }
 
             const polys = turf.featureCollection([
@@ -1569,6 +1649,8 @@
         extra.push(await testAttrStringFormatterRejects());
         extra.push(await testAttrRenamerRejects());
         extra.push(await testAttrKeeperRejects());
+        extra.push(await testRasterZonalStats());
+        extra.push(await testIntersectorLineSplit());
         extra.push(await runWithTimeout('attr_aux_workers', () => testAttrAuxWorkers(), 45000, true));
         extra.push(await runWithTimeout('attr_formula_workers', () => testAttrFormulaWorkers(), 45000, true));
         extra.push(await testWorkspaceParams());
@@ -1593,6 +1675,7 @@
         extra.push(await runWithTimeout('geo_worker_prewarm_api', () => testGeoWorkerPrewarmApi(), 20000, true));
         extra.push(await runWithTimeout('geo_worker_health', () => testGeoWorkerHealth(), 20000, true));
         extra.push(await runWithTimeout('raster_worker_health', () => testRasterWorkerHealth(), 20000, true));
+        extra.push(await runWithTimeout('raster_zonal_stats_worker', () => testRasterZonalStatsWorker(), 30000, true));
         extra.push(await runWithTimeout('geo_basic_workers', () => testGeoBasicWorkers(), 45000, true));
         extra.push(await runWithTimeout('geo_dissolve_worker', () => testGeoDissolveWorker(), 60000, true));
         extra.push(await runWithTimeout('spatial_core_workers', () => testSpatialCoreWorkers(), 70000, true));
@@ -1646,6 +1729,8 @@
         extra.push(await testAttrStringFormatterRejects());
         extra.push(await testAttrRenamerRejects());
         extra.push(await testAttrKeeperRejects());
+        extra.push(await testRasterZonalStats());
+        extra.push(await testIntersectorLineSplit());
         extra.push(await testWorkspaceParams());
         extra.push(await testWorkspaceParamsIO());
         extra.push(await testUndoRedoCore());
