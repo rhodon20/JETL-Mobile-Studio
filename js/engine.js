@@ -216,9 +216,10 @@ function ensureJETLMap() {
     if (typeof L === 'undefined') throw new Error('Leaflet no está disponible');
 
     map = L.map(mapElement, { renderer: L.canvas() }).setView([40.416, -3.703], 6);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OSM contributors'
-    }).addTo(map);
+    // Asynchronous (MapLibre loads on demand); the map is usable meanwhile.
+    window.JETLBasemapReady = typeof window.JETLAddBasemap === 'function'
+        ? window.JETLAddBasemap(map)
+        : Promise.resolve(null);
     layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
     return map;
 }
