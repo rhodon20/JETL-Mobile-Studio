@@ -202,6 +202,9 @@
 		},
 		_transitionEnd: function(e) {
 			L.Util.requestAnimFrame(function() {
+				// JETL patch (still needed in 0.1.4): the layer may have been removed
+				// before this frame runs (basemap.js drops it when the style fails).
+				if (!this._map || !this._glMap) return;
 				var zoom = this._map.getZoom();
 				var center = this._map.getCenter();
 				var offset = this._map.latLngToContainerPoint(this._map.getBounds().getNorthWest());
