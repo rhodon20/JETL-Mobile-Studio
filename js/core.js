@@ -8,6 +8,91 @@
         let currentNodeId = null;
         let currentRunTimestamp = 0; // Para el control de estado (verde/naranja)
 
+        // =============================================
+        // 1.a ESTADO COMPARTIDO (dueño único)
+        // =============================================
+        // El editor y el mapa se crean al arrancar (engine.js); los resultados, las
+        // capas y las cachés son objetos que nadie sustituye: se vacían en sitio con
+        // JETLClearObject, así cualquier referencia guardada sigue siendo válida.
+        let editor = null;
+        let map = null;
+        const mapLayers = {};          // nodeId -> capa Leaflet dibujada
+        const executionData = {};      // nodeId -> { data, _runId, _contentHash, _ms }
+        window.executionData = executionData;
+        window._file_cache = {};       // 'file_' + nodeId -> FeatureCollection leída
+        window._tiff_cache = {};       // refId -> ArrayBuffer GeoTIFF
+        window._node_tiff_ref = {};    // nodeId -> refId
+        window.isEngineCancelled = false;
+
+        function JETLClearObject(obj) {
+            Object.keys(obj).forEach((k) => { delete obj[k]; });
+            return obj;
+        }
+        window.JETLClearObject = JETLClearObject;
+
+        function clearNodeRuntimeCaches(nodeId) {
+            if (!nodeId) return;
+            delete window._file_cache['file_' + nodeId];
+            const tiffRef = window._node_tiff_ref[nodeId];
+            if (tiffRef) {
+                delete window._tiff_cache[tiffRef];
+                delete window._node_tiff_ref[nodeId];
+            }
+        }
+
+        function clearAllRuntimeCaches() {
+            JETLClearObject(window._file_cache);
+            JETLClearObject(window._tiff_cache);
+            JETLClearObject(window._node_tiff_ref);
+        }
+
+        window.JETLRuntimeCache = {
+            clearNode: clearNodeRuntimeCaches,
+            clearAll: clearAllRuntimeCaches
+        };
+
+        function JETLSetEngineCancelled(value) {
+            window.isEngineCancelled = !!value;
+        }
+        window.JETLSetEngineCancelled = JETLSetEngineCancelled;
+
+        // Descargas: un único punto, sustituible en pruebas con JETLSetDownloadHandler.
+        let JETLDownloadHandler = null;
+        function download(content, filename, mime) {
+            if (JETLDownloadHandler) return JETLDownloadHandler(content, filename, mime);
+            const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        function JETLSetDownloadHandler(fn) {
+            const prev = JETLDownloadHandler;
+            JETLDownloadHandler = typeof fn === 'function' ? fn : null;
+            return prev;
+        }
+        window.JETLSetDownloadHandler = JETLSetDownloadHandler;
+
+        function toCSV(g) {
+            if (!g || !g.features || g.features.length === 0) return "";
+            const props = new Set();
+            g.features.forEach(f => Object.keys(f.properties || {}).forEach(k => !k.startsWith('_') && props.add(k)));
+            const h = Array.from(props);
+            const escape = v => {
+                if (v === null || v === undefined) return '';
+                let s = String(v);
+                if (s.includes('"')) s = s.replace(/"/g, '""');
+                if (s.includes(',') || s.includes('\n') || s.includes('"')) return `"${s}"`;
+                return s;
+            };
+            const rows = g.features.map(f => h.map(k => escape(f.properties ? f.properties[k] : '')).join(','));
+            return h.join(',') + '\n' + rows.join('\n');
+        }
+
         const ensureFC = (geo) => {
             if (!geo) return turf.featureCollection([]);
             if (geo.type === 'FeatureCollection') return geo;
@@ -142,81 +227,41 @@
         window.JETLResolveParamText = JETLResolveParamText;
 
         // =============================================
-        // 1.c FALLBACK DE CARGA SMOKE (anti-cache/SW)
+        // 1.c SUITE SMOKE (carga bajo demanda)
         // =============================================
+        // window.JETLSmoke es estable desde el arranque; js/smoke.js se descarga la
+        // primera vez que se usa y publica window.JETLSmokeSuite.
         const SMOKE_SRC = 'js/smoke.js';
         let __smokeLoadPromise = null;
 
-        function ensureSmokeApiLoaded() {
-            if (typeof window === 'undefined') return;
-            if (window.JETLSmoke) return;
-            const existing = document.querySelector('script[data-jetl-smoke-fallback="1"]');
-            if (existing) return;
-            const s = document.createElement('script');
-            s.src = SMOKE_SRC;
-            s.defer = true;
-            s.setAttribute('data-jetl-smoke-fallback', '1');
-            s.onload = () => console.log('[JETL] smoke fallback loaded');
-            s.onerror = (e) => console.warn('[JETL] smoke fallback failed', e);
-            (document.head || document.body || document.documentElement).appendChild(s);
-        }
-
         function ensureSmokeApiLoadedAsync(timeoutMs = 5000) {
-            if (typeof window === 'undefined') return Promise.resolve(false);
-            if (window.JETLSmoke && !window.JETLSmoke.__proxy) return Promise.resolve(true);
+            if (window.JETLSmokeSuite) return Promise.resolve(true);
             if (__smokeLoadPromise) return __smokeLoadPromise;
-
             __smokeLoadPromise = new Promise((resolve) => {
-                let done = false;
-                const finish = (ok) => {
-                    if (done) return;
-                    done = true;
-                    resolve(!!ok);
-                };
-
-                const checkReady = () => !!(window.JETLSmoke && !window.JETLSmoke.__proxy);
-                if (checkReady()) return finish(true);
-
-                let s = document.querySelector('script[data-jetl-smoke-fallback="1"]');
-                if (!s) {
-                    s = document.createElement('script');
-                    s.src = SMOKE_SRC;
-                    s.defer = true;
-                    s.setAttribute('data-jetl-smoke-fallback', '1');
-                    (document.head || document.body || document.documentElement).appendChild(s);
-                }
-
-                s.addEventListener('load', () => finish(checkReady()), { once: true });
-                s.addEventListener('error', () => finish(false), { once: true });
-                setTimeout(() => finish(checkReady()), timeoutMs);
+                const s = document.createElement('script');
+                s.src = SMOKE_SRC;
+                const timer = setTimeout(() => resolve(!!window.JETLSmokeSuite), timeoutMs);
+                s.onload = () => { clearTimeout(timer); resolve(!!window.JETLSmokeSuite); };
+                s.onerror = () => { clearTimeout(timer); resolve(false); };
+                document.head.appendChild(s);
             }).finally(() => {
                 __smokeLoadPromise = null;
             });
             return __smokeLoadPromise;
         }
 
-        if (typeof window !== 'undefined' && !window.JETLSmoke) {
-            const smokeProxy = {
-                __proxy: true,
-                runBasic: async () => {
-                    await ensureSmokeApiLoadedAsync();
-                    if (!window.JETLSmoke || window.JETLSmoke === smokeProxy || typeof window.JETLSmoke.runBasic !== 'function') {
-                        throw new Error('JETLSmoke no disponible (fallo de carga de js/smoke.js)');
-                    }
-                    return window.JETLSmoke.runBasic();
-                },
-                runExtended: async () => {
-                    await ensureSmokeApiLoadedAsync();
-                    if (!window.JETLSmoke || window.JETLSmoke === smokeProxy || typeof window.JETLSmoke.runExtended !== 'function') {
-                        throw new Error('JETLSmoke no disponible (fallo de carga de js/smoke.js)');
-                    }
-                    return window.JETLSmoke.runExtended();
-                }
+        function smokeEntry(name) {
+            return async (...args) => {
+                await ensureSmokeApiLoadedAsync();
+                if (!window.JETLSmokeSuite) throw new Error('JETLSmoke no disponible (fallo de carga de js/smoke.js)');
+                return window.JETLSmokeSuite[name](...args);
             };
-            window.JETLSmoke = smokeProxy;
         }
 
-        if (typeof window !== 'undefined') {
-            window.ensureSmokeApiLoaded = ensureSmokeApiLoaded;
-            window.ensureSmokeApiLoadedAsync = ensureSmokeApiLoadedAsync;
-        }
+        window.JETLSmoke = {
+            runBasic: smokeEntry('runBasic'),
+            runStable: smokeEntry('runStable'),
+            runExtended: smokeEntry('runExtended'),
+            runGate: smokeEntry('runGate')
+        };
+        window.ensureSmokeApiLoadedAsync = ensureSmokeApiLoadedAsync;

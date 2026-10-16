@@ -108,6 +108,9 @@ export function computeViolations() {
             if (i.defines.has(name) || i.writes.has(name)) continue;
             const defs = [...(owners[name] || [])];
             for (const d of defs) {
+                // The dev layer (smoke suite) is fetched on demand by its loader and
+                // never runs in normal use, so looking it up is not a dependency.
+                if (LAYER_NAMES[layerOf[d]] === 'dev' && d !== file) continue;
                 edges[file].add(d);
                 if (layerOf[d] > layerOf[file]) {
                     violations.add(`upward: ${file} (${LAYER_NAMES[layerOf[file]]}) uses ${name} from ${d} (${LAYER_NAMES[layerOf[d]]})`);

@@ -23,6 +23,7 @@ function loadAttributes() {
         console,
         resolveParamText: (value) => String(value ?? ''),
         JETLClone: (value) => JSON.parse(JSON.stringify(value)),
+        JETLWorkersEnabled: () => false,
         turf: { featureCollection }
     };
     vm.runInNewContext(attributesSource, context, { filename: 'attributes.js' });
@@ -93,7 +94,8 @@ function loadSpatial(windowOverrides = {}) {
         turf,
         JETLClone: (value) => JSON.parse(JSON.stringify(value)),
         resolveParamText: (value) => String(value ?? ''),
-        normalizeResult: (value) => value
+        normalizeResult: (value) => value,
+        JETLWorkersEnabled: () => false
     };
     vm.runInNewContext(spatialSource, context, { filename: 'spatial.js' });
     return window.TOOL_REGISTRY;
@@ -120,7 +122,7 @@ function loadGeometry(windowOverrides = {}) {
     };
     const proj4 = (source, target, coordinate) => coordinate.slice();
     proj4.defs = () => undefined;
-    vm.runInNewContext(geometrySource, { window, globalThis: window, console, turf, proj4 }, { filename: 'geometry.js' });
+    vm.runInNewContext(geometrySource, { window, globalThis: window, console, turf, proj4, JETLWorkersEnabled: () => false }, { filename: 'geometry.js' });
     return window.TOOL_REGISTRY;
 }
 

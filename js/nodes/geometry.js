@@ -701,7 +701,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = i[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 25000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({ task: 'geo_centroid', features: fc }, 60000);
@@ -725,7 +725,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             <div style="font-size:0.6em;color:#888">Reduce vÃ©rtices manteniendo la forma.</div>`,
         run: async (id, inputs, dom) => {
             const tol = parseFloat(dom.querySelector('[df-tol]').value) || 0.0001;
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -759,7 +759,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         run: async (id, inputs, dom) => {
             const tol = parseFloat(dom.querySelector('[df-tol]').value) || 0.00005;
             const preserveBoundary = !!dom.querySelector('[df-preserve-boundary]')?.checked;
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -925,7 +925,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const lineCount = flatIn.features.filter((f) => turf.getType(f) === 'LineString').length;
             const USE_WORKER_FROM = 300;
 
-            if (lineCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (lineCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -976,7 +976,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 return (typeof d === 'string' && d) ? d : null;
             };
 
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     const srcDef = ensureDef(src);
                     const dstDef = ensureDef(dst);
@@ -1020,7 +1020,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         run: async (id, inputs) => {
             const features = inputs[0];
             if (!features || !features.features) throw new Error("Sin datos");
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = { task: 'make_valid', features: features };
@@ -1068,7 +1068,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const unit = dom.querySelector('[df-unit]').value;
             const res = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1111,7 +1111,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const features = inputs[0].features;
             const fields = rawFields ? rawFields.split(',').map(f => f.trim()).filter(f => f !== '') : [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -1202,7 +1202,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = inputs[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 5000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1249,7 +1249,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const features = inputs[0].features;
             const res = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1328,7 +1328,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         run: async (id, inputs) => {
             const res = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1370,7 +1370,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Donut Extractor', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Extract Polygon Holes</div>`,
         run: async (id, inputs) => {
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1416,7 +1416,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = inputs[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 3000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1460,7 +1460,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = inputs[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 10000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1508,7 +1508,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = inputs[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 10000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1569,7 +1569,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = i[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 25000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({ task: 'geo_point_surf', features: fc }, 60000);
@@ -1590,7 +1590,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fc = i[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
             const USE_WORKER_FROM = 25000;
-            if (inCount >= USE_WORKER_FROM && typeof postWorkerTask === 'function') {
+            if (inCount >= USE_WORKER_FROM && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({ task: 'geo_bbox', features: fc }, 60000);
@@ -1612,7 +1612,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!inputs || !inputs.features) throw new Error("Sin datos");
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -1706,7 +1706,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!features || !features.features.length) throw new Error("Input vacÃ­o");
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -1749,7 +1749,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const resultPoints = [];
             const fc = inputs[0] || turf.featureCollection([]);
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({

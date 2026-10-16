@@ -130,8 +130,7 @@
         if (window.JETLRuntimeCache && typeof window.JETLRuntimeCache.clearAll === 'function') {
             window.JETLRuntimeCache.clearAll();
         }
-        executionData = {};
-        window.executionData = executionData;
+        JETLClearObject(executionData);
         currentRunTimestamp = 0;
         if (typeof historyStack !== 'undefined') {
             historyStack.length = 0;
@@ -141,7 +140,7 @@
             try { map.removeLayer(l); } catch (e) {}
             try { if (layerControl) layerControl.removeLayer(l); } catch (e) {}
         });
-        mapLayers = {};
+        JETLClearObject(mapLayers);
         if (layerControl) {
             try { map.removeControl(layerControl); } catch (e) {}
             layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);

@@ -163,6 +163,23 @@ function postWorkerTask(payload, timeoutMs = 30000, transfer = null) {
     });
 }
 
+// Nodes try the worker pool only when this is true; tests force the main-thread
+// path with JETLWithWorkersDisabled.
+let workersDisabledDepth = 0;
+function JETLWorkersEnabled() {
+    return workersDisabledDepth === 0;
+}
+
+async function JETLWithWorkersDisabled(fn) {
+    workersDisabledDepth++;
+    try {
+        return await fn();
+    } finally {
+        workersDisabledDepth--;
+    }
+}
+window.JETLWithWorkersDisabled = JETLWithWorkersDisabled;
+
 function cancelWorkerTasks(reason) {
     if (!geoWorkerPool) return;
     geoWorkerPool.cancelAll(reason || 'Operacion cancelada por el usuario');
@@ -200,15 +217,9 @@ function prewarmGeoWorker(timeoutMs = 15000) {
                 geoWorkerPrewarmPromise = null;
             };
             if (!geoWorkerPool) return done(false);
-            const prevCancelled = !!window.isEngineCancelled;
-            window.isEngineCancelled = false;
-            geoWorkerPool.post({ task: 'worker_health' }, timeoutMs).then(() => {
-                window.isEngineCancelled = prevCancelled;
-                done(true);
-            }).catch(() => {
-                window.isEngineCancelled = prevCancelled;
-                done(false);
-            });
+            // pool.post() ignores the run cancellation flag, so a cancelled run cannot
+            // make the health check fail.
+            geoWorkerPool.post({ task: 'worker_health' }, timeoutMs).then(() => done(true), () => done(false));
         } catch (e) {
             resolve(false);
             geoWorkerPrewarmPromise = null;

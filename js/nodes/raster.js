@@ -81,7 +81,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             if (window.log) window.log(`Procesando Raster (${mode === 'select' ? 'Bandas: ' + selectedIndices.join(',') : 'Todas'})...`);
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -236,7 +236,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             const prefix = dom.querySelector('[df-prefix]').value || 'zs';
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({

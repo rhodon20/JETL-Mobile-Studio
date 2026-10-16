@@ -1,8 +1,7 @@
 // =============================================
 // 3. ENGINE & EVENTS
 // =============================================
-let editor, map, mapLayers = {}, executionData = {};
-window.executionData = executionData;
+// editor, map, mapLayers, executionData and the runtime caches are owned by core.js.
 window.lastRunReport = null;
 let dirtyNodeMap = {};
 let selectedCanvasConnection = null;
@@ -26,8 +25,7 @@ function updateLocalDraftUI() {
 function resetEditorState() {
     editor.clear();
     clearAllRuntimeCaches();
-    executionData = {};
-    window.executionData = executionData;
+    JETLClearObject(executionData);
     clearAllDirty();
     if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
     currentRunTimestamp = 0;
@@ -142,35 +140,6 @@ window.JETLDirty = {
     clearAll: clearAllDirty,
     invalidateAll: invalidateAllNodes,
     invalidateNodeAndDownstream
-};
-
-function ensureRuntimeCaches() {
-    if (!window._file_cache) window._file_cache = {};
-    if (!window._tiff_cache) window._tiff_cache = {};
-    if (!window._node_tiff_ref) window._node_tiff_ref = {};
-}
-
-function clearNodeRuntimeCaches(nodeId) {
-    if (!nodeId) return;
-    ensureRuntimeCaches();
-    delete window._file_cache['file_' + nodeId];
-    const tiffRef = window._node_tiff_ref[nodeId];
-    if (tiffRef) {
-        delete window._tiff_cache[tiffRef];
-        delete window._node_tiff_ref[nodeId];
-    }
-}
-
-function clearAllRuntimeCaches() {
-    window._file_cache = {};
-    window._tiff_cache = {};
-    window._node_tiff_ref = {};
-}
-
-window.JETLRuntimeCache = {
-    ensure: ensureRuntimeCaches,
-    clearNode: clearNodeRuntimeCaches,
-    clearAll: clearAllRuntimeCaches
 };
 
 function normalizeResult(res) {
@@ -1682,7 +1651,7 @@ function initEngineDelegation() {
 }
 
 async function runEngine() {
-    window.isEngineCancelled = false;
+    JETLSetEngineCancelled(false);
     currentRunTimestamp = Date.now();
     const initialGraph = _getGraphDataSafe();
     beginRunTrace('Ejecución Total', 'full', Object.keys(initialGraph));
@@ -1753,7 +1722,7 @@ async function runEngine() {
 }
 
 function cancelEngineRun() {
-    window.isEngineCancelled = true;
+    JETLSetEngineCancelled(true);
     if (typeof window.cancelWorkerTasks === 'function') {
         window.cancelWorkerTasks('Operacion cancelada por el usuario');
     }
@@ -1765,7 +1734,7 @@ function cancelEngineRun() {
 }
 
 async function runEnginePartial(targetId) {
-    window.isEngineCancelled = false;
+    JETLSetEngineCancelled(false);
     currentRunTimestamp = Date.now();
     const initialGraph = _getGraphDataSafe();
     beginRunTrace(`Parcial #${targetId}`, 'partial', collectRequiredNodeIds(targetId, initialGraph));
@@ -1869,8 +1838,7 @@ function loadProject(input) {
             // Limpieza profunda (igual que antes)
             editor.clear();
             clearAllRuntimeCaches();
-            executionData = {};
-            window.executionData = executionData;
+            JETLClearObject(executionData);
             clearAllDirty();
             invalidateAllNodes('project_loaded');
             if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
@@ -1883,7 +1851,7 @@ function loadProject(input) {
                 map.removeLayer(l);
                 if (layerControl) layerControl.removeLayer(l);
             });
-            mapLayers = {};
+            JETLClearObject(mapLayers);
 
             if (layerControl) {
                 map.removeControl(layerControl);

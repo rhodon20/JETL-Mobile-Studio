@@ -5,14 +5,9 @@
 (function () {
     let __runExtendedPromise = null;
 
+    // Runs fn with the worker pool disabled so nodes take their main-thread path.
     function _withWorkerBypass(fn) {
-        const prevPost = window.postWorkerTask;
-        try {
-            window.postWorkerTask = undefined;
-            return fn();
-        } finally {
-            window.postWorkerTask = prevPost;
-        }
+        return window.JETLWithWorkersDisabled(fn);
     }
 
     function _countNodesFromState(state) {
@@ -611,7 +606,7 @@
             return { ok: false, name: 'workspace_params_io', detail: 'API params no disponible' };
         }
         const prev = window.JETLParams.getAll ? window.JETLParams.getAll() : {};
-        const prevDownload = window.download;
+        let prevDownload = null;
         try {
             window.JETLParams.setAll({ WKT_P: 'POINT(2 3)', OUT_FN: 'param_export.csv' });
 
@@ -629,7 +624,7 @@
             if (!okReader) return { ok: false, name: 'workspace_params_io', detail: 'reader_wkt no resolvio ${...}' };
 
             let capturedFn = '';
-            window.download = (content, filename) => { capturedFn = String(filename || ''); };
+            prevDownload = JETLSetDownloadHandler((content, filename) => { capturedFn = String(filename || ''); });
             const wdom = document.createElement('div');
             wdom.innerHTML = `<input df-fn value="\${OUT_FN}">`;
             writer.run('smoke_writer_csv_params', [out], wdom);
@@ -638,7 +633,7 @@
         } catch (e) {
             return { ok: false, name: 'workspace_params_io', detail: e && e.message ? e.message : String(e) };
         } finally {
-            window.download = prevDownload;
+            JETLSetDownloadHandler(prevDownload);
             if (window.JETLParams && typeof window.JETLParams.setAll === 'function') window.JETLParams.setAll(prev || {});
         }
     }
@@ -699,24 +694,31 @@
         }
     }
 
-    function testEngineCancelApi() {
+    // Behavioural check: cancelling a run raises the flag and rejects in-flight worker tasks.
+    async function testEngineCancelApi() {
         if (typeof window.cancelEngineRun !== 'function') {
             return { ok: false, name: 'engine_cancel_api', detail: 'cancelEngineRun no disponible' };
         }
         const prevCancel = !!window.isEngineCancelled;
-        const prevCancelWorker = window.cancelWorkerTasks;
-        let workerCancelCalled = false;
         try {
-            window.isEngineCancelled = false;
-            window.cancelWorkerTasks = function () { workerCancelCalled = true; };
+            JETLSetEngineCancelled(false);
+            // Warm a worker first: cancelling terminates it, and terminating one that is
+            // still importing its libraries would abort those requests.
+            await prewarmGeoWorker(12000);
+            const pending = postWorkerTask({ task: 'worker_health' }, 15000)
+                .then(() => 'resolved', (e) => (e && e.cancelled ? 'cancelled' : String(e && e.message ? e.message : e)));
             window.cancelEngineRun();
-            const ok = !!window.isEngineCancelled && workerCancelCalled;
-            return { ok, name: 'engine_cancel_api', detail: ok ? 'cancel flag + worker cancel OK' : `estado inesperado flag=${!!window.isEngineCancelled} worker=${workerCancelCalled}` };
+            const flag = !!window.isEngineCancelled;
+            const outcome = await pending;
+            if (/No worker pool/.test(outcome)) {
+                return { ok: flag, name: 'engine_cancel_api', detail: `flag=${flag}; worker omitido (sin pool)` };
+            }
+            const ok = flag && outcome === 'cancelled';
+            return { ok, name: 'engine_cancel_api', detail: ok ? 'cancel flag + worker cancel OK' : `estado inesperado flag=${flag} worker=${outcome}` };
         } catch (e) {
             return { ok: false, name: 'engine_cancel_api', detail: e && e.message ? e.message : String(e) };
         } finally {
-            window.isEngineCancelled = prevCancel;
-            window.cancelWorkerTasks = prevCancelWorker;
+            JETLSetEngineCancelled(prevCancel);
         }
     }
 
@@ -1051,7 +1053,6 @@
             ModelPixelScale: [1, 1, 0], ModelTiepoint: [0, 0, 0, 0, 4, 0],
             GeographicTypeGeoKey: 4326, GeogCitationGeoKey: 'WGS 84'
         });
-        window._tiff_cache = window._tiff_cache || {};
         window._tiff_cache[refId] = buffer;
         const raster = turf.featureCollection([turf.point([2, 2], { _raster_ref_id: refId })]);
         const polys = turf.featureCollection([turf.polygon([[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]], { id: 1 })]);
@@ -1430,7 +1431,7 @@
             return { ok: true, name: 'geometry_aux_workers', detail: 'omitido (postWorkerTask no disponible)' };
         }
         try {
-            window.isEngineCancelled = false;
+            JETLSetEngineCancelled(false);
             if (typeof createGeoWorker === 'function' && !window.geoWorker) createGeoWorker();
             const runWorkerTask = async (payload, timeoutMs, label) => {
                 const taskLabel = label || payload.task || 'worker_task';
@@ -1438,7 +1439,7 @@
                 let lastMsg = '';
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     try {
-                        window.isEngineCancelled = false;
+                        JETLSetEngineCancelled(false);
                         return await postWorkerTask(payload, attempt === 1 ? timeoutMs : Math.max(timeoutMs, 120000));
                     } catch (e) {
                         const msg = e && e.message ? e.message : String(e);
@@ -1450,14 +1451,8 @@
                             /Smoke .*reset/i.test(msg);
                         if (!isTimeout && !isCancelledResidual) throw new Error(`${taskLabel}: ${msg}`);
                         try {
-                            window.isEngineCancelled = false;
-                            if (typeof window.resetGeoWorkerPool === 'function') {
-                                window.resetGeoWorkerPool(`Smoke retry reset: ${taskLabel}#${attempt}`);
-                            } else {
-                                if (typeof window.cancelWorkerTasks === 'function') window.cancelWorkerTasks();
-                                window.geoWorker = null;
-                                if (typeof createGeoWorker === 'function') createGeoWorker();
-                            }
+                            JETLSetEngineCancelled(false);
+                            resetGeoWorkerPool(`Smoke retry reset: ${taskLabel}#${attempt}`);
                         } catch (_) { }
                         await new Promise((r) => setTimeout(r, 30));
                     }
@@ -1661,7 +1656,7 @@
                 });
         });
 
-        if (typeof window !== 'undefined') window.isEngineCancelled = false;
+        JETLSetEngineCancelled(false);
         const base = await runBasic();
         const extra = [];
         extra.push(await testAttrStatsNode());
@@ -1691,7 +1686,7 @@
         extra.push(testDirtyPropagationApi());
         extra.push(testPackagesApi());
         extra.push(testFeatureIndexStability());
-        if (typeof window !== 'undefined') window.isEngineCancelled = false;
+        JETLSetEngineCancelled(false);
         if (typeof createGeoWorker === 'function' && !window.geoWorker) {
             try { createGeoWorker(); } catch (e) {}
         }
@@ -1708,7 +1703,7 @@
         extra.push(await runWithTimeout('spatial_geom_workers', () => testSpatialGeomWorkers(), 70000, true));
         extra.push(await runWithTimeout('spatial_aux_workers', () => testSpatialAuxWorkers(), 70000, true));
         extra.push(await runWithTimeout('geometry_aux_workers', () => testGeometryAuxWorkers(), 120000, true));
-        extra.push(testEngineCancelApi());
+        extra.push(await testEngineCancelApi());
 
         const results = [...base.results, ...extra];
         const pass = results.filter(r => r.ok).length;
@@ -1770,7 +1765,7 @@
         extra.push(testDirtyPropagationApi());
         extra.push(testPackagesApi());
         extra.push(testFeatureIndexStability());
-        extra.push(testEngineCancelApi());
+        extra.push(await testEngineCancelApi());
 
         const results = [...base.results, ...extra];
         const pass = results.filter(r => r.ok).length;
@@ -1807,5 +1802,6 @@
         return gate;
     }
 
-    window.JETLSmoke = { runBasic, runExtended, runStable, runGate };
+    // core.js owns window.JETLSmoke and delegates to this suite once loaded.
+    window.JETLSmokeSuite = { runBasic, runExtended, runStable, runGate };
 })();

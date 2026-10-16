@@ -337,7 +337,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const minDeg = parseFloat(dom.querySelector('[df-deg]').value) || 0;
             const res = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -418,7 +418,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const threshold = parseFloat(dom.querySelector('[df-deg]').value);
             const points = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -535,7 +535,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!features || !features.features) throw new Error("Entrada vacía");
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -645,7 +645,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!anchor || !anchor.features.length) throw new Error("Input 2 (Ancla) vacío");
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -734,7 +734,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!mask || !mask.features.length) throw new Error("Input 2 (Mask) vacío");
 
             // --- INTENTO VIA WORKER (OPTIMIZADO) ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker(); // Reiniciar si murió
 
@@ -835,7 +835,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!source || !source.features.length) throw new Error("Input 1 vacío");
             if (!join || !join.features.length) throw new Error("Input 2 vacío");
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = { task: 'spatial_join', source, join, mode, joinType, prefix, strategy };
@@ -937,7 +937,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!candidates || !candidates.features.length) throw new Error("Input 2 vacío");
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -1022,7 +1022,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const isLineMode = features1.some(f => turf.getType(f).includes('Line')) && features2.some(f => turf.getType(f).includes('Line'));
 
             // --- INTENTO VIA WORKER ---
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
 
@@ -1136,7 +1136,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const features = i[0].features;
             const CHUNK = 50;
             try {
-                if (typeof postWorkerTask === 'function') {
+                if (JETLWorkersEnabled()) {
                     if (!window.geoWorker) createGeoWorker(); // Asumiendo fn global
                     const payload = { task: 'clip', features: { type: 'FeatureCollection', features }, mask, chunk: CHUNK };
                     const wres = await postWorkerTask(payload, 30000);

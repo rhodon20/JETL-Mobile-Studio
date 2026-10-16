@@ -157,6 +157,7 @@ test('String Formatter ejecuta la configuración JSON del modal', async () => {
         window: { TOOL_REGISTRY: {} },
         console,
         resolveParamText(value) { return String(value ?? ''); },
+        JETLWorkersEnabled: () => false,
         turf: { featureCollection(features) { return { type: 'FeatureCollection', features }; } }
     };
     vm.runInNewContext(attributes, context, { filename: 'attributes.js' });

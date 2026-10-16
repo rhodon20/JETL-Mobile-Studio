@@ -587,8 +587,6 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             // Generamos un ID único y guardamos el binario pesado en window
             // Esto evita que se rompa al pasar por JSON entre nodos.
             const cacheId = 'tiff_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            if (!window._tiff_cache) window._tiff_cache = {};
-            if (!window._node_tiff_ref) window._node_tiff_ref = {};
             const prevRef = window._node_tiff_ref[String(id)];
             if (prevRef && window._tiff_cache[prevRef]) {
                 delete window._tiff_cache[prevRef];

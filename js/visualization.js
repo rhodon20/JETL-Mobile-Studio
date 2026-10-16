@@ -1251,7 +1251,6 @@ async function loadFile(input, _) {
         if (!geojson) throw new Error("Formato no soportado en vista previa");
         if (typeof ensureFC === 'function') geojson = ensureFC(geojson);
 
-        if (!window._file_cache) window._file_cache = {};
         if (nodeId) window._file_cache['file_' + nodeId] = geojson;
 
         // Mantener legacy si el template es el antiguo
@@ -1289,23 +1288,6 @@ function logRunSummary(label) {
     });
 }
 
-function download(c, n, t) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c], { type: t })); a.download = n; a.click(); }
-
-function toCSV(g) {
-    if (!g || !g.features || g.features.length === 0) return "";
-    const props = new Set();
-    g.features.forEach(f => Object.keys(f.properties || {}).forEach(k => !k.startsWith('_') && props.add(k)));
-    const h = Array.from(props);
-    const escape = v => {
-        if (v === null || v === undefined) return '';
-        let s = String(v);
-        if (s.includes('"')) s = s.replace(/"/g, '""');
-        if (s.includes(',') || s.includes('\n') || s.includes('"')) return `"${s}"`;
-        return s;
-    };
-    const rows = g.features.map(f => h.map(k => escape(f.properties ? f.properties[k] : '')).join(','));
-    return h.join(',') + '\n' + rows.join('\n');
-}
 
 function clearCanvas() {
     if (!confirm("¿Borrar todo?")) return;
@@ -1315,9 +1297,8 @@ function clearCanvas() {
     }
     SafeStorage.clear('jetl_flow_optimized');
     Object.values(mapLayers).forEach(l => { map.removeLayer(l); layerControl.removeLayer(l); });
-    mapLayers = {};
-    executionData = {};
-    window.executionData = executionData;
+    JETLClearObject(mapLayers);
+    JETLClearObject(executionData);
     if (window.JETLDirty && typeof window.JETLDirty.clearAll === 'function') window.JETLDirty.clearAll();
     if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
     featureCacheBrowserState = { nodeId: '', port: '' };

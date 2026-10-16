@@ -457,7 +457,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const prefix = 'stats';
             if (!fields.length) throw new Error("Define al menos un campo");
 
-            if (onError !== 'reject' && typeof postWorkerTask === 'function') {
+            if (onError !== 'reject' && JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -564,7 +564,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const mapping = mapStr.split(',').map(p => p.split(':').map(s => s.trim())).filter(([a, b]) => a && b);
             if (!mapping.length) throw new Error("Define al menos un mapeo old:new");
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -625,7 +625,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const toKeep = new Set(readKeeperFieldsCompat(dom));
             if (!toKeep.size) throw new Error("Define al menos un campo a mantener");
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -690,7 +690,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const creations = readCreatorCreationsCompat(dom); const onError = dom.querySelector('[df-on-error]')?.value || 'null';
             if (!creations.length) throw new Error('Define al menos una creación de atributo');
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -744,7 +744,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fieldName = resolveParamText(dom.querySelector('[df-field]').value);
             let count = parseInt(resolveParamText(dom.querySelector('[df-start]').value)) || 1;
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -786,7 +786,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const dir = resolveParamText(dom.querySelector('[df-dir]').value) || 'asc';
             const features = [...inputs[0].features]; // Copia para sortear
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -1118,7 +1118,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const fields = fieldRaw.split(',').map((s) => s.trim()).filter(Boolean);
             if (!fields.length) throw new Error("Campo objetivo vacio");
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1242,7 +1242,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             // Parsear el mapeo "campo1:campo2, campoA:campoB"
             const joinPairs = mapStr.split(',').map(p => p.split(':').map(s => s.trim()));
             if (joinPairs.length === 0 || !joinPairs[0][0]) throw new Error("Define campos de uniÃ³n");
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -1360,7 +1360,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const right = inputs[1].features || [];
             const joinPairs = mapStr.split(',').map(p => p.split(':').map(s => s.trim())).filter(p => p[0] && p[1]);
             if (joinPairs.length === 0) throw new Error("Define campos de union");
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -1441,7 +1441,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             if (!field) throw new Error("Campo destino vacio");
             if (!exprRaw) throw new Error("Expresion vacia");
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1529,7 +1529,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const passed = [];
             const rejected = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1608,7 +1608,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const passed = [];
             const rejected = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const wres = await postWorkerTask({
@@ -1699,7 +1699,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             const targetFields = rawFields ? rawFields.split(',').map(s => s.trim()).filter(s => s !== '') : null;
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
@@ -1802,7 +1802,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             const p = [];
             const f = [];
 
-            if (typeof postWorkerTask === 'function') {
+            if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
                     const payload = {
