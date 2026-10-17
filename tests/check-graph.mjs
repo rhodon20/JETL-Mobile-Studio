@@ -100,6 +100,9 @@ function analyseFile(code, file, isModule) {
     const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType, ranges: true, allowHashBang: true });
     const scope = analyze(ast, { ecmaVersion: 2022, sourceType }).globalScope;
     const defines = new Set(isModule ? [] : scope.variables.map(v => v.name));
+    // Top-level names of a module are private to it (imported ones included).
+    const moduleScope = isModule ? scope.childScopes.find(s => s.type === 'module') : null;
+    const privateNames = new Set(moduleScope ? moduleScope.variables.map(v => v.name) : []);
     const imports = new Set();
     if (isModule) {
         ast.body.filter(n => n.type === 'ImportDeclaration' || ((n.type === 'ExportNamedDeclaration' || n.type === 'ExportAllDeclaration') && n.source))
@@ -130,7 +133,7 @@ function analyseFile(code, file, isModule) {
             if (!n.computed && n.object.type === 'Identifier' && n.object.name === 'window') uses.add(n.property.name);
         }
     });
-    return { defines, writes, uses, imports, undeclaredWrites };
+    return { defines, writes, uses, imports, undeclaredWrites, privateNames };
 }
 
 export function computeViolations() {
@@ -168,6 +171,12 @@ export function computeViolations() {
             if (layerOf[target] > layerOf[file]) {
                 violations.add(`upward: ${file} (${LAYER_NAMES[layerOf[file]]}) imports ${target} (${LAYER_NAMES[layerOf[target]]})`);
             }
+        }
+        // A bare name another module keeps private is a ReferenceError at runtime.
+        for (const name of i.uses) {
+            if (owners[name] || i.privateNames.has(name) || BROWSER_GLOBALS.has(name) || VENDOR_GLOBALS.has(name)) continue;
+            const holder = Object.keys(info).find(f => f !== file && info[f].privateNames.has(name));
+            if (holder) violations.add(`private: ${file} uses ${name}, which is private to ${holder}`);
         }
         for (const name of i.undeclaredWrites) {
             if (!owners[name] && !BROWSER_GLOBALS.has(name)) violations.add(`undeclared-write: ${file} assigns ${name}, which no script declares`);

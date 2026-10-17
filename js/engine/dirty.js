@@ -77,3 +77,8 @@ window.JETLDirty = {
     invalidateAll: invalidateAllNodes,
     invalidateNodeAndDownstream
 };
+
+export {
+    _getGraphDataSafe, markNodeDirty, clearNodeDirty, clearAllDirty, invalidateAllNodes,
+    invalidateNodeAndDownstream, isNodeDirty
+};

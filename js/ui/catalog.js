@@ -1,5 +1,7 @@
 // Catálogo de herramientas (barra lateral y arrastrar al lienzo), navegador
 // del flujo y búsqueda rápida.
+import { addNode, addNodeClick } from '../engine.js';
+
 // Durante el arranque el motor pinta el catálogo una sola vez, después de registrar
 // también los paquetes comunitarios: antes de que el editor esté montado no se repinta.
 JETLEvents.on('tools:changed', () => {

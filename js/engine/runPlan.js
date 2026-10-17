@@ -190,3 +190,8 @@ function buildRunReport(label, status, errorMessage) {
         nodes
     };
 }
+
+export {
+    countFeaturesFromResult, countOutputsFromResult, getRunErrorNodeId, buildExecutionPlan,
+    collectRequiredNodeIds, beginRunTrace, markRunTraceNode, finishRunTrace, buildRunReport
+};

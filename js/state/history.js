@@ -305,3 +305,14 @@ function initHistory() {
         }
     });
 }
+
+// Vacía el historial (al reiniciar el espacio de trabajo desde una plantilla).
+function clearHistory() {
+    historyStack.length = 0;
+    historyIndex = -1;
+}
+
+// Los botones deshacer/rehacer del HTML (onclick) y el smoke los llaman por nombre.
+Object.assign(window, { undo, redo, addToHistory });
+
+export { addToHistory, clearHistory, undo, redo, initHistory };

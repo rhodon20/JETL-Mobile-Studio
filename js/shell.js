@@ -7,6 +7,13 @@ import {
 } from './ui/catalog.js';
 import { closeRunMonitor } from './ui/runPanel.js';
 import './mobile.js';
+import {
+    selectedCanvasConnection, setSelectedCanvasConnection, LOCAL_DRAFT_KEY, updateLocalDraftUI,
+    startNewProject, restoreLocalDraft, addNodeClick, cancelEngineRun, runEnginePartial, saveProject, loadProject
+} from './engine.js';
+import { clearNodeDirty, invalidateAllNodes, invalidateNodeAndDownstream } from './engine/dirty.js';
+import { downloadRunReport } from './state/runHistory.js';
+import { undo, redo, initHistory } from './state/history.js';
 
 let jetlAppInitialized = false;
 
@@ -59,17 +66,17 @@ function initializeJETLApp() {
     syncCanvasViewport();
 
     editor.on('connectionSelected', (connection) => {
-        selectedCanvasConnection = connection ? {
+        setSelectedCanvasConnection(connection ? {
             output_id: String(connection.output_id),
             input_id: String(connection.input_id),
             output_class: String(connection.output_class),
             input_class: String(connection.input_class)
-        } : null;
+        } : null);
         if (selectedCanvasConnection && typeof showToast === 'function') {
             showToast('Conexión seleccionada · añade un nodo para insertarlo', 'info');
         }
     });
-    editor.on('connectionUnselected', () => { selectedCanvasConnection = null; });
+    editor.on('connectionUnselected', () => { setSelectedCanvasConnection(null); });
 
     // El borrador local no se restaura silenciosamente. El usuario puede
     // recuperarlo desde Proyecto > Restaurar.
@@ -94,7 +101,7 @@ function initializeJETLApp() {
                 if (!srcId && !dstId) invalidateAllNodes(ev);
                 if (ev === 'connectionRemoved' && selectedCanvasConnection &&
                     srcId === selectedCanvasConnection.output_id && dstId === selectedCanvasConnection.input_id) {
-                    selectedCanvasConnection = null;
+                    setSelectedCanvasConnection(null);
                 }
             }
             SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));

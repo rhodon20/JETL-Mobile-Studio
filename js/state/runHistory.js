@@ -1,4 +1,6 @@
 // Historial de ejecuciones guardado en el navegador y exportación de informes.
+import { buildRunReport } from '../engine/runPlan.js';
+
 window.lastRunReport = null;
 const RUN_HISTORY_KEY = 'jetl_run_history_v1';
 const RUN_HISTORY_LIMIT = 30;
@@ -81,3 +83,5 @@ window.JETLRunReport = {
     build: buildRunReport,
     export: downloadRunReport
 };
+
+export { RUN_HISTORY_KEY, loadRunHistory, publishRunReport, downloadRunReport };

@@ -1,6 +1,8 @@
 // Monitor de la ejecución en curso (overlay y estado de cada nodo en el
 // lienzo) y panel de historial. Escucha los eventos de js/engine/runPlan.js.
 import { escapeFlowNavigatorHTML, focusFlowNode } from './catalog.js';
+import { _getGraphDataSafe } from '../engine/dirty.js';
+import { RUN_HISTORY_KEY, loadRunHistory, publishRunReport, downloadRunReport } from '../state/runHistory.js';
 
 let activeRunMonitor = null;
 

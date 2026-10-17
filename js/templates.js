@@ -1,6 +1,9 @@
 // =============================================
 // FLOW TEMPLATES
 // =============================================
+import { addToHistory, clearHistory } from './state/history.js';
+import { addNode } from './engine.js';
+
 (function () {
     const CUSTOM_TEMPLATES_KEY = 'jetl_custom_templates_v1';
 
@@ -132,10 +135,7 @@
         }
         JETLClearObject(executionData);
         currentRunTimestamp = 0;
-        if (typeof historyStack !== 'undefined') {
-            historyStack.length = 0;
-            historyIndex = -1;
-        }
+        clearHistory();
         Object.values(mapLayers).forEach(l => {
             try { map.removeLayer(l); } catch (e) {}
             try { if (layerControl) layerControl.removeLayer(l); } catch (e) {}

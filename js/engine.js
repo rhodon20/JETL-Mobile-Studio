@@ -2,7 +2,18 @@
 // 3. ENGINE & EVENTS
 // =============================================
 // editor, map, mapLayers, executionData and the runtime caches are owned by core.js.
+import { _getGraphDataSafe, clearAllDirty, invalidateAllNodes } from './engine/dirty.js';
+import {
+    getRunErrorNodeId, buildExecutionPlan, collectRequiredNodeIds, beginRunTrace, buildRunReport
+} from './engine/runPlan.js';
+import { publishRunReport } from './state/runHistory.js';
+import { processNode } from './processNode.js';
+
 let selectedCanvasConnection = null;
+// La conexión seleccionada la fija shell.js desde los eventos del editor.
+function setSelectedCanvasConnection(connection) {
+    selectedCanvasConnection = connection;
+}
 const LOCAL_DRAFT_KEY = 'jetl_flow_optimized';
 
 function hasLocalDraft() {
@@ -470,3 +481,12 @@ function loadProject(input) {
     input.value = '';
 }
 
+// Comandos que se invocan por nombre desde la navegación de la cabecera, el smoke
+// y las pruebas de la app (clásicos, no pueden importarlos).
+Object.assign(window, { addNode, addNodeClick, runEngine, runEnginePartial, cancelEngineRun });
+
+export {
+    selectedCanvasConnection, setSelectedCanvasConnection, LOCAL_DRAFT_KEY, updateLocalDraftUI,
+    startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
+    cancelEngineRun, saveProject, loadProject
+};

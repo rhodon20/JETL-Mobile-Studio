@@ -136,3 +136,5 @@ async function processNode(id, allNodes) {
 
     return result;
 }
+
+export { processNode };
