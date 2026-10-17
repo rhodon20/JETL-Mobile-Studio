@@ -39,15 +39,33 @@ JETL es una webapp ETL geoespacial visual y client-side (sin backend obligatorio
   - referencia `node -> tiffRef` para evitar fugas al recargar GeoTIFF en el mismo nodo.
 
 ## Estructura clave
-- `index.html`: shell UI principal.
-- `js/engine.js`: orquestacion, eventos, carga/guardado.
-- `js/processNode.js`: ejecucion de nodos.
-- `js/visualization.js`: mapa, tabla, filtros, export.
-- `js/schemaUI.js`: schema discovery y UI dinamica en nodos de atributos.
-- `js/formats.js`: lectura/escritura de formatos.
-- `js/smoke.js`: smoke tests integrados.
-- `js/templates.js`: plantillas de flujo.
-- `ROADMAP.md`: plan operativo y log de avance.
+Scripts clásicos (globales compartidos) organizados en capas. Cada capa sólo usa
+las inferiores; `npm run check` (tests/check-graph.mjs) lo comprueba en CI y hoy
+el grafo no tiene violaciones ni ciclos.
+
+| Capa | Archivos | Qué hace |
+|---|---|---|
+| boot | script inline de la cabecera | estado de arranque, informe de errores, `JETLLoadScriptOnce` |
+| core | `js/core.js`, `js/params.js` (inline) | estado compartido con dueño único, `JETLEvents`, `log`/`showToast`, utilidades |
+| services | `js/formats.js`, `js/core/workerPool.js`, `js/basemap.js`, `js/motion.js`, cargador inline | formatos, workers, mapa base, animación, carga diferida |
+| nodes | `js/nodes/*.js`, `js/tools.js` | catálogo de herramientas (`TOOL_REGISTRY`) |
+| engine | `js/processNode.js`, `js/engine/dirty.js`, `js/engine/runPlan.js` | ejecución de nodos, nodos sucios, plan, traza e informe |
+| state | `js/state/history.js`, `js/state/runHistory.js`, `js/projectPersistence.js`, `js/packages.js` | deshacer/rehacer, historial de ejecuciones, proyecto, paquetes |
+| app | `js/engine.js`, `js/templates.js` | comandos: proyecto, nodos, ejecutar |
+| ui | `js/visualization.js`, `js/schemaUI.js`, `js/modalSystem.js`, `js/mobile.js`, `js/ui/*.js`, navegación inline (`data-jetl-nav`) | mapa, tabla, controles de nodo, monitor, catálogo, vista móvil |
+| shell | `js/shell.js` | arranque y cableado del DOM (se carga el último) |
+
+Las capas inferiores no llaman a la interfaz: anuncian lo ocurrido con
+`JETLEvents.emit` y la UI se suscribe (`log`, `toast`, `run:start`, `run:node`,
+`run:finish`, `node:added`, `node:error`, `tools:changed`, `workspace:reset`,
+`workspace:replaced`, `canvas:fit`, `flow:show`, `results:closed`).
+
+`index.html` incrusta core, params, formats y el CSS crítico para el primer
+pintado: se regeneran desde los archivos con `npm run inline` (nunca a mano).
+Al cambiar un script, sube su `?v=` en `index.html` (o `JETL_RUNTIME_VERSION` /
+`JETL_EXTRAS_VERSION` para los diferidos).
+
+Pruebas: `npm test` (grafo, unitarias, smoke, flujo de la app y mapa base).
 
 ## Smoke test rapido
 En consola del navegador:

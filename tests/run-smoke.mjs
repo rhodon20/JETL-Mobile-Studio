@@ -36,8 +36,6 @@ try {
         console.log('[smoke] reloaded offline from service worker cache');
     }
 
-    // Startup is staged: vendor libraries load after the shell, and JETLSmoke starts
-    // as a proxy until js/smoke.js is fetched.
     // Startup is staged: the shell boots first, the GIS runtime (Leaflet, turf...) and
     // the extras (schema UI, templates, packages) load on demand, and JETLSmoke is a
     // proxy until js/smoke.js is fetched. Load everything the suite exercises.
