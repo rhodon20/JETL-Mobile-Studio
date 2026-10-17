@@ -277,3 +277,6 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     }
 });
+
+// El smoke carga las librerías raster antes de sus pruebas.
+Object.assign(window, { ensureRasterLibraries });

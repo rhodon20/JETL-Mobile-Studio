@@ -39,9 +39,20 @@ JETL es una webapp ETL geoespacial visual y client-side (sin backend obligatorio
   - referencia `node -> tiffRef` para evitar fugas al recargar GeoTIFF en el mismo nodo.
 
 ## Estructura clave
-Scripts clásicos (globales compartidos) organizados en capas. Cada capa sólo usa
-las inferiores; `npm run check` (tests/check-graph.mjs) lo comprueba en CI y hoy
-el grafo no tiene violaciones ni ciclos.
+Módulos ES organizados en capas. Cada capa sólo usa las inferiores;
+`npm run check` (tests/check-graph.mjs) lo comprueba en CI y hoy el grafo no tiene
+violaciones ni ciclos.
+
+- Son scripts clásicos sólo el núcleo incrustado en `index.html` (core, params,
+  formats: estado compartido y utilidades globales para el primer pintado), la
+  cabecera (arranque y navegación) y el cargador, más `basemap.js` y `motion.js`,
+  que se cargan con el cargador de librerías.
+- Los módulos se importan entre sí (`import`/`export`). Lo que necesita código
+  clásico o el HTML (onclick, navegación de la cabecera, smoke) se publica
+  explícitamente con `Object.assign(window, {...})`; el resto es privado.
+- Los módulos bajo demanda (`visualization`, `schemaUI`, `modalSystem`,
+  `templates`, `packages`) los carga el cargador con `import()`; nadie puede
+  importarlos de forma estática sin perder la carga diferida.
 
 | Capa | Archivos | Qué hace |
 |---|---|---|

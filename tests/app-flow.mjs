@@ -113,10 +113,10 @@ try {
         const toggled = sidebar.classList.contains('open') !== before;
         button.click();
         button.remove();
-        return { toggled, internal: typeof window.handleSort, templates: typeof window.openTemplatesModal };
+        return { toggled, internal: typeof window.handleSort, nodeHelper: typeof window.resolveParamTextReader, templates: typeof window.openTemplatesModal };
     });
     check('delegated action reaches the on-demand visualization module', lazy.toggled, JSON.stringify(lazy));
-    check('module internals are not global', lazy.internal === 'undefined' && lazy.templates === 'function', JSON.stringify(lazy));
+    check('module internals are not global', lazy.internal === 'undefined' && lazy.nodeHelper === 'undefined' && lazy.templates === 'function', JSON.stringify(lazy));
 
     // The brand shows the deployed version and whether it is the latest one.
     const stamped = await page.evaluate(() => document.querySelector('meta[name="jetl-build"]').content);

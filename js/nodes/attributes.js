@@ -1829,8 +1829,5 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     }
 });
 
-
-
-
-
-
+// spatial.js resuelve parámetros ${...} con la misma función.
+Object.assign(window, { resolveParamText });

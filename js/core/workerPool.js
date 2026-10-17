@@ -231,3 +231,7 @@ function prewarmGeoWorker(timeoutMs = 15000) {
 window.prewarmGeoWorker = prewarmGeoWorker;
 // El pool se crea bajo demanda al ejecutar una operación espacial. Arrancar
 // varios Workers durante la primera pintura penaliza especialmente a Safari.
+
+// Los nodos (módulos sin imports, que las pruebas cargan como scripts) y el smoke
+// usan el pool por nombre.
+Object.assign(window, { createGeoWorker, postWorkerTask, JETLWorkersEnabled });
