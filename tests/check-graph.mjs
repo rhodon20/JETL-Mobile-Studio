@@ -27,7 +27,7 @@ const BASELINE = path.join(ROOT, 'tests', 'graph-baseline.json');
 const LAYERS = {
     boot: ['inline:head'],
     core: ['js/core.js', 'js/params.js'],
-    services: ['js/formats.js', 'js/core/workerPool.js', 'js/basemap.js', 'js/motion.js', 'inline:loader'],
+    services: ['js/formats.js', 'js/core/workerPool.js', 'js/basemap.js', 'js/motion.js', 'js/core/crs.js', 'inline:loader'],
     nodes: ['js/nodes/readers.js', 'js/nodes/geometry.js', 'js/nodes/utils.js', 'js/nodes/spatial.js',
         'js/nodes/attributes.js', 'js/nodes/raster.js', 'js/nodes/writers.js', 'js/tools.js'],
     engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js'],

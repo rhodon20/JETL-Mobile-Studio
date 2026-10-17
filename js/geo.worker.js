@@ -517,8 +517,10 @@ self.onmessage = async function(e) {
                     return [p[0],p[1],...coord.slice(2)];
                 });
             }catch(_){}
+            f.properties=Object.assign({},f.properties||{},{_crs:dst});
             if(i%200===0) await new Promise(r=>setTimeout(r,0));
         }
+        fc.metadata=Object.assign({},fc.metadata||{},{crs:dst});
         self.postMessage({taskId:msg.taskId,status:'ok',data:fc});
     } catch(err){ self.postMessage({taskId:msg.taskId,status:'err',message:err&&err.message?err.message:String(err)}); } }
     else if(msg.task === 'geo_topo_simplify') { try {

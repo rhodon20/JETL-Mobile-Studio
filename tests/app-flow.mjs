@@ -121,6 +121,27 @@ try {
     });
     reproject.forEach((r) => check(`reproject transforms each vertex once (${r.count} feature${r.count > 1 ? 's' : ''})`, r.finite && r.closedAtExpected, JSON.stringify(r)));
 
+    // A result in another CRS is drawn where it belongs: Reproject tags its output
+    // and the map reprojects it to degrees for display only.
+    const projected = await page.evaluate(async () => {
+        window.JETLProjects.startNew();
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_reproject');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        document.querySelector(`#node-${b} [df-dst]`).value = 'EPSG:25830';
+        await runEngine();
+        await window.showOnMap(String(b));
+        const bounds = mapLayers[String(b)]?.getBounds();
+        const out = executionData[b]?.data;
+        return {
+            crs: out?.metadata?.crs,
+            firstX: out?.features?.[0]?.geometry?.coordinates?.[0]?.[0]?.[0],
+            center: bounds ? [bounds.getCenter().lng, bounds.getCenter().lat] : null
+        };
+    });
+    check('reprojected output is tagged with its CRS', projected.crs === 'EPSG:25830' && projected.firstX > 400000, JSON.stringify(projected));
+    check('map draws a projected result in place', !!projected.center && Math.abs(projected.center[0] + 3.7) < 0.05 && Math.abs(projected.center[1] - 40.45) < 0.05, JSON.stringify(projected));
+
     // On-demand ES modules: their internals stay private, while the API other
     // code calls when they are loaded is published, e.g. a delegated UI action.
     const lazy = await page.evaluate(() => {

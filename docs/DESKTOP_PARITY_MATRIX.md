@@ -58,7 +58,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
 | Consola, tabla y mapa | Implementado | Conservar tabs táctiles y estado por salida |
-| Reproyectar a EPSG:4326 al pintar | **Pendiente** (`reprojectGeoJSONTo4326`): datos en otro CRS no se pintan bien en el mapa | Pintar correctamente cualquier salida con CRS conocido |
+| Reproyectar a EPSG:4326 al pintar | Implementado (`js/core/crs.js`): reproyecta sólo para pintar, con el CRS de `metadata.crs`, el `crs` de GeoJSON o `_crs`; avisa si no conoce el CRS. Desktop además descarga definiciones de epsg.io | Ampliar definiciones sin red si hacen falta más CRS |
 | Tabla: centrar la entidad en el mapa al tocar una fila, columnas fijas, mostrar/ocultar campos, carga progresiva | Pendiente (`focusTableFeatureOnMap`, `toggleTablePinnedField`) | Prioritario en móvil por el ancho de las tablas |
 | Gestor de capas | Parcial: control estándar de Leaflet (Desktop: aislar, renombrar, zoom) | — |
 | Herramienta de medir | Pendiente (`toggleMeasure`) | — |
@@ -86,7 +86,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 
 ## Prioridades para un usuario móvil
 Propuesta de orden, por impacto en el uso real en un teléfono:
-1. Reproyectar al pintar (corrección: hoy un resultado en otro CRS no se ve bien).
+1. ~~Reproyectar al pintar~~ (hecho).
 2. Lectura sin pérdida de la configuración de proyectos Desktop.
 3. Recuperación automática del borrador (los navegadores móviles cierran pestañas).
 4. Perfil de baja memoria.

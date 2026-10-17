@@ -24,6 +24,10 @@
    4.445 entidades: 38,5 s en el historial del usuario).
 
 ## Deuda conocida
+- Definiciones proj4 repetidas en cuatro sitios: `GEOMETRY_PROJ4_DEFS_COMPAT` y
+  `KNOWN_CRS` (Reproject) en `js/nodes/geometry.js`, `KNOWN_CRS` en
+  `js/geo.worker.js` y `CRS_DEFS` en `js/core/crs.js`. Unificarlas cuando los
+  nodos puedan importar módulos (hoy las pruebas los cargan como scripts).
 - Topo Simplify: artefactos (huecos/solapes) en mallas densas reales y falta la
   opción de mantener los bordes límite sin simplificar.
 - `GeoWorkerPool` reasigna `geoWorker` sin actualizar `window.geoWorker`.
@@ -53,6 +57,8 @@ Detalle en el historial de git (mensajes de commit). Resumen:
   ahora crea coordenadas nuevas en el hilo principal y en el worker. Los demás
   `coordEach` que modifican en el sitio son idempotentes (redondeo, ajuste al
   punto más cercano) y no se ven afectados.
+- Paridad: el mapa reproyecta a EPSG:4326 al pintar y Reproject etiqueta su
+  salida con el CRS de destino (`metadata.crs` y `_crs`), como Desktop.
 
 ---
 

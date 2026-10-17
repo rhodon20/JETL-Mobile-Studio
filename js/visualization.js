@@ -6,6 +6,7 @@
 // (entidad y filas) y el puerto mostrado de cada nodo, y se llaman entre sí
 // (el inspector repinta tabla y mapa, el mapa la tabla y el inspector...).
 import { showPortPickerToast } from './ui/notify.js';
+import { detectCrs, toDisplayCrs } from './core/crs.js';
 
 // Variables de estado
 let selectedFeatureIndex = null;
@@ -570,6 +571,11 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     } else if (srcFeatures.length > PERF_GENERIC_THRESHOLD) {
         perfSampleInfo = { shown: srcFeatures.length, total: srcFeatures.length, reason: 'interaction' };
     }
+
+    // El mapa trabaja en grados: un resultado en otro CRS se reproyecta sólo para pintarlo.
+    const display = toDisplayCrs(drawData, detectCrs(data));
+    if (display.unsupported) showToast(`Sin definición para ${display.crs}: se pinta sin reproyectar`, 'warn');
+    drawData = display.collection;
 
     const nodeName = editor.getNodeFromId(id).name;
     const tool = TOOL_REGISTRY[nodeName];

@@ -1,18 +1,5 @@
 ﻿// Cat: geometry
 (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY || {};
-// Transforma las coordenadas de una geometría creando arrays nuevos. Nunca en el
-// sitio: turf cierra los anillos reutilizando el array del primer vértice (y
-// structuredClone conserva esa referencia), así que modificarlo en el sitio
-// transformaría ese vértice dos veces.
-function geometryMapCoordinates(geometry, transform) {
-    if (!geometry) return geometry;
-    if (geometry.type === 'GeometryCollection') {
-        return { ...geometry, geometries: (geometry.geometries || []).map((part) => geometryMapCoordinates(part, transform)) };
-    }
-    const map = (coords) => (typeof coords[0] === 'number' ? transform(coords) : coords.map(map));
-    return { ...geometry, coordinates: Array.isArray(geometry.coordinates) ? map(geometry.coordinates) : geometry.coordinates };
-}
-
 function geometryCloneCompat(value) {
     if (typeof window !== 'undefined' && typeof window.JETLClone === 'function') return window.JETLClone(value);
     return JSON.parse(JSON.stringify(value));
@@ -1021,9 +1008,16 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const p = prj.forward(coord);
                 return [p[0], p[1], ...coord.slice(2)];
             };
+            // Coordenadas nuevas, nunca en el sitio: turf cierra los anillos reutilizando
+            // el array del primer vértice (y structuredClone conserva esa referencia), así
+            // que transformarlo en el sitio lo proyectaría dos veces. La copia del objeto
+            // geometría evita lo mismo si dos entidades comparten geometría.
             (out.features || []).forEach((feature) => {
-                feature.geometry = geometryMapCoordinates(feature.geometry, project);
+                if (feature.geometry) feature.geometry = geometryMapCoordsCompat({ ...feature.geometry }, project);
+                // El resultado está en `dst`: el mapa y los nodos siguientes lo leen de aquí.
+                feature.properties = { ...(feature.properties || {}), _crs: dst };
             });
+            out.metadata = { ...(out.metadata || {}), crs: dst };
             return out;
         }
     },

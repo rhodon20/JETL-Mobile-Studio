@@ -69,7 +69,7 @@ violaciones ni ciclos.
 |---|---|---|
 | boot | script inline de la cabecera | estado de arranque, informe de errores, `JETLLoadScriptOnce` |
 | core | `js/core.js`, `js/params.js` (inline) | estado compartido con dueño único, `JETLEvents`, `log`/`showToast`, utilidades |
-| services | `js/formats.js`, `js/core/workerPool.js`, `js/basemap.js`, `js/motion.js`, cargador inline | formatos, workers, mapa base, animación, carga diferida |
+| services | `js/formats.js`, `js/core/workerPool.js`, `js/core/crs.js`, `js/basemap.js`, `js/motion.js`, cargador inline | formatos, workers, CRS para pintar, mapa base, animación, carga diferida |
 | nodes | `js/nodes/*.js`, `js/tools.js` | catálogo de herramientas (`TOOL_REGISTRY`) |
 | engine | `js/processNode.js`, `js/engine/dirty.js`, `js/engine/runPlan.js` | ejecución de nodos, nodos sucios, plan, traza e informe |
 | state | `js/state/history.js`, `js/state/runHistory.js`, `js/projectPersistence.js`, `js/packages.js` | deshacer/rehacer, historial de ejecuciones, proyecto, paquetes |
