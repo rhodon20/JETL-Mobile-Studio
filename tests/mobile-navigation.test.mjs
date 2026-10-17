@@ -191,7 +191,7 @@ test('las librerías GIS no se cargan automáticamente al terminar la página', 
 });
 
 test('ningún módulo auxiliar forma parte del arranque automático', () => {
-    const extras = index.match(/const JETL_EXTRA_SCRIPTS = \[([\s\S]*?)\];/)?.[1] ?? '';
+    const extras = index.match(/const JETL_EXTRA_MODULES = \[([\s\S]*?)\];/)?.[1] ?? '';
     assert.ok(extras, 'No se encontró la lista de módulos auxiliares');
     assert.match(extras, /schemaUI/);
     assert.match(extras, /templates/);

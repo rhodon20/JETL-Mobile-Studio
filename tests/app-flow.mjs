@@ -101,6 +101,23 @@ try {
     check('failing node marked on the canvas', failed.nodeState === 'error', failed.nodeState);
     check('monitor closes from its button', failed.monitorClosed, JSON.stringify(failed));
 
+    // On-demand ES modules: their internals stay private, while the API other
+    // code calls when they are loaded is published, e.g. a delegated UI action.
+    const lazy = await page.evaluate(() => {
+        const sidebar = document.getElementById('sidebar');
+        const before = sidebar.classList.contains('open');
+        const button = document.createElement('button');
+        button.dataset.uiAction = 'toggle-sidebar';
+        document.body.appendChild(button);
+        button.click();
+        const toggled = sidebar.classList.contains('open') !== before;
+        button.click();
+        button.remove();
+        return { toggled, internal: typeof window.handleSort, templates: typeof window.openTemplatesModal };
+    });
+    check('delegated action reaches the on-demand visualization module', lazy.toggled, JSON.stringify(lazy));
+    check('module internals are not global', lazy.internal === 'undefined' && lazy.templates === 'function', JSON.stringify(lazy));
+
     // The brand shows the deployed version and whether it is the latest one.
     const stamped = await page.evaluate(() => document.querySelector('meta[name="jetl-build"]').content);
     const openBuildInfo = async () => {

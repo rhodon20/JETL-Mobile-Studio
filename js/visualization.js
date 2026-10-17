@@ -1468,6 +1468,9 @@ function pickColor(i) {
     return palette[i % palette.length];
 }
 
-
-
-
+// Se carga bajo demanda como módulo ES, así que nadie puede importarla: lo que usan
+// shell.js, el catálogo y el smoke (cuando ya está cargada) se publica aquí.
+Object.assign(window, {
+    applySymbology, applyTableFilter, buildTable, clearCanvas, loadFile, selectedRowSet, showOnMap,
+    toggleSidebar, toggleSymbologyPanel, togglePanelHeight, zoomToAllLayers
+});

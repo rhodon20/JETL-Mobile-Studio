@@ -53,7 +53,7 @@ const listed = (name) => {
     return [...body.matchAll(/'([^']+)'/g)].map((m) => m[1]);
 };
 const groups = {
-    JETL_EXTRAS_VERSION: listed('JETL_EXTRA_SCRIPTS'),
+    JETL_EXTRAS_VERSION: listed('JETL_EXTRA_MODULES'),
     JETL_RUNTIME_VERSION: [...listed('JETL_RUNTIME_SCRIPTS'), 'js/visualization.js'],
     JETL_MOTION_VERSION: ['js/vendor/anime.min.js', 'js/motion.js']
 };

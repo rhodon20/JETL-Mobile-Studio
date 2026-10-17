@@ -70,7 +70,12 @@ function readSources() {
     Object.values(LAYERS).flat().filter(f => !f.startsWith('inline:'))
         .forEach(f => { sources[f] = fs.readFileSync(path.join(ROOT, f), 'utf8'); });
     const deferred = [...html.matchAll(/<script (?:defer|type="module") src="(js\/[^"?]+)/g)].map(m => m[1]);
-    const modules = new Set([...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map(m => m[1]));
+    const modules = new Set([
+        ...[...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map(m => m[1]),
+        // Loaded on demand with import(): the extras list and literal import('./js/...').
+        ...[...(html.match(/const JETL_EXTRA_MODULES = \[([\s\S]*?)\]/)?.[1] || '').matchAll(/'([^']+)'/g)].map(m => m[1]),
+        ...[...html.matchAll(/import\('\.\/(js\/[^'?]+)/g)].map(m => m[1])
+    ]);
     const lazy = [...html.matchAll(/'(js\/[a-zA-Z/]+\.js)'/g)].map(m => m[1]).filter(f => !f.startsWith('js/vendor/'));
     // Modules reached through `import` are modules too (and are loaded that way).
     const pending = [...modules];
@@ -104,6 +109,14 @@ function analyseFile(code, file, isModule) {
     const undeclaredWrites = new Set(isModule ? scope.through.filter(r => r.isWrite()).map(r => r.identifier.name) : []);
     const writes = new Set();
     walk.simple(ast, {
+        CallExpression(n) {
+            // Object.assign(window, { a, b }) publishes a and b.
+            const c = n.callee;
+            if (c.type === 'MemberExpression' && c.object.name === 'Object' && c.property.name === 'assign' &&
+                n.arguments[0]?.type === 'Identifier' && n.arguments[0].name === 'window' && n.arguments[1]?.type === 'ObjectExpression') {
+                n.arguments[1].properties.forEach(prop => { if (prop.key?.type === 'Identifier') writes.add(prop.key.name); });
+            }
+        },
         AssignmentExpression(n) {
             const l = n.left;
             if (l.type === 'MemberExpression' && !l.computed && l.object.type === 'Identifier' && l.object.name === 'window') {

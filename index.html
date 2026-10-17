@@ -3997,7 +3997,7 @@ window.JETLBootModuleLoaded(1, 17, "readers.js");
         // motores GIS pesados se mantienen fuera del arranque: ejecutarlos en
         // el hilo principal estaba congelando la interacción en Safari móvil.
         // Las versiones ('dev' aquí) las pone scripts/build.mjs con el hash del contenido.
-        const JETL_EXTRA_SCRIPTS = [
+        const JETL_EXTRA_MODULES = [
             'js/modalSystem.js',
             'js/schemaUI.js',
             'js/templates.js',
@@ -4068,7 +4068,7 @@ window.JETLBootModuleLoaded(1, 17, "readers.js");
             try {
                 await loadJETLMotion().catch(() => null);
                 await Promise.all(JETL_RUNTIME_SCRIPTS.map(loadJETLScript));
-                await loadJETLScript('js/visualization.js');
+                await import('./js/visualization.js?v=' + JETL_RUNTIME_VERSION);
                 window.__JETL_RUNTIME_STATE = 'ready';
                 window.__JETL_RESOLVE_RUNTIME(true);
             } catch (error) {
@@ -4084,13 +4084,12 @@ window.JETLBootModuleLoaded(1, 17, "readers.js");
         let jetlExtrasPromise = null;
         function loadJETLExtras() {
             if (jetlExtrasPromise) return jetlExtrasPromise;
-            jetlExtrasPromise = JETL_EXTRA_SCRIPTS.reduce((chain, src) => chain.then(() => new Promise((resolve) => {
-                const script = document.createElement('script');
-                script.src = src + '?v=' + JETL_EXTRAS_VERSION;
-                script.onload = () => resolve(true);
-                script.onerror = () => resolve(false);
-                document.body.appendChild(script);
-            })), Promise.resolve()).then(() => true);
+            // En orden y sin detenerse si uno falla: cada módulo extra es independiente.
+            jetlExtrasPromise = JETL_EXTRA_MODULES.reduce((chain, src) => chain.then(() => import('./' + src + '?v=' + JETL_EXTRAS_VERSION)
+                .then(() => true, (error) => {
+                    console.error(`[JETL] No se pudo cargar ${src}`, error);
+                    return false;
+                })), Promise.resolve()).then(() => true);
             return jetlExtrasPromise;
         }
         window.JETLEnsureExtras = loadJETLExtras;
