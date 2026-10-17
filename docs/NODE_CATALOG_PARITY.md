@@ -87,6 +87,80 @@ El segundo comando termina con error si faltan identificadores Desktop dentro
 del alcance Studio. Raster y LiDAR siguen apareciendo en el informe, pero no
 hacen fallar el gate ni se contabilizan como deuda.
 
+## Paridad de configuración (revisión de octubre de 2026)
+
+Revisado contra JETL Desktop `7797aa1` (17 de julio de 2026). El manifiesto
+(`desktop-node-manifest.json`) coincide con el *code graph* actual de Desktop
+(mismo blob `f191f87`): los 115 nodos del alcance siguen compartidos y sin
+discrepancias de puertos.
+
+Compartir identificador y puertos no basta: el criterio de equivalencia de este
+documento incluye parámetros, valores por defecto y lectura de proyectos.
+`scripts/audit-node-params.mjs` lo mide comparando los campos `df-*` que cada
+plantilla guarda en el proyecto:
+
+```bash
+node scripts/audit-node-params.mjs <ruta-a-un-clon-de-JETL-Desktop> --summary
+```
+
+Resultado: **53 de los 115 nodos difieren en su configuración.** Clasificados a
+mano a partir del informe y del código:
+
+### 1. Funcionalidad que falta en Studio
+| Nodo | Falta |
+|---|---|
+| `attr_counter` | contar por grupos (`group-by`) |
+| `geo_chunk` | modo por número de vértices (`mode`, `max-vertices`) |
+| `geo_angle_calculator` | modo azimut horizontal (`mode`, `azimuth-attr`, `angle-attr`) |
+| `geo_vertex_creator` | modo «From Attributes» (`x-field`, `y-field`, `z-field`, `output-crs`) |
+| `writer_*` (8) | CRS de salida, división de la salida por atributo (`split-field`/`split-enabled`), nombre de capa y modo/campo de salida. Las opciones de carpeta, plantilla de ruta, sobrescritura y modo silencioso dependen del sistema de archivos: no aplican en navegador |
+
+### 2. Valores por defecto o codificación distintos
+| Nodo | Desktop → Studio |
+|---|---|
+| `attr_area` | la unidad se guarda como nombre (`sq_meters`, `sq_km`, `hectares`, `sq_ft`) en Desktop y como factor (`1`, `0.000001`, …) en Studio: un proyecto de Desktop trae un valor que Studio no entiende |
+| `geo_reproject` | origen `""` → `EPSG:4326`; destino `EPSG:4326` → `EPSG:3857` |
+| `util_creator` | Desktop crea 1 entidad con un atributo `path`; Studio parte de `{}` |
+
+### 3. Misma configuración guardada de otra forma
+Desktop guarda la configuración de estos nodos en un JSON (`*-config`) y Studio
+en campos sueltos u otro JSON, o al revés. Funcionan en su propio producto, pero
+un proyecto de uno abierto en el otro puede perder la configuración:
+`attr_aggregator` (Studio ya acepta también `g2-config`), `attr_list_concatenator`,
+`attr_list_exploder`, `attr_splitter`, `attr_manager`, `attr_manager_v2`,
+`attr_string_formatter`, `attr_stats`, `attr_test`, `attr_join_adv`,
+`attr_feature_merger`, `attr_matcher`, `attr_renamer`, `geo_buffer`,
+`geo_dissolve`, `geo_line_builder`, `sp_spatial_filter`, `sp_spatial_join`,
+`sp_spatial_relator`, `sp_anchored_snapper`, `sp_neighbor_finder`,
+`sp_intersector`, `geo_snap`, `util_http_caller`, `util_rest_request`,
+`util_graphql_request`, `reader_csv`/`reader_excel` (lat/lon dentro de
+`reader-config`) y los lectores con editor (`reader-config`, `reader-edited-data`).
+Diferencias sólo de nombre sin efecto: `reader_gpkg`/`reader_parquet` (el archivo
+no se guarda en el proyecto en ninguno de los dos).
+
+### 4. Prioridad de lectura de la configuración
+En Desktop, 11 nodos de atributos leen primero los datos del nodo en el
+proyecto (`getAttributeNodeRuntimeData`: `node.data` de Drawflow), después su
+JSON y por último los campos sueltos: `attr_manager`, `attr_keeper`,
+`attr_splitter`, `attr_list_exploder`, `attr_list_concatenator`,
+`attr_substring`, `attr_string_replacer`, `attr_aggregator`, `attr_counter`,
+`attr_sorter`, `attr_test`. Studio sólo lee el JSON o los campos, así que un
+proyecto Desktop con la configuración en los datos del nodo se ejecutaría con
+los valores por defecto sin avisar.
+
+### Proyectos de Desktop que no son objetivo
+Los proyectos de `versions/` de Desktop (migraciones de FME, «golden»/«scaffold»)
+usan 20 tipos `fme_*` que no están en el catálogo de 134 y que ejecuta el backend
+Python de Desktop (`backend/jetl_backend/backend_run.py`). No son ejecutables en
+un navegador y quedan fuera del alcance, igual que PythonCaller.
+
+### Limitaciones de la medición
+El script lee los campos `df-*` de `input`, `select` y `textarea` de la plantilla
+inicial; no ve configuración guardada en otros elementos (p. ej. el `df-test-rows`
+de Tester en Studio) ni la semántica de ejecución. La clasificación anterior está
+revisada a mano en el código para los casos citados; el resto del grupo 3 debe
+verificarse nodo a nodo al portarlo.
+
 ## Orden de trabajo
 
 1. **P0 — Manifiesto y compatibilidad:** exportar el catálogo canónico de
@@ -132,6 +206,10 @@ hacen fallar el gate ni se contabilizan como deuda.
    compatibilidad heredada.
 4. **P1 — Configuración equivalente:** extender el modal de Desktop a todos los
    nodos complejos y garantizar importación/exportación sin pérdida.
+   **Pendiente, medido:** 53/115 nodos difieren (ver «Paridad de configuración»):
+   4 nodos y los writers con funcionalidad que falta, 3 con valores por defecto
+   o codificación distintos, el resto con la configuración guardada de otra
+   forma, y 11 nodos de atributos sin la prioridad de lectura de Desktop.
 5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
    de servicio y ofrecer diagnóstico accionable cuando el backend no exista.
 6. **Fuera de alcance — Raster y LiDAR:** conservar sólo compatibilidad de

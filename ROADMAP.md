@@ -11,14 +11,12 @@
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 
 ## Próximos pasos (en este orden)
-1. **Paridad con JETL Desktop.** Revisar el repositorio de Desktop y actualizar
-   `docs/DESKTOP_PARITY_MATRIX.md`, `docs/NODE_CATALOG_PARITY.md` y
-   `docs/UI_PARITY_PLAN.md`; decidir qué se porta.
-   Pendiente según la matriz actual: multiselección y operaciones en lote;
-   marcadores y anotaciones de lienzo; catálogo de transformadores/paquetes
-   compatible con la web. Parcial: minimapa del navegador de flujo, perfiles de
-   memoria, visores vector/3D, inspector de esquema en móvil, visualización
-   progresiva, autoguardado con versiones, preferencias.
+1. **Paridad con JETL Desktop.** Revisión hecha el 18 de octubre (Desktop
+   `7797aa1`): `docs/DESKTOP_PARITY_MATRIX.md` (capacidades, con prioridades para
+   móvil) y `docs/NODE_CATALOG_PARITY.md` > Paridad de configuración (53/115 nodos
+   difieren; `scripts/audit-node-params.mjs`). Falta decidir qué se porta y en
+   qué orden; la propuesta empieza por reproyectar al pintar y leer sin pérdida
+   la configuración de proyectos Desktop.
 2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
    bloqueo de arranque en Safari) aprovechando las URLs versionadas por
    contenido; validar en iPhone antes de publicar.
@@ -26,6 +24,15 @@
    4.445 entidades: 38,5 s en el historial del usuario).
 
 ## Deuda conocida
+- **Reproject (`geo_reproject`) proyecta dos veces un vértice compartido.** Las
+  geometrías generadas con turf (p. ej. `turf.bboxPolygon`) cierran el anillo con
+  el mismo array en el primer y el último vértice; `structuredClone` (vía
+  `JETLClone`) conserva esa referencia y la transformación en el sitio con
+  `turf.coordEach` lo procesa dos veces: con el BBox Creator por defecto y
+  Reproject 4326→3857 la salida es `[-46430033847, NaN]` y no se pinta. Desktop
+  no lo sufre (clona con JSON y crea coordenadas nuevas). Revisar también los
+  demás `coordEach` que modifican coordenadas: `js/nodes/geometry.js:798`,
+  `js/nodes/spatial.js:222` y `:693`, `js/geo.worker.js:506`.
 - Topo Simplify: artefactos (huecos/solapes) en mallas densas reales y falta la
   opción de mantener los bordes límite sin simplificar.
 - `GeoWorkerPool` reasigna `geoWorker` sin actualizar `window.geoWorker`.

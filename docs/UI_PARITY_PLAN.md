@@ -100,7 +100,9 @@ sobrescribir el archivo local sin un permiso que el navegador no puede mantener.
 
 ### Fase 3 — Navegación del flujo
 
-- Buscador global de nodos y atributos. Implementado v1.
+- Buscador global de nodos y atributos. Implementado v1 para nodos; la búsqueda
+  «por atributos» mira la configuración del nodo, no los campos de los datos como
+  Desktop (revisión de octubre de 2026, `DESKTOP_PARITY_MATRIX.md`).
 - Centrado y selección desde resultados. Implementado v1.
 - Miniresumen del flujo en proyectos grandes. Implementado v1 con recuento de nodos, conexiones y categorías.
 - Inserción encadenada: con una única selección, el nodo nuevo se coloca a la
