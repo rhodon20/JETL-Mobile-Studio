@@ -41,7 +41,7 @@ function bootMotion(prefersReducedMotion = false) {
 }
 
 test('Anime.js se prepara como capa de UI y no se duplica en el runtime GIS', () => {
-    assert.match(index, /const JETL_MOTION_VERSION = '20260824-1'/);
+    assert.match(index, /const JETL_MOTION_VERSION = 'dev'/); // scripts/build.mjs pone el hash
     assert.match(index, /window\.JETLEnsureMotion = loadJETLMotion/);
     assert.match(index, /requestIdleCallback\(warmMotion/);
     const runtimeScripts = index.match(/const JETL_RUNTIME_SCRIPTS = \[([\s\S]*?)\];/)?.[1] ?? '';

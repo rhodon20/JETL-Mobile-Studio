@@ -62,8 +62,8 @@ Las capas inferiores no llaman a la interfaz: anuncian lo ocurrido con
 
 `index.html` incrusta core, params, formats y el CSS crítico para el primer
 pintado: se regeneran desde los archivos con `npm run inline` (nunca a mano).
-Al cambiar un script, sube su `?v=` en `index.html` (o `JETL_RUNTIME_VERSION` /
-`JETL_EXTRAS_VERSION` para los diferidos).
+Las versiones de caché (`?v=`) no se escriben a mano: `npm run build` las pone en
+`dist/` con el hash del contenido de cada archivo.
 
 Pruebas: `npm test` (grafo, unitarias, smoke, flujo de la app y mapa base).
 

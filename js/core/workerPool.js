@@ -142,7 +142,7 @@ function createGeoWorker() {
     try {
         const hc = navigator.hardwareConcurrency || 4;
         const size = Math.max(2, Math.min(hc - 1, 6));
-        geoWorkerPool = new GeoWorkerPool('js/geo.worker.js?v=20260824-2', size);
+        geoWorkerPool = new GeoWorkerPool('js/geo.worker.js', size);
         window.geoWorker = geoWorker;
         window.geoWorkerPool = geoWorkerPool;
     } catch (e) {
