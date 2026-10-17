@@ -2146,6 +2146,8 @@
     initDelegation();
     JETLEvents.on('tools:changed', () => setTimeout(refreshAll, 0));
     JETLEvents.on('workspace:replaced', () => refreshAll());
+    JETLEvents.on('node:added', (e) => setTimeout(() => updateNode(e.id), 0));
+    JETLEvents.on('run:finish', (e) => { if (e.status === 'ok') refreshAll(); });
 
     window.JETLSchemaUI = {
         updateNode,

@@ -5,14 +5,19 @@ import vm from 'node:vm';
 
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const engine = readFileSync(new URL('../js/engine.js', import.meta.url), 'utf8');
+const catalog = readFileSync(new URL('../js/ui/catalog.js', import.meta.url), 'utf8');
+const shell = readFileSync(new URL('../js/shell.js', import.meta.url), 'utf8');
+const runPlan = readFileSync(new URL('../js/engine/runPlan.js', import.meta.url), 'utf8');
+const runHistory = readFileSync(new URL('../js/state/runHistory.js', import.meta.url), 'utf8');
+const runPanel = readFileSync(new URL('../js/ui/runPanel.js', import.meta.url), 'utf8');
 const readers = readFileSync(new URL('../js/nodes/readers.js', import.meta.url), 'utf8');
 const attributes = readFileSync(new URL('../js/nodes/attributes.js', import.meta.url), 'utf8');
 
 test('el gesto del catálogo distingue tap de scroll', () => {
-    const start = engine.indexOf('function createTouchIntentTracker');
-    const end = engine.indexOf('window.JETLCreateTouchIntentTracker', start);
+    const start = catalog.indexOf('function createTouchIntentTracker');
+    const end = catalog.indexOf('window.JETLCreateTouchIntentTracker', start);
     assert.ok(start >= 0 && end > start, 'falta el clasificador de gesto');
-    const source = `${engine.slice(start, end)}; window.createTracker = createTouchIntentTracker;`;
+    const source = `${catalog.slice(start, end)}; window.createTracker = createTouchIntentTracker;`;
     const context = { window: {}, Math };
     vm.runInNewContext(source, context);
 
@@ -27,7 +32,7 @@ test('el gesto del catálogo distingue tap de scroll', () => {
     scroll.move(20, 56);
     assert.equal(scroll.end(), null, 'el scroll no puede insertar un nodo');
 
-    const sidebarMarkup = engine.match(/function renderSidebar[\s\S]*?function filterTools/)?.[0] ?? '';
+    const sidebarMarkup = catalog.match(/function renderSidebar[\s\S]*?function filterTools/)?.[0] ?? '';
     assert.doesNotMatch(sidebarMarkup, /ontouchend|this\.click\(\)/);
 });
 
@@ -46,25 +51,25 @@ test('quicksearch está en la cabecera entre marca y acciones', () => {
     const toolbarPosition = header.indexOf('class="toolbar"');
     assert.ok(brandPosition >= 0 && brandPosition < searchPosition && searchPosition < toolbarPosition);
     assert.match(index, /id="qs-input"[^>]+placeholder="Buscar nodo"/);
-    assert.match(engine, /if \(isMobileSearch\(\)\) addNodeClick\(item\.dataset\.k\)/);
+    assert.match(catalog, /if \(isMobileSearch\(\)\) addNodeClick\(item\.dataset\.k\)/);
 });
 
 test('abrir un editor de nodo carga su módulo diferido en el primer toque', () => {
-    assert.match(engine, /const schemaActionEl = e\.target\.closest\('\[data-schema-action\]'\)/);
-    assert.match(engine, /if \(schemaActionEl && !window\.JETLSchemaUI\)/);
-    assert.match(engine, /window\.JETLEnsureExtras\(\)/);
-    assert.match(engine, /schemaActionEl\.click\(\)/);
-    assert.doesNotMatch(engine, /\['calc-open-editor'[\s\S]+?\.includes\(schemaAction\)/);
+    assert.match(shell, /const schemaActionEl = e\.target\.closest\('\[data-schema-action\]'\)/);
+    assert.match(shell, /if \(schemaActionEl && !window\.JETLSchemaUI\)/);
+    assert.match(shell, /window\.JETLEnsureExtras\(\)/);
+    assert.match(shell, /schemaActionEl\.click\(\)/);
+    assert.doesNotMatch(shell, /\['calc-open-editor'[\s\S]+?\.includes\(schemaAction\)/);
     assert.match(readers, /data-schema-action="reader-open-editor"/);
     assert.match(attributes, /data-schema-action="keeper-open-editor"/);
     assert.match(attributes, /data-schema-action="creator-open-editor"/);
 });
 
 test('el historial persiste y limita las ejecuciones registradas', () => {
-    const start = engine.indexOf("const RUN_HISTORY_KEY");
-    const end = engine.indexOf('function renderRunHistory', start);
+    const start = runHistory.indexOf("const RUN_HISTORY_KEY");
+    const end = runHistory.indexOf('function downloadRunReport', start);
     assert.ok(start >= 0 && end > start, 'faltan las funciones de historial');
-    const source = `${engine.slice(start, end)}; window.loadHistory = loadRunHistory; window.recordReport = publishRunReport;`;
+    const source = `${runHistory.slice(start, end)}; window.loadHistory = loadRunHistory; window.recordReport = publishRunReport;`;
     const values = new Map();
     const context = {
         window: {},
@@ -74,7 +79,8 @@ test('el historial persiste y limita las ejecuciones registradas', () => {
             save(key, value) { values.set(key, value); },
             clear(key) { values.delete(key); }
         },
-        JSON
+        JSON,
+        JETLEvents: { emit() { return 0; } }
     };
     vm.runInNewContext(source, context);
     for (let i = 0; i < 35; i += 1) {
@@ -91,14 +97,14 @@ test('el historial sustituye a Flujo en el dock y conserva retorno al canvas', (
     const dock = index.match(/<nav id="mobile-dock"[\s\S]*?<\/nav>/)?.[0] ?? '';
     assert.match(dock, /<span>Historial<\/span>/);
     assert.doesNotMatch(dock, /<span>Flujo<\/span>/);
-    assert.match(engine, /function openRunHistory\(\)[\s\S]*?JETLNativeNav\?\.\('flow'\)/);
+    assert.match(runPanel, /function openRunHistory\(\)[\s\S]*?JETLNativeNav\?\.\('flow'\)/);
 });
 
 test('ejecutar todo planifica cada nodo de ramas y componentes desconectados', () => {
-    const start = engine.indexOf('function buildExecutionPlan');
-    const end = engine.indexOf('window.JETLBuildExecutionPlan', start);
+    const start = runPlan.indexOf('function buildExecutionPlan');
+    const end = runPlan.indexOf('window.JETLBuildExecutionPlan', start);
     assert.ok(start >= 0 && end > start, 'falta el planificador topológico');
-    const source = `${engine.slice(start, end)}; window.plan = buildExecutionPlan;`;
+    const source = `${runPlan.slice(start, end)}; window.plan = buildExecutionPlan;`;
     const context = { window: {}, Map, Object, String, Number, Error };
     vm.runInNewContext(source, context);
     const graph = {
@@ -203,16 +209,16 @@ test('el historial ofrece detalle, KPIs, filtro y exportación por ejecución', 
     assert.match(index, /id="run-history-detail"/);
     assert.match(index, /data-run-history-export="json"/);
     assert.match(index, /data-run-history-export="csv"/);
-    assert.match(engine, /<span>Procesados<\/span>/);
-    assert.match(engine, /<span>Caché<\/span>/);
-    assert.match(engine, /id="run-history-node-filter"/);
-    assert.match(engine, /class="run-history-node-table"/);
-    assert.match(engine, /function downloadRunReport\(format = 'json', reportOverride = null\)/);
+    assert.match(runPanel, /<span>Procesados<\/span>/);
+    assert.match(runPanel, /<span>Caché<\/span>/);
+    assert.match(runPanel, /id="run-history-node-filter"/);
+    assert.match(runPanel, /class="run-history-node-table"/);
+    assert.match(runHistory, /function downloadRunReport\(format = 'json', reportOverride = null\)/);
 });
 
 test('el monitor refleja progreso, nodo activo y error navegable', () => {
-    const start = engine.indexOf('let activeRunMonitor = null');
-    const end = engine.indexOf('function buildExecutionPlan', start);
+    const start = runPanel.indexOf('let activeRunMonitor = null');
+    const end = runPanel.indexOf("JETLEvents.on('run:start'", start);
     assert.ok(start >= 0 && end > start, 'falta el monitor de ejecución');
     const makeClassList = () => {
         const values = new Set();
@@ -232,7 +238,7 @@ test('el monitor refleja progreso, nodo activo y error navegable', () => {
         setInterval() { return 1; }, clearInterval() {}, setTimeout() { return 2; }, clearTimeout() {},
         Date, Math, Number, String, Set
     };
-    vm.runInNewContext(`${engine.slice(start, end)}; window.startMonitor=startRunMonitor; window.updateMonitor=updateRunMonitorNode; window.finishMonitor=finishRunMonitor;`, context);
+    vm.runInNewContext(`${runPanel.slice(start, end)}; window.startMonitor=startRunMonitor; window.updateMonitor=updateRunMonitorNode; window.finishMonitor=finishRunMonitor;`, context);
     context.window.startMonitor('Ejecución Total', ['1', '2']);
     assert.equal(elements.loader.style.display, 'flex');
     assert.ok(nodes[0].classList.values.has('jetl-run-pending'));
@@ -251,9 +257,10 @@ test('el monitor refleja progreso, nodo activo y error navegable', () => {
 test('la cancelación se registra sin convertirla en un error de nodo', () => {
     const processNode = readFileSync(new URL('../js/processNode.js', import.meta.url), 'utf8');
     assert.match(processNode, /cancelled \? 'cancelled' : 'error'/);
-    assert.match(engine, /finishRunMonitor\('cancelled'\)/);
-    assert.match(engine, /cancelled_nodes:/);
-    assert.match(engine, /<span>Cancelados<\/span>/);
+    assert.match(engine, /finishRun\('Ejecución Total', 'cancelled'\)/);
+    assert.match(runPanel, /JETLEvents\.on\('run:finish', \(e\) => finishRunMonitor\(e\.status, e\.errorNodeId\)\)/);
+    assert.match(runPlan, /cancelled_nodes:/);
+    assert.match(runPanel, /<span>Cancelados<\/span>/);
 });
 
 test('la ejecución no dispara la animación legacy de cables ni oculta el nodo activo', () => {

@@ -9,7 +9,7 @@
     "test:unit": "node --test tests/*.test.mjs",
     "test:smoke": "node tests/run-smoke.mjs",
     "test:extended": "node tests/run-smoke.mjs --extended",
-    "test": "npm run check && npm run test:unit && npm run test:smoke && node tests/basemap.mjs"
+    "test": "npm run check && npm run test:unit && npm run test:smoke && node tests/app-flow.mjs && node tests/basemap.mjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

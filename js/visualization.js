@@ -384,6 +384,46 @@ function bindTableInteractions() {
     });
 }
 
+// El mapa se crea la primera vez que hace falta (necesita Leaflet, que llega con este runtime).
+function ensureJETLMap() {
+    if (map) return map;
+    const mapElement = document.getElementById('map');
+    if (!mapElement) throw new Error('No se encontró el contenedor del mapa');
+    if (typeof L === 'undefined') throw new Error('Leaflet no está disponible');
+
+    map = L.map(mapElement, { renderer: L.canvas() }).setView([40.416, -3.703], 6);
+    // Asynchronous (MapLibre loads on demand); the map is usable meanwhile.
+    window.JETLBasemapReady = typeof window.JETLAddBasemap === 'function'
+        ? window.JETLAddBasemap(map)
+        : Promise.resolve(null);
+    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
+    return map;
+}
+window.ensureJETLMap = ensureJETLMap;
+
+// Al terminar bien una ejecución: resumen en el log, contadores de los nodos y,
+// si era parcial, el resultado del nodo destino en el mapa y la tabla.
+JETLEvents.on('run:finish', (e) => {
+    if (e.status !== 'ok') return;
+    logRunSummary(e.label);
+    updateBadges();
+    if (e.scope !== 'partial') return;
+    const targetId = e.targetId;
+    if (executionData[targetId] && executionData[targetId].data) {
+        const res = executionData[targetId].data;
+        if (TOOL_REGISTRY[editor.getNodeFromId(targetId).name].out !== 0) {
+            showOnMap(targetId);
+            currentNodeId = String(targetId);
+            if (typeof window.resolveNodeDisplayData === 'function') {
+                const info = window.resolveNodeDisplayData(String(targetId));
+                buildTable(info && info.data ? info.data : res);
+            } else {
+                buildTable(res);
+            }
+        }
+    }
+});
+
 // Función principal de pintado en el mapa
 function zoomToAllLayers() {
     const group = new L.FeatureGroup();
@@ -1322,6 +1362,16 @@ function clearCanvas() {
 
 function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [.97, 1], translateY: [8, 0], opacity: [0, 1], duration: 220, easing: 'easeOutCubic' }); }
 JETLEvents.on('node:error', (e) => anim_NodeError(e.id));
+JETLEvents.on('node:added', (e) => { if (e.element && !e.animated) anim_NodeEnter(e.element); });
+// Al vaciar el espacio de trabajo se olvidan los puertos mostrados y, al cargar
+// un proyecto, también la selección de la tabla y la simbología.
+JETLEvents.on('workspace:reset', (e) => {
+    window.resetNodeDisplayPorts();
+    if (!e || !e.clearSelection) return;
+    selectedRowSet.clear();
+    symbologyByNode = {};
+    currentSymbologyNode = null;
+});
 function anim_NodeError(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, translateX: [-10, 10, -5, 5, 0], duration: 500, easing: 'easeInOutQuad' }); }
 function anim_NodeSuccess(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, scale: [1, 1.1, 1], boxShadow: ['0 0 0 0px rgba(46, 204, 113, 0.7)', '0 0 0 10px rgba(46, 204, 113, 0)'], duration: 600, easing: 'easeOutQuad' }); }
 function anim_CableFlow(nodeId) {

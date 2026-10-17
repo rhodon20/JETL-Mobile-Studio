@@ -21,14 +21,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Unit tests, smoke (stable) and basemap
+      - name: Unit tests, smoke (stable), app flow and basemap
         run: npm test
       - name: Smoke (extended, workers)
         run: npm run test:extended
       - name: Build
         run: npm run build
-      - name: Smoke against the built site
-        run: node tests/run-smoke.mjs --root dist
+      - name: Smoke and app flow against the built site
+        run: node tests/run-smoke.mjs --root dist && node tests/app-flow.mjs --root dist
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:

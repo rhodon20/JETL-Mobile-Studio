@@ -42,7 +42,7 @@
     function fitFlowToViewport() {
         if (!isMobile()) return;
         const flow = document.getElementById('drawflow');
-        const instance = window.JETLEditor;
+        const instance = editor;
         const canvas = instance?.precanvas;
         if (!flow || !canvas || flow.clientWidth < 1 || flow.clientHeight < 1) return;
 
@@ -134,4 +134,5 @@
     }
 
     window.JETLMobile = { openView, closeTransientViews, fitFlowToViewport, runFlow };
+    JETLEvents.on('canvas:fit', fitFlowToViewport);
 })();

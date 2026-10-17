@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const engine = readFileSync(new URL('../js/engine.js', import.meta.url), 'utf8');
+// The flow navigator lives in js/ui/catalog.js.
+const engine = readFileSync(new URL('../js/ui/catalog.js', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 function loadEntryBuilder() {

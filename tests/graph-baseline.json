@@ -1,21 +1,11 @@
 [
-  "cycle: inline:head <-> inline:loader <-> js/basemap.js <-> js/engine.js <-> js/formats.js <-> js/mobile.js <-> js/nodes/readers.js <-> js/processNode.js <-> js/schemaUI.js <-> js/templates.js <-> js/visualization.js",
-  "upward: inline:head (boot) uses JETLEnsureMotion from inline:loader (app)",
-  "upward: inline:head (boot) uses JETLEnsureRuntime from inline:loader (app)",
-  "upward: inline:head (boot) uses JETLRuntimeReady from inline:loader (app)",
+  "cycle: inline:head <-> inline:loader <-> js/basemap.js <-> js/engine.js <-> js/formats.js <-> js/mobile.js <-> js/nodes/readers.js <-> js/schemaUI.js <-> js/visualization.js",
+  "upward: inline:head (boot) uses JETLEnsureMotion from inline:loader (services)",
+  "upward: inline:head (boot) uses JETLEnsureRuntime from inline:loader (services)",
+  "upward: inline:head (boot) uses JETLRuntimeReady from inline:loader (services)",
   "upward: inline:head (boot) uses addNodeClick from js/engine.js (app)",
-  "upward: inline:head (boot) uses ensureJETLMap from js/engine.js (app)",
+  "upward: inline:head (boot) uses ensureJETLMap from js/visualization.js (ui)",
   "upward: inline:head (boot) uses runEngine from js/engine.js (app)",
   "upward: inline:head (boot) uses switchTab from js/visualization.js (ui)",
-  "upward: js/mobile.js (ui) uses JETLEditor from js/engine.js (app)",
-  "upward: js/mobile.js (ui) uses JETLEnsureRuntime from inline:loader (app)",
-  "upward: js/mobile.js (ui) uses JETLRuntimeReady from inline:loader (app)",
-  "upward: js/mobile.js (ui) uses __JETL_RUNTIME_ERROR from inline:loader (app)",
-  "upward: js/mobile.js (ui) uses __JETL_RUNTIME_STATE from inline:loader (app)",
-  "upward: js/mobile.js (ui) uses runEngine from js/engine.js (app)",
-  "upward: js/processNode.js (engine) uses JETLDirty from js/engine.js (app)",
-  "upward: js/processNode.js (engine) uses JETLRunTrace from js/engine.js (app)",
-  "upward: js/templates.js (state) uses addNode from js/engine.js (app)",
-  "upward: js/visualization.js (ui) uses JETLDirty from js/engine.js (app)",
-  "upward: js/visualization.js (ui) uses ensureJETLMap from js/engine.js (app)"
+  "upward: js/templates.js (state) uses addNode from js/engine.js (app)"
 ]

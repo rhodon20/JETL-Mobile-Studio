@@ -21,16 +21,20 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(ROOT, 'tests', 'graph-baseline.json');
 
 // Lowest to highest. Files not listed here fail the check.
+// app holds the commands (project, nodes, runs); the ui invokes them and they
+// report back through JETLEvents. shell starts the app and wires the DOM, so it
+// may use every layer below it.
 const LAYERS = {
     boot: ['inline:head'],
     core: ['js/core.js', 'js/params.js'],
-    services: ['js/formats.js', 'js/core/workerPool.js', 'js/basemap.js', 'js/motion.js'],
+    services: ['js/formats.js', 'js/core/workerPool.js', 'js/basemap.js', 'js/motion.js', 'inline:loader'],
     nodes: ['js/nodes/readers.js', 'js/nodes/geometry.js', 'js/nodes/utils.js', 'js/nodes/spatial.js',
         'js/nodes/attributes.js', 'js/nodes/raster.js', 'js/nodes/writers.js', 'js/tools.js'],
-    engine: ['js/processNode.js'],
-    state: ['js/state/history.js', 'js/projectPersistence.js', 'js/templates.js', 'js/packages.js'],
-    ui: ['js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js'],
-    app: ['js/engine.js', 'inline:loader'],
+    engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js'],
+    state: ['js/state/history.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/templates.js', 'js/packages.js'],
+    app: ['js/engine.js'],
+    ui: ['js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js'],
+    shell: ['js/shell.js'],
     dev: ['js/smoke.js']
 };
 const LAYER_NAMES = Object.keys(LAYERS);
