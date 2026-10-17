@@ -40,6 +40,8 @@ Reglas que conviene saber antes de tocar código:
   archivos de `js/` y `css/` y ejecuta `npm run inline`; `npm run check` falla si
   `index.html` quedó desfasado.
 - No escribas versiones `?v=` a mano: las pone el build.
+- Iconos y pantallas de arranque (Android/iOS) salen de `icons/icon.svg`:
+  `node scripts/generate-icons.mjs` los regenera y enlaza en `index.html`.
 - Respeta las capas (abajo). `npm run check` falla si un archivo usa algo de una
   capa superior, si aparece un ciclo o si se usa por nombre algo privado de otro
   módulo.

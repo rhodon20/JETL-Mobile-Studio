@@ -62,8 +62,8 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Tabla: centrar la entidad en el mapa al tocar una fila, columnas fijas, mostrar/ocultar campos, carga progresiva | Pendiente (`focusTableFeatureOnMap`, `toggleTablePinnedField`) | Prioritario en móvil por el ancho de las tablas |
 | Gestor de capas | Parcial: control estándar de Leaflet (Desktop: aislar, renombrar, zoom) | — |
 | Herramienta de medir | Pendiente (`toggleMeasure`) | — |
-| Visor 3D vectorial | **Pendiente** (`vectorViewer3D.js`, JS puro sin backend: portable) | — |
-| Raster y LiDAR | Fuera de alcance | Conservar proyectos heredados |
+| Visor 3D vectorial | Fuera de alcance (decisión del 18 de octubre de 2026): aporta poco en móvil y es pesado, aunque `vectorViewer3D.js` sea JS sin backend | — |
+| Raster y LiDAR (nodos y visores) | Fuera de alcance | Conservar proyectos heredados |
 | Esquema y metadatos | **Pendiente**: Studio no propaga esquemas sin ejecutar (`schemaEngine.js`) ni tiene inspector de campos/estadísticas | Inspector móvil con tipos, campos y estadísticas |
 | Visualización progresiva | Parcial: muestreo y umbrales fijos; sin filtro por vista ni nivel de detalle (`progressiveViz.js`) | Evitar bloquear la UI con datasets grandes |
 

@@ -214,6 +214,8 @@ verificarse nodo a nodo al portarlo.
    de servicio y ofrecer diagnóstico accionable cuando el backend no exista.
 6. **Fuera de alcance — Raster y LiDAR:** conservar sólo compatibilidad de
    lectura de proyectos existentes; no portar nodos ni visores de datos masivos.
+   El visor 3D vectorial de Desktop también queda fuera (decisión del 18 de
+   octubre de 2026): poco valor en móvil para su peso.
 
 La paridad del catálogo es el eje principal del roadmap. El pulido visual y el
 movimiento avanzan en paralelo, pero no sustituyen capacidad funcional.
