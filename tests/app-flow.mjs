@@ -101,6 +101,26 @@ try {
     check('failing node marked on the canvas', failed.nodeState === 'error', failed.nodeState);
     check('monitor closes from its button', failed.monitorClosed, JSON.stringify(failed));
 
+    // Reproject must transform each vertex once. turf closes rings reusing the
+    // first vertex's array, and structuredClone/postMessage keep that sharing:
+    // transforming in place used to project it twice. Main thread (1 feature)
+    // and worker (>= 200 features) paths.
+    const reproject = await page.evaluate(async () => {
+        const node = window.TOOL_REGISTRY.geo_reproject;
+        const dom = { querySelector: (sel) => ({ value: sel === '[df-src]' ? 'EPSG:4326' : 'EPSG:3857' }) };
+        const expected = proj4('EPSG:4326', 'EPSG:3857', [-3.75, 40.4]);
+        const check = async (count) => {
+            const fc = turf.featureCollection(Array.from({ length: count }, () => turf.bboxPolygon([-3.75, 40.4, -3.65, 40.5])));
+            const out = await node.run('reproject_check', [fc], dom);
+            const rings = out.features.map((f) => f.geometry.coordinates[0]);
+            const finite = rings.every((ring) => ring.every((c) => Number.isFinite(c[0]) && Number.isFinite(c[1])));
+            const closedAtExpected = rings.every((ring) => [ring[0], ring[ring.length - 1]].every((c) => Math.abs(c[0] - expected[0]) < 1e-3 && Math.abs(c[1] - expected[1]) < 1e-3));
+            return { count, finite, closedAtExpected, first: rings[0][0], last: rings[0][rings[0].length - 1] };
+        };
+        return [await check(1), await check(200)];
+    });
+    reproject.forEach((r) => check(`reproject transforms each vertex once (${r.count} feature${r.count > 1 ? 's' : ''})`, r.finite && r.closedAtExpected, JSON.stringify(r)));
+
     // On-demand ES modules: their internals stay private, while the API other
     // code calls when they are loaded is published, e.g. a delegated UI action.
     const lazy = await page.evaluate(() => {
@@ -158,7 +178,8 @@ try {
 
     const byPath = {};
     scriptRequests.forEach((url) => { (byPath[url.pathname] = byPath[url.pathname] || []).push(url.search); });
-    const twice = Object.entries(byPath).filter(([, searches]) => searches.length > 1).map(([p, searches]) => `${p} ${searches.join(' ')}`);
+    // Each pool worker fetches geo.worker.js; the check is about ES modules running twice.
+    const twice = Object.entries(byPath).filter(([p, searches]) => searches.length > 1 && !p.endsWith('/geo.worker.js')).map(([p, searches]) => `${p} ${searches.join(' ')}`);
     check('each script is fetched once', twice.length === 0, twice.join('; '));
     if (stamped !== 'dev') {
         const unversioned = Object.entries(byPath).filter(([p, searches]) => !p.includes('/vendor/') && searches.some((q) => !q.startsWith('?v='))).map(([p]) => p);

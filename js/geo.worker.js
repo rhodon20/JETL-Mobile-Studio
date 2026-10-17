@@ -110,6 +110,13 @@ const KNOWN_CRS = {
     'EPSG:23030': '+proj=utm +zone=30 +ellps=intl +towgs84=-87,-98,-121,0,0,0,0 +units=m +no_defs +type=crs'
 };
 
+function mapGeometryCoords(geometry,transform){
+    if(!geometry) return geometry;
+    if(geometry.type==='GeometryCollection') return Object.assign({},geometry,{geometries:(geometry.geometries||[]).map((g)=>mapGeometryCoords(g,transform))});
+    const map=(coords)=>(typeof coords[0]==='number'?transform(coords):coords.map(map));
+    return Object.assign({},geometry,{coordinates:Array.isArray(geometry.coordinates)?map(geometry.coordinates):geometry.coordinates});
+}
+
 self.onmessage = async function(e) {
     const msg = e.data;
     if (!msg || !msg.task) return;
@@ -502,11 +509,12 @@ self.onmessage = async function(e) {
         const feats=Array.isArray(fc.features)?fc.features:[];
         for(let i=0;i<feats.length;i++){
             const f=feats[i];
+            // Coordenadas nuevas, no en el sitio: los anillos de turf comparten el array del
+            // primer y último vértice (postMessage conserva la referencia) y se proyectaría dos veces.
             try{
-                turf.coordEach(f,(coord)=>{
+                f.geometry=mapGeometryCoords(f.geometry,(coord)=>{
                     const p=prj.forward(coord);
-                    coord[0]=p[0];
-                    coord[1]=p[1];
+                    return [p[0],p[1],...coord.slice(2)];
                 });
             }catch(_){}
             if(i%200===0) await new Promise(r=>setTimeout(r,0));
