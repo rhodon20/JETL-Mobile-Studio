@@ -1,10 +1,70 @@
-# JETL Roadmap de Ejecucion (Codex Owner)
+# JETL Mobile Studio - Roadmap
+
+Última actualización: 2026-10-18
+
+## Estado actual
+- Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
+- Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
+  comprobada en CI (`tests/check-graph.mjs`).
+- Pruebas: `npm test` (grafo, 109 unitarias, smoke estable 30/30, flujo de la
+  app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
+- Validado por el usuario en iPhone (Safari) tras cada fase.
+
+## Próximos pasos (en este orden)
+1. **Paridad con JETL Desktop.** Revisar el repositorio de Desktop y actualizar
+   `docs/DESKTOP_PARITY_MATRIX.md`, `docs/NODE_CATALOG_PARITY.md` y
+   `docs/UI_PARITY_PLAN.md`; decidir qué se porta.
+   Pendiente según la matriz actual: multiselección y operaciones en lote;
+   marcadores y anotaciones de lienzo; catálogo de transformadores/paquetes
+   compatible con la web. Parcial: minimapa del navegador de flujo, perfiles de
+   memoria, visores vector/3D, inspector de esquema en móvil, visualización
+   progresiva, autoguardado con versiones, preferencias.
+2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
+   bloqueo de arranque en Safari) aprovechando las URLs versionadas por
+   contenido; validar en iPhone antes de publicar.
+3. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
+   4.445 entidades: 38,5 s en el historial del usuario).
+
+## Deuda conocida
+- Topo Simplify: artefactos (huecos/solapes) en mallas densas reales y falta la
+  opción de mantener los bordes límite sin simplificar.
+- `GeoWorkerPool` reasigna `geoWorker` sin actualizar `window.geoWorker`.
+- `drag()` en `js/ui/catalog.js` parece código muerto (`shell.js` gestiona
+  `dragstart`).
+
+## Hecho: reorganización (octubre de 2026)
+Detalle en el historial de git (mensajes de commit). Resumen:
+- Base: pruebas automáticas (smoke en Chromium, unitarias), CI y despliegue en
+  Pages, normalización de finales de línea, vendors y archivos muertos.
+- Correcciones: índice espacial (rbush), Zonal Stats, Line Split; escape de
+  texto no confiable en log, mapa, tabla y catálogo; frame del plugin de
+  MapLibre tras retirar la capa.
+- Mapa base oscuro sin API key (OpenFreeMap + respaldo OSM).
+- Una sola fuente para el código incrustado en `index.html`.
+- G1: comprobador del grafo con línea base que sólo puede encoger.
+- G2: dueño único del estado compartido.
+- G3: eventos (`JETLEvents`) en vez de llamadas de capas bajas a la UI.
+- G4: `engine.js` dividido por responsabilidad; capas app < ui < shell;
+  navegación de la cabecera separada del arranque.
+- G5: módulos ES (de arriba abajo), *import map* y versiones de caché por
+  hash de contenido generadas en el build.
+- Historial de ejecuciones legible en móvil; panel de versión desplegada
+  (pulsar «JETL Studio»).
+
+---
+
+# Histórico: roadmap de febrero–marzo de 2026
+
+Se conserva como registro; su estado, KPI y protocolo (smoke desde la consola)
+corresponden a esa fecha. El proceso actual está en `TESTING.md`.
+
+## Cabecera original
 
 Ultima actualizacion: 2026-03-05
 Owner de ejecucion: Codex (este agente)
 Objetivo: convertir JETL en una base estable, mantenible y mas cercana a FME Workbench.
 
-## KPI de avance (snapshot)
+### KPI de avance (snapshot de marzo)
 - Fecha snapshot: 2026-03-05
 - Tareas totales: 30
 - Tareas `done`: 30

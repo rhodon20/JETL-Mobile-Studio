@@ -1,51 +1,35 @@
-# Checklist de Release y Regresion
+# Checklist de publicación
 
-Ultima actualizacion: 2026-02-28
+Publicar es llevar `main` al commit deseado: el CI despliega en GitHub Pages si
+todo pasa. Ver `TESTING.md` para el detalle de cada prueba.
 
-## 1) Pre-release tecnico
-- [ ] Cargar app en `index.html` con cache limpio (`Ctrl+F5`).
-- [ ] Verificar indicador de estado en verde.
-- [ ] Ejecutar `await JETLSmoke.runBasic()` y confirmar `fail: 0`.
-- [ ] Ejecutar `await JETLSmoke.runExtended()` y confirmar `fail: 0`.
+## 1) Antes de llevar a `main`
+- [ ] `npm test` en verde en local.
+- [ ] CI en verde en la rama (incluye smoke extendido y pruebas contra `dist/`).
+- [ ] Si el cambio toca el arranque o la carga de scripts: comparar
+      `node tests/boot-timing.mjs --root dist` antes y después.
+- [ ] Documentación al día si cambia la estructura, las pruebas o el proceso.
 
-## 2) Regresion UI base
-- [ ] Sidebar: click en herramienta agrega nodo.
-- [ ] Sidebar: drag and drop al lienzo funciona.
-- [ ] Nodo: botones `run`, `view`, `delete` funcionan.
-- [ ] Tabla: filtro por campo y texto funciona.
-- [ ] Tabla: seleccion multiple + export GeoJSON/CSV funciona.
-- [ ] Undo/Redo: secuencia de crear/mover/conectar/borrar revierte y rehace bien.
+## 2) Después de desplegar
+- [ ] El CI de `main` termina en verde (incluye el despliegue).
+- [ ] En el dispositivo: pulsar «JETL Studio» en la cabecera. Debe mostrar el
+      despliegue nuevo y «Es la última versión publicada». Si avisa de una más
+      reciente, pulsar Recargar.
 
-## 3) Regresion nodos atributos criticos
-- [ ] `Attribute Join`: combos de campos por `input_1/input_2` + add pair.
-- [ ] `Feature Merger`: asistente de pares de campos operativo.
-- [ ] `Field Calculator Pro`: insercion de campos y calculo sin errores.
-- [ ] `Matcher`: lista checkbox de campos sincronizada con input.
-- [ ] `Stats Calc`: resultados visibles en columnas `stats_*`.
-- [ ] `Tester`: constructor de condiciones (`AND/OR`) y salida correcta.
+## 3) Regresión manual en iPhone (Safari)
+Prioriza lo que toque el cambio.
+- [ ] Arranque: el contador llega al final y el editor responde.
+- [ ] Barra inferior: Nodos, Historial, Ejecutar todo, Resultados, Proyecto.
+- [ ] Añadir nodos (catálogo, búsqueda rápida), conectar, insertar en una conexión.
+- [ ] Ejecutar todo: monitor, contadores en los nodos, resumen en el log.
+- [ ] Ejecutar hasta un nodo: resultado en tabla y mapa.
+- [ ] Flujo con error: botón para ir al nodo y nodo marcado.
+- [ ] Historial: lista, detalle con tiempos por nodo, filtro, exportar.
+- [ ] Deshacer/rehacer, menú contextual, plantillas, proyecto nuevo,
+      guardar/cargar `.jetl`.
+- [ ] Mapa: mapa base, zoom, capas.
 
-## 4) Regresion motor y ejecucion
-- [ ] Ejecucion completa de flujo medio sin errores en consola.
-- [ ] Cancelacion manual de flujo pesado responde correctamente.
-- [ ] Reejecucion tras cancelar sigue funcionando.
-- [ ] `Clear Canvas` limpia nodos, mapa, cache y estado.
-- [ ] Plantilla demo aplica y ejecuta.
-
-## 5) I/O y formatos
-- [ ] KML import/export roundtrip correcto.
-- [ ] GeoJSON read/write correcto.
-- [ ] CSV write correcto.
-- [ ] GPKG (experimental): probar lectura y export.
-- [ ] Parquet (experimental): probar lectura y export.
-
-## 6) Evidencias de release
-- [ ] Guardar captura de `SMOKE`/`SMOKE+CORE`.
-- [ ] Guardar nota breve de navegadores validados.
-- [ ] Actualizar `PROJECT_STATUS.txt` con fecha y resultado.
-- [ ] Actualizar `ROADMAP.md` con iteracion cerrada.
-
-## 7) Gate de salida
-- [ ] No hay fallos criticos abiertos.
-- [ ] `SMOKE` y `SMOKE+CORE` en verde.
-- [ ] Checklist completado al 100% o con excepciones documentadas.
-
+## 4) Formatos (cuando el cambio les afecte)
+- [ ] GeoJSON, KML, CSV: leer, transformar, exportar y reabrir.
+- [ ] GeoTIFF, GPKG, Parquet: según `COMPATIBILITY_MATRIX.md`; actualizar la
+      matriz con lo validado.

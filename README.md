@@ -1,42 +1,49 @@
-# JETL Studio - JavaScript ETL Geoespacial (v2026.03.05)
+# JETL Mobile Studio
 
-JETL es una webapp ETL geoespacial visual y client-side (sin backend obligatorio), inspirada en flujos tipo FME Workbench.
+ETL geoespacial visual que se ejecuta entero en el navegador (sin backend),
+adaptado a móvil a partir de JETL Desktop. Se publica en GitHub Pages:
+https://rhodon20.github.io/JETL-Mobile-Studio/
 
-## Estado actual
-- App funcional en navegador moderno (Chrome/Edge/Firefox).
-- Smoke test integrado en runtime (`JETLSmoke.runExtended()`), validado 38/38.
-- Registro base de nodos estable y extensible via paquetes comunitarios.
-- Pipeline de lectura, transformacion, visualizacion y export funcionando en pruebas manuales.
+## Qué hace
+- Editor visual de flujos (Drawflow) con ejecución total o hasta un nodo.
+- Mapa (Leaflet + mapa base oscuro de OpenFreeMap, sin API key; si no responde,
+  OpenStreetMap oscurecido) y tabla de atributos con orden, filtro, selección y
+  export de la selección.
+- Monitor de ejecución, historial de las últimas 30 ejecuciones con tiempos por
+  nodo, e inspector de datos por puerto.
+- Plantillas de flujo, parámetros globales (`${param}`), paquetes de
+  transformadores, simbología por atributos.
+- Proyectos `.jetl` (guardar/cargar) y borrador local en el navegador.
+- Interfaz móvil: barra inferior (Nodos / Historial / Ejecutar todo /
+  Resultados / Proyecto), gestos en el lienzo.
 
-## Capacidades principales
-- Editor visual de nodos con Drawflow.
-- Mapa interactivo con Leaflet.
-- Tabla de atributos con:
-  - ordenacion por columnas,
-  - filtro rapido (texto/campo),
-  - seleccion multiple,
-  - export de seleccion (GeoJSON/CSV).
-- Ejecucion total y parcial por nodo.
-- Plantillas de flujo.
-- Simbologia por atributos (categorica y cuantiles).
-- Persistencia local de flujo (`LocalStorage`) y carga/guardado de proyectos `.jetl`.
+### Formatos
+- Lectura: GeoJSON/JSON, KML, Shapefile (ZIP), OSM (Overpass), WKT, GeoTIFF,
+  GPKG y Parquet (experimentales).
+- Escritura: GeoJSON, CSV, KML, GPKG y Parquet (experimentales).
+- Estado por navegador: `COMPATIBILITY_MATRIX.md`.
 
-## I/O y formatos
-- Readers: GeoJSON/JSON/KML/ZIP Shapefile, OSM, GeoTIFF, GPKG (experimental), Parquet (experimental).
-- Writers: GeoJSON, CSV, KML, GPKG (experimental), Parquet (experimental).
-- KML import/export reparado y validado en smoke basico.
+## Desarrollo
 
-## Mejoras recientes (2026-03-05)
-- Schema UI reactivo:
-  - `Attribute Join` con desplegables de campos por Input 1/Input 2.
-  - `Field Calculator Pro` con insercion guiada de campos.
-- Hardening UI:
-  - migracion masiva de handlers inline a delegacion de eventos (`data-ui-action`, `data-node-action`, `data-table-action`).
-- Seguridad minima en formulas:
-  - evaluador con validacion de expresion y bloqueo de tokens peligrosos para calculators de atributos.
-- Gestion de cache runtime:
-  - limpieza unificada de `_file_cache` y `_tiff_cache`,
-  - referencia `node -> tiffRef` para evitar fugas al recargar GeoTIFF en el mismo nodo.
+```sh
+npm ci                     # dependencias de las pruebas (Playwright, acorn)
+python3 -m http.server     # servir el repo y abrir http://localhost:8000
+npm test                   # todo lo que se exige antes de publicar
+npm run build              # genera dist/ (lo que se despliega)
+```
+
+Usa Node 22 (como el CI). La app debe servirse por HTTP, no con `file://`:
+usa módulos ES y workers.
+
+Reglas que conviene saber antes de tocar código:
+- `index.html` incrusta core, params, formats y el CSS crítico. Edita los
+  archivos de `js/` y `css/` y ejecuta `npm run inline`; `npm run check` falla si
+  `index.html` quedó desfasado.
+- No escribas versiones `?v=` a mano: las pone el build.
+- Respeta las capas (abajo). `npm run check` falla si un archivo usa algo de una
+  capa superior, si aparece un ciclo o si se usa por nombre algo privado de otro
+  módulo.
+- Pruebas y criterios: `TESTING.md`. Publicar: `RELEASE_CHECKLIST.md`.
 
 ## Estructura clave
 Módulos ES organizados en capas. Cada capa sólo usa las inferiores;
@@ -86,47 +93,23 @@ Versión desplegada: pulsa «JETL Studio» en la cabecera. Muestra el despliegue
 que estás viendo y avisa (con botón Recargar) si hay uno más reciente; el sello
 lo pone `scripts/build.mjs` en `index.html` y `version.json`.
 
-## Smoke test rapido
-En consola del navegador:
+## Despliegue
+Cada push a `main` pasa el CI (`.github/workflows/ci.yml`): comprobaciones,
+pruebas unitarias, smoke, flujo de la app y mapa base, build de `dist/` y las
+mismas pruebas contra `dist/`. Si todo pasa, publica `dist/` en GitHub Pages.
 
-```js
-await JETLSmoke.runBasic()
-```
+## Limitaciones conocidas
+- **Sin modo sin conexión.** El service worker está retirado (`sw.js` se
+  desregistra) desde un bloqueo de arranque en Safari; es el siguiente bloque
+  del roadmap.
+- GPKG y Parquet son experimentales; los nodos raster de Desktop están fuera de
+  alcance (`docs/NODE_CATALOG_PARITY.md`).
+- Datos grandes: falta perfilar ejecuciones lentas reales.
+- En Safari anterior a 16.4 (sin *import maps*) la app funciona, pero los
+  módulos importados se descargan sin versión de caché.
 
-Salida esperada: `pass: 4, fail: 0`.
-
-Suite ampliada (smoke + core nodos atributos):
-
-```js
-await JETLSmoke.runExtended()
-```
-
-Incluye validaciones de:
-- `Stats Calc` (columnas `stats_*` visibles y correctas),
-- `Tester` con condiciones combinadas `AND/OR`.
-
-Suite estable de regresion (sin checks worker volatiles):
-
-```js
-await JETLSmoke.runStable()
-```
-
-Gate de release (lanza error si falla):
-
-```js
-await JETLSmoke.runGate('stable')
-```
-
-Protocolo completo de pruebas: `TESTING.md`.
-
-## Limitaciones actuales
-- Proyecto en evolucion: la suite automatizada completa aun esta en construccion.
-- GPKG y Parquet siguen en estado experimental.
-- Datasets muy grandes pueden requerir ajustes de performance.
-
-## Roadmap
-El roadmap vivo y el historial de iteraciones estan en `ROADMAP.md`.
-
-## Calidad y release
-- Matriz de compatibilidad por navegador: `COMPATIBILITY_MATRIX.md`.
-- Checklist estandar de release/regresion: `RELEASE_CHECKLIST.md`.
+## Documentación
+- `ROADMAP.md`: estado y próximos pasos (y el registro histórico).
+- `HANDOFF.md`: cómo retomar el trabajo.
+- `TESTING.md`, `RELEASE_CHECKLIST.md`, `COMPATIBILITY_MATRIX.md`.
+- `docs/`: paridad con JETL Desktop (nodos e interfaz).

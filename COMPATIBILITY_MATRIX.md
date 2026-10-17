@@ -1,7 +1,15 @@
 # Matriz de Compatibilidad (Navegadores)
 
-Ultima actualizacion: 2026-02-28  
-Alcance: formatos complejos `GeoTIFF`, `GPKG`, `Parquet`.
+Ultima actualizacion: 2026-10-18  
+Alcance: la app en general y los formatos complejos `GeoTIFF`, `GPKG`, `Parquet`.
+
+## App (arranque, editor, ejecución, historial)
+| Entorno | Estado | Notas |
+|---|---|---|
+| Chromium (CI, Playwright) | OK | `npm test` y pruebas contra `dist/` en cada push. |
+| iOS Safari (iPhone) | OK | Validado por el usuario en octubre de 2026 tras cada fase: arranque, añadir/conectar nodos, ejecutar (incluido OSM Reader), historial, panel de versión. |
+| Safari < 16.4 | PARCIAL (simulado) | Sin *import maps*: funciona, pero los módulos importados se descargan sin versión de caché. |
+| Sin conexión | N/A | Sin service worker por ahora (`ROADMAP.md`). |
 
 ## Leyenda
 - `OK`: flujo validado manualmente en navegador.
@@ -28,7 +36,7 @@ Alcance: formatos complejos `GeoTIFF`, `GPKG`, `Parquet`.
 2. Ejecutar transformador simple intermedio (`attr_creator` o `geo_buffer`).
 3. Visualizar en mapa y tabla.
 4. Exportar (si aplica) y reabrir archivo exportado.
-5. Verificar `SMOKE` y logs sin errores.
+5. Verificar que el log no muestra errores; `npm test` cubre la regresión general.
 
 ## Criterios para subir de EXP a OK
 1. Validacion en Chrome + Edge + Firefox desktop.
