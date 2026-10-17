@@ -16,6 +16,9 @@ import { downloadRunReport } from './state/runHistory.js';
 import { undo, redo, initHistory } from './state/history.js';
 
 let jetlAppInitialized = false;
+// Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
+// (movimiento reducido) no hay nada que esperar.
+const BOOT_SPLASH_MIN_MS = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 1200;
 
 function setJETLStartupStatus(state, message) {
     const dot = document.getElementById('sys-status');
@@ -136,8 +139,18 @@ function initializeJETLApp() {
 
     setJETLStartupStatus('ready', 'Sistema listo');
     if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
-    const bootDiagnostic = document.getElementById('boot-diagnostic');
-    if (bootDiagnostic) bootDiagnostic.remove();
+    // La pantalla de arranque se desvanece cuando ha terminado su animación de
+    // entrada (~1,2 s desde la navegación; sólo retrasa arranques más rápidos que
+    // eso). El segundo temporizador la retira aunque no haya transición
+    // (movimiento reducido o pestaña en segundo plano).
+    const bootSplash = document.getElementById('boot-splash');
+    if (bootSplash) {
+        setTimeout(() => {
+            bootSplash.classList.add('is-done');
+            bootSplash.addEventListener('transitionend', () => bootSplash.remove(), { once: true });
+            setTimeout(() => bootSplash.remove(), 600);
+        }, Math.max(0, BOOT_SPLASH_MIN_MS - performance.now()));
+    }
 
     // El editor ya es utilizable. Los listeners auxiliares se conectan en el
     // siguiente fotograma para garantizar que Safari pueda pintar la interfaz.
@@ -179,6 +192,7 @@ function initializeJETLApp() {
             window.__JETL_BOOT.stage = 'error';
             window.__JETL_BOOT.error = errorMessage;
         }
+        document.getElementById('boot-splash')?.classList.add('is-error');
         const bootDiagnostic = document.getElementById('boot-diagnostic');
         if (bootDiagnostic) {
             bootDiagnostic.textContent = `No se pudo iniciar JETL Studio: ${errorMessage}`;

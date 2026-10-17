@@ -25,6 +25,9 @@ try {
     page.on('dialog', (dialog) => dialog.accept());
     await page.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready', null, { timeout: 30000 });
+    // The boot splash fades out once the editor is ready and stops blocking taps.
+    const splashGone = await page.waitForFunction(() => !document.getElementById('boot-splash'), null, { timeout: 2000 }).then(() => true, () => false);
+    check('boot splash fades out when ready', splashGone);
     await page.evaluate(async () => { await window.JETLEnsureRuntime(); await window.JETLEnsureExtras(); });
 
     // Full run: bbox reader -> centroid.
