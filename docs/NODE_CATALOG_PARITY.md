@@ -138,15 +138,23 @@ un proyecto de uno abierto en el otro puede perder la configuración:
 Diferencias sólo de nombre sin efecto: `reader_gpkg`/`reader_parquet` (el archivo
 no se guarda en el proyecto en ninguno de los dos).
 
-### 4. Prioridad de lectura de la configuración
-En Desktop, 11 nodos de atributos leen primero los datos del nodo en el
-proyecto (`getAttributeNodeRuntimeData`: `node.data` de Drawflow), después su
-JSON y por último los campos sueltos: `attr_manager`, `attr_keeper`,
-`attr_splitter`, `attr_list_exploder`, `attr_list_concatenator`,
-`attr_substring`, `attr_string_replacer`, `attr_aggregator`, `attr_counter`,
-`attr_sorter`, `attr_test`. Studio sólo lee el JSON o los campos, así que un
-proyecto Desktop con la configuración en los datos del nodo se ejecutaría con
-los valores por defecto sin avisar.
+### 4. Prioridad de lectura de la configuración (no es una brecha real)
+En Desktop, 11 nodos de atributos leen primero los datos del nodo en el proyecto
+(`getAttributeNodeRuntimeData`: `node.data` de Drawflow) con claves semánticas
+(`source_attr`, `group_by`, `selectedFields`…), después su JSON y por último los
+campos sueltos: `attr_manager`, `attr_keeper`, `attr_splitter`,
+`attr_list_exploder`, `attr_list_concatenator`, `attr_substring`,
+`attr_string_replacer`, `attr_aggregator`, `attr_counter`, `attr_sorter`,
+`attr_test`. Pero la interfaz de Desktop no escribe esas claves (sólo sus
+lectores usan `updateNodeDataFromId`): las generan los scripts de migración FME
+(`scripts/generate_panoramicas_*.mjs`), cuyos proyectos ejecuta el backend Python.
+No se porta: no aporta nada a proyectos creados en la interfaz de Desktop y, en
+Studio, unas claves antiguas en `node.data` ganarían a lo editado en el modal.
+
+La brecha real al abrir un proyecto creado con la interfaz de Desktop es el
+grupo 3: Drawflow importa el HTML y los datos del nodo de Desktop, y donde los
+campos se llaman distinto Studio no encuentra los suyos y usa los valores por
+defecto (hoy sólo `attr_aggregator` acepta también el nombre de Desktop).
 
 ### Proyectos de Desktop que no son objetivo
 Los proyectos de `versions/` de Desktop (migraciones de FME, «golden»/«scaffold»)
@@ -208,8 +216,8 @@ verificarse nodo a nodo al portarlo.
    nodos complejos y garantizar importación/exportación sin pérdida.
    **Pendiente, medido:** 53/115 nodos difieren (ver «Paridad de configuración»):
    4 nodos y los writers con funcionalidad que falta, 3 con valores por defecto
-   o codificación distintos, el resto con la configuración guardada de otra
-   forma, y 11 nodos de atributos sin la prioridad de lectura de Desktop.
+   o codificación distintos y el resto con la configuración guardada de otra
+   forma (lo que hace perder configuración al abrir proyectos de Desktop).
 5. **P2 — Capacidades con backend:** mantener el nodo visible, definir contrato
    de servicio y ofrecer diagnóstico accionable cuando el backend no exista.
 6. **Fuera de alcance — Raster y LiDAR:** conservar sólo compatibilidad de
