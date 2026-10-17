@@ -69,17 +69,28 @@ function readSources() {
     };
     Object.values(LAYERS).flat().filter(f => !f.startsWith('inline:'))
         .forEach(f => { sources[f] = fs.readFileSync(path.join(ROOT, f), 'utf8'); });
-    const deferred = [...html.matchAll(/<script defer src="(js\/[^"?]+)/g)].map(m => m[1]);
+    const deferred = [...html.matchAll(/<script (?:defer|type="module") src="(js\/[^"?]+)/g)].map(m => m[1]);
+    const modules = new Set([...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map(m => m[1]));
     const lazy = [...html.matchAll(/'(js\/[a-zA-Z/]+\.js)'/g)].map(m => m[1]).filter(f => !f.startsWith('js/vendor/'));
     const known = new Set(Object.keys(sources));
     const unlisted = [...new Set([...deferred, ...lazy])].filter(f => !known.has(f));
-    return { sources, unlisted };
+    return { sources, unlisted, modules };
 }
 
-function analyseFile(code) {
-    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'script', ranges: true, allowHashBang: true });
-    const scope = analyze(ast, { ecmaVersion: 2022 }).globalScope;
-    const defines = new Set(scope.variables.map(v => v.name));
+// ES modules declare nothing global: what they share goes through `export` (or an
+// explicit window.X), and what they need through `import` (or classic globals).
+function analyseFile(code, file, isModule) {
+    const sourceType = isModule ? 'module' : 'script';
+    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType, ranges: true, allowHashBang: true });
+    const scope = analyze(ast, { ecmaVersion: 2022, sourceType }).globalScope;
+    const defines = new Set(isModule ? [] : scope.variables.map(v => v.name));
+    const imports = new Set();
+    if (isModule) {
+        ast.body.filter(n => n.type === 'ImportDeclaration' || ((n.type === 'ExportNamedDeclaration' || n.type === 'ExportAllDeclaration') && n.source))
+            .forEach(n => imports.add(path.posix.join(path.posix.dirname(file), n.source.value)));
+    }
+    // In a module, assigning a name nobody declares throws (strict mode).
+    const undeclaredWrites = new Set(isModule ? scope.through.filter(r => r.isWrite()).map(r => r.identifier.name) : []);
     const writes = new Set();
     walk.simple(ast, {
         AssignmentExpression(n) {
@@ -95,13 +106,13 @@ function analyseFile(code) {
             if (!n.computed && n.object.type === 'Identifier' && n.object.name === 'window') uses.add(n.property.name);
         }
     });
-    return { defines, writes, uses };
+    return { defines, writes, uses, imports, undeclaredWrites };
 }
 
 export function computeViolations() {
-    const { sources, unlisted } = readSources();
+    const { sources, unlisted, modules } = readSources();
     const info = {};
-    for (const [file, code] of Object.entries(sources)) info[file] = analyseFile(code);
+    for (const [file, code] of Object.entries(sources)) info[file] = analyseFile(code, file, modules.has(file));
 
     const owners = {};
     for (const [file, i] of Object.entries(info)) {
@@ -124,6 +135,18 @@ export function computeViolations() {
                     violations.add(`upward: ${file} (${LAYER_NAMES[layerOf[file]]}) uses ${name} from ${d} (${LAYER_NAMES[layerOf[d]]})`);
                 }
             }
+        }
+    }
+    for (const [file, i] of Object.entries(info)) {
+        for (const target of i.imports) {
+            if (!(target in info)) { violations.add(`import: ${file} imports ${target}, which has no layer`); continue; }
+            edges[file].add(target);
+            if (layerOf[target] > layerOf[file]) {
+                violations.add(`upward: ${file} (${LAYER_NAMES[layerOf[file]]}) imports ${target} (${LAYER_NAMES[layerOf[target]]})`);
+            }
+        }
+        for (const name of i.undeclaredWrites) {
+            if (!owners[name] && !BROWSER_GLOBALS.has(name)) violations.add(`undeclared-write: ${file} assigns ${name}, which no script declares`);
         }
     }
     for (const [name, files] of Object.entries(owners)) {

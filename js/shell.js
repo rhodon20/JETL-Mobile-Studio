@@ -1,6 +1,6 @@
 // Arranque de la aplicación y cableado del DOM: crea el editor, conecta sus
 // eventos y enlaza botones y menús con los comandos (engine.js) y la interfaz.
-// Es lo último que se carga: puede usar todo lo anterior.
+// Es lo último que se carga (módulo ES): puede usar todo lo anterior.
 let jetlAppInitialized = false;
 
 function setJETLStartupStatus(state, message) {
