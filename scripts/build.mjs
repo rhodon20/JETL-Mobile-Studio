@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import * as acorn from 'acorn';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,8 +69,35 @@ html = html.replace(/(\b(?:src|href)=")((?:js|css)\/[^"?]+)(?:\?v=[^"]*)?"/g, (_
     tagged++;
     return `${attr}${file}?v=${contentHash(file)}"`;
 });
+// ES modules imported by other modules have no tag. The import map gives each one
+// the same versioned URL wherever it is imported from, and modulepreload fetches
+// them alongside the entry modules instead of one import after another. Browsers
+// without import maps load them unversioned: still a single instance each.
+const entries = [...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map((m) => m[1]);
+const imported = new Set();
+const queue = [...entries];
+while (queue.length) {
+    const file = queue.pop();
+    const ast = acorn.parse(fs.readFileSync(path.join(DIST, file), 'utf8'), { ecmaVersion: 2022, sourceType: 'module' });
+    for (const node of ast.body) {
+        if (!node.source || !/^(Import|Export(Named|All))Declaration$/.test(node.type)) continue;
+        const target = path.posix.join(path.posix.dirname(file), node.source.value);
+        if (entries.includes(target)) throw new Error(`[build] ${target} has a tag and is also imported by ${file}: it would load twice`);
+        if (!imported.has(target)) { imported.add(target); queue.push(target); }
+    }
+}
+if (imported.size) {
+    const sorted = [...imported].sort();
+    const map = { imports: Object.fromEntries(sorted.map((file) => [`./${file}`, `./${file}?v=${contentHash(file)}`])) };
+    const head = [`<script type="importmap">${JSON.stringify(map)}</script>`,
+        ...sorted.map((file) => `<link rel="modulepreload" href="${file}?v=${contentHash(file)}">`)];
+    const anchor = '<meta name="jetl-build" content="dev">';
+    if (!html.includes(anchor)) throw new Error(`[build] ${anchor} not found to place the import map`);
+    html = html.replace(anchor, `${anchor}\n    ${head.join('\n    ')}`);
+}
+
 fs.writeFileSync(path.join(DIST, 'index.html'), html);
-console.log(`[build] versioned ${tagged} tags, ${Object.keys(groups).length} lazy groups and the worker`);
+console.log(`[build] versioned ${tagged} tags, ${Object.keys(groups).length} lazy groups, the worker and ${imported.size} imported modules`);
 
 // Version stamp: the page carries the deploy it belongs to and version.json the
 // latest one (fetched without cache), so the app can tell a stale copy apart.

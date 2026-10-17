@@ -1,5 +1,7 @@
 // Monitor de la ejecución en curso (overlay y estado de cada nodo en el
 // lienzo) y panel de historial. Escucha los eventos de js/engine/runPlan.js.
+import { escapeFlowNavigatorHTML, focusFlowNode } from './catalog.js';
+
 let activeRunMonitor = null;
 
 const RUN_NODE_CLASSES = ['jetl-run-pending', 'jetl-run-running', 'jetl-run-ok', 'jetl-run-cached', 'jetl-run-error', 'jetl-run-cancelled'];
@@ -293,3 +295,5 @@ function openRunHistory() {
 window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render: renderRunHistory };
 window.JETLOpenRunHistory = openRunHistory;
 window.JETLCloseRunHistory = closeRunHistory;
+
+export { closeRunMonitor };

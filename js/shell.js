@@ -1,6 +1,13 @@
 // Arranque de la aplicación y cableado del DOM: crea el editor, conecta sus
 // eventos y enlaza botones y menús con los comandos (engine.js) y la interfaz.
 // Es lo último que se carga (módulo ES): puede usar todo lo anterior.
+import {
+    renderSidebar, filterTools, syncCanvasViewport, createTouchIntentTracker, initFlowNavigator,
+    openFlowNavigator, closeFlowNavigator, focusFlowNode, initQuickSearch, allowDrop, drop
+} from './ui/catalog.js';
+import { closeRunMonitor } from './ui/runPanel.js';
+import './mobile.js';
+
 let jetlAppInitialized = false;
 
 function setJETLStartupStatus(state, message) {

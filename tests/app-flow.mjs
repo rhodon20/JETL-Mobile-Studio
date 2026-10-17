@@ -17,6 +17,10 @@ const { browser, page, problems } = await openApp(server.origin);
 const checks = [];
 const check = (name, ok, detail = '') => checks.push({ name, ok: !!ok, detail });
 
+// Every script must be fetched once: two URLs for one ES module would run it twice.
+const scriptRequests = [];
+page.on('request', (req) => { if (req.resourceType() === 'script' && req.url().startsWith(server.origin)) scriptRequests.push(new URL(req.url())); });
+
 try {
     page.on('dialog', (dialog) => dialog.accept());
     await page.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
@@ -61,10 +65,10 @@ try {
 
     // History panel lists the runs.
     const history = await page.evaluate(() => {
-        openRunHistory();
+        window.JETLOpenRunHistory();
         const modal = document.getElementById('run-history-modal');
         const out = { open: modal.classList.contains('is-open'), items: modal.querySelectorAll('.run-history-item').length };
-        closeRunHistory();
+        window.JETLCloseRunHistory();
         out.closed = !modal.classList.contains('is-open');
         return out;
     });
@@ -87,13 +91,15 @@ try {
             focusHidden: focus?.hidden, focusNode: focus?.dataset.nodeId,
             nodeState: document.getElementById('node-' + c)?.dataset.runState
         };
-        closeRunMonitor();
+        document.getElementById('loader-close').click();
+        out.monitorClosed = document.getElementById('loader').style.display === 'none';
         return out;
     });
     check('new project empties the workspace', failed.emptied);
     check('failed run report', failed.status === 'error', failed.status);
     check('monitor points at the failing node', failed.monitor === 'error' && failed.focusHidden === false && failed.focusNode === failed.c, JSON.stringify(failed));
     check('failing node marked on the canvas', failed.nodeState === 'error', failed.nodeState);
+    check('monitor closes from its button', failed.monitorClosed, JSON.stringify(failed));
 
     // The brand shows the deployed version and whether it is the latest one.
     const stamped = await page.evaluate(() => document.querySelector('meta[name="jetl-build"]').content);
@@ -132,6 +138,15 @@ try {
         return document.getElementById('drawflow').dataset.viewport;
     });
     check('canvas grid follows zoom', /,1\.[1-9]\d$/.test(grid || ''), grid);
+
+    const byPath = {};
+    scriptRequests.forEach((url) => { (byPath[url.pathname] = byPath[url.pathname] || []).push(url.search); });
+    const twice = Object.entries(byPath).filter(([, searches]) => searches.length > 1).map(([p, searches]) => `${p} ${searches.join(' ')}`);
+    check('each script is fetched once', twice.length === 0, twice.join('; '));
+    if (stamped !== 'dev') {
+        const unversioned = Object.entries(byPath).filter(([p, searches]) => !p.includes('/vendor/') && searches.some((q) => !q.startsWith('?v='))).map(([p]) => p);
+        check('published scripts are fetched with their version', unversioned.length === 0, unversioned.join(', '));
+    }
 
     for (const c of checks) console.log(`[app-flow] ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` — ${c.detail}`}`);
     checks.filter((c) => !c.ok).forEach((c) => problems.push(`${c.name}: ${c.detail}`));

@@ -357,3 +357,8 @@ function initQuickSearch() {
 function drag(e) { e.dataTransfer.setData("node", e.target.dataset.k); }
 function drop(e) { e.preventDefault(); const k = e.dataTransfer.getData("node"); if (k) addNode(k, e.clientX, e.clientY); }
 function allowDrop(e) { e.preventDefault(); }
+
+export {
+    renderSidebar, filterTools, syncCanvasViewport, createTouchIntentTracker, escapeFlowNavigatorHTML,
+    initFlowNavigator, openFlowNavigator, closeFlowNavigator, focusFlowNode, initQuickSearch, allowDrop, drop
+};

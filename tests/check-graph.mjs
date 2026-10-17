@@ -72,6 +72,17 @@ function readSources() {
     const deferred = [...html.matchAll(/<script (?:defer|type="module") src="(js\/[^"?]+)/g)].map(m => m[1]);
     const modules = new Set([...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map(m => m[1]));
     const lazy = [...html.matchAll(/'(js\/[a-zA-Z/]+\.js)'/g)].map(m => m[1]).filter(f => !f.startsWith('js/vendor/'));
+    // Modules reached through `import` are modules too (and are loaded that way).
+    const pending = [...modules];
+    while (pending.length) {
+        const file = pending.pop();
+        if (!(file in sources)) continue;
+        const ast = acorn.parse(sources[file], { ecmaVersion: 2022, sourceType: 'module' });
+        ast.body.filter(n => n.source && /^(Import|Export(Named|All))Declaration$/.test(n.type)).forEach(n => {
+            const target = path.posix.join(path.posix.dirname(file), n.source.value);
+            if (!modules.has(target)) { modules.add(target); pending.push(target); }
+        });
+    }
     const known = new Set(Object.keys(sources));
     const unlisted = [...new Set([...deferred, ...lazy])].filter(f => !known.has(f));
     return { sources, unlisted, modules };

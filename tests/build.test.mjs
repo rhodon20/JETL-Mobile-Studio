@@ -22,8 +22,12 @@ const hashOf = (...files) => {
 test.after(() => fs.rmSync(OUT, { recursive: true, force: true }));
 
 test('cada script y hoja de estilo publicados llevan el hash de su contenido', () => {
-    const refs = [...html.matchAll(/\b(?:src|href)="((?:js|css)\/[^"?]+)(?:\?v=([^"]*))?"/g)];
-    assert.ok(refs.length >= 20, `se esperaban las etiquetas de la app, hay ${refs.length}`);
+    const tags = html.replace(/<link rel="modulepreload"[^>]*>/g, '');
+    const refs = [...tags.matchAll(/\b(?:src|href)="((?:js|css)\/[^"?]+)(?:\?v=([^"]*))?"/g)];
+    const source = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const expected = [...source.matchAll(/\b(?:src|href)="(?:js|css)\/[^"?]+"/g)].length;
+    assert.ok(expected > 0);
+    assert.equal(refs.length, expected, 'todas las referencias del código fuente deben publicarse versionadas');
     for (const [, file, version] of refs) assert.equal(version, hashOf(file), `${file} sin versión de contenido`);
 });
 
@@ -40,4 +44,17 @@ test('el despliegue queda sellado en la página y en version.json', () => {
     const version = JSON.parse(fs.readFileSync(path.join(OUT, 'version.json'), 'utf8'));
     assert.match(version.sha, /^[0-9a-f]{7}$|^local$/);
     assert.match(html, new RegExp(`<meta name="jetl-build" content="${version.sha}" data-run="[^"]*" data-built-at="${version.builtAt}">`));
+});
+
+test('los módulos importados tienen una única URL versionada y se precargan', () => {
+    const map = JSON.parse(html.match(/<script type="importmap">([\s\S]*?)<\/script>/)?.[1] ?? '{}');
+    const imported = Object.keys(map.imports || {});
+    assert.ok(imported.length > 0, 'falta el import map');
+    for (const key of imported) {
+        const file = key.replace(/^\.\//, '');
+        assert.equal(map.imports[key], `./${file}?v=${hashOf(file)}`);
+        assert.match(html, new RegExp(`<link rel="modulepreload" href="${file.replace(/\./g, '\\.')}\\?v=${hashOf(file)}">`));
+        assert.doesNotMatch(html, new RegExp(`<script type="module" src="${file.replace(/\./g, '\\.')}`), `${file} no puede tener etiqueta e import a la vez`);
+    }
+    assert.ok(html.indexOf('type="importmap"') < html.indexOf('<script type="module"'), 'el import map debe ir antes de cualquier módulo');
 });
