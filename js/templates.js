@@ -147,7 +147,7 @@
         }
         if (typeof addToHistory === 'function') addToHistory();
         SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
-        if (window.JETLSchemaUI && typeof window.JETLSchemaUI.refreshAll === 'function') window.JETLSchemaUI.refreshAll();
+        JETLEvents.emit('workspace:replaced');
     }
 
     function slugify(text) {
@@ -497,9 +497,7 @@
             } else if (tpl.graph && editor && typeof editor.import === 'function') {
                 resetWorkspace();
                 editor.import(tpl.graph);
-                if (window.JETLSchemaUI && typeof window.JETLSchemaUI.refreshAll === 'function') {
-                    setTimeout(() => window.JETLSchemaUI.refreshAll(), 0);
-                }
+                setTimeout(() => JETLEvents.emit('workspace:replaced'), 0);
                 if (typeof addToHistory === 'function') addToHistory();
                 SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
             } else {

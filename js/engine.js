@@ -142,28 +142,6 @@ window.JETLDirty = {
     invalidateNodeAndDownstream
 };
 
-function normalizeResult(res) {
-    if (!res) return null;
-    if (res.type === 'Feature') return turf.featureCollection([res]);
-    if (res.type === 'FeatureCollection') return res;
-    if (Array.isArray(res) && res.length && res[0].type) return turf.featureCollection(res);
-    const keys = Object.keys(res || {});
-    if (keys.some(k => k && k.startsWith && k.startsWith('output_'))) return res;
-    if (res && res.geometry) return turf.featureCollection([turf.feature(res.geometry, res.properties || {})]);
-    return res;
-}
-
-function resolvePort(parentRes, parentPort) {
-    if (!parentRes) return null;
-    if (parentRes.type === 'FeatureCollection' || parentRes.type === 'Feature') return normalizeResult(parentRes);
-    if (typeof parentRes === 'object') {
-        if (parentPort && parentRes[parentPort]) return normalizeResult(parentRes[parentPort]);
-        if (parentRes.output_1) return normalizeResult(parentRes.output_1);
-        if (parentRes.output) return normalizeResult(parentRes.output);
-    }
-    return null;
-}
-
 // WORKER SETUP (POOL) is now handled via js/core/workerPool.js
 
 
@@ -384,6 +362,14 @@ if (document.readyState === 'loading' || document.readyState === 'interactive') 
 window.addEventListener('load', () => {
     if (!jetlAppInitialized) initializeJETLApp();
 }, { once: true });
+
+// Durante el arranque el motor pinta el catálogo una sola vez, después de registrar
+// también los paquetes comunitarios: antes de que el editor esté montado no se repinta.
+JETLEvents.on('tools:changed', () => {
+    if (!(window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready')) return;
+    const f = document.getElementById('sidebar-filter-input');
+    renderSidebar(f ? String(f.value || '') : '');
+});
 
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');

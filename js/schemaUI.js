@@ -1529,7 +1529,6 @@
     let currentReaderEditor = null;
 
     function _readerFileStore() {
-        if (!window.JETLReaderFileStore?.get || !window.JETLReaderFileStore?.set) window.JETLReaderFileStore = new WeakMap();
         return window.JETLReaderFileStore;
     }
 
@@ -2145,6 +2144,8 @@
     }
 
     initDelegation();
+    JETLEvents.on('tools:changed', () => setTimeout(refreshAll, 0));
+    JETLEvents.on('workspace:replaced', () => refreshAll());
 
     window.JETLSchemaUI = {
         updateNode,

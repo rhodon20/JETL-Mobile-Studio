@@ -114,7 +114,7 @@ async function processNode(id, allNodes) {
         if (dom) {
             dom.style.boxShadow = "0 0 0 2px #c0392b";
             dom.style.opacity = '1';
-            if (typeof anim_NodeError === 'function') anim_NodeError(id);
+            JETLEvents.emit('node:error', { id });
         }
         throw e;
     }

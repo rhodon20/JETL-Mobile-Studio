@@ -1113,7 +1113,7 @@ function syncTableFocus() {
     }
 }
 
-function log(m, t) {
+function renderLogEntry(m, t) {
     const l = document.getElementById('logs');
     if (!l) return;
     const ts = new Date().toLocaleTimeString();
@@ -1139,7 +1139,7 @@ function clearToastInteractive() {
     toastInteractiveCleanup = null;
 }
 
-function showToast(m, type) {
+function renderToast(m, type) {
     const t = document.getElementById('toast');
     if (!t) return console.log(m);
     const msgEl = document.getElementById('toast-msg');
@@ -1159,6 +1159,10 @@ function showToast(m, type) {
         anime({ targets: t, opacity: 0, translateY: 20, duration: 300, easing: 'easeInQuad', complete: () => { t.className = ''; } });
     }, 3000);
 }
+
+// log() y showToast() viven en core.js y emiten eventos; aquí sólo se pintan.
+JETLEvents.on('log', (e) => renderLogEntry(e.message, e.level));
+JETLEvents.on('toast', (e) => renderToast(e.message, e.type));
 
 function showPortPickerToast(nodeId, ports, currentPort) {
     return new Promise((resolve) => {
@@ -1317,6 +1321,7 @@ function clearCanvas() {
 }
 
 function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [.97, 1], translateY: [8, 0], opacity: [0, 1], duration: 220, easing: 'easeOutCubic' }); }
+JETLEvents.on('node:error', (e) => anim_NodeError(e.id));
 function anim_NodeError(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, translateX: [-10, 10, -5, 5, 0], duration: 500, easing: 'easeInOutQuad' }); }
 function anim_NodeSuccess(id) { const el = document.getElementById('node-' + id); if (!el) return; anime({ targets: el, scale: [1, 1.1, 1], boxShadow: ['0 0 0 0px rgba(46, 204, 113, 0.7)', '0 0 0 10px rgba(46, 204, 113, 0)'], duration: 600, easing: 'easeOutQuad' }); }
 function anim_CableFlow(nodeId) {

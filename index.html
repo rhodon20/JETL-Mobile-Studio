@@ -2948,6 +2948,9 @@ body.modal-open {
         window._tiff_cache = {};       // refId -> ArrayBuffer GeoTIFF
         window._node_tiff_ref = {};    // nodeId -> refId
         window.isEngineCancelled = false;
+        // Ficheros elegidos en el editor de un lector (elemento del nodo -> File[]);
+        // los escribe schemaUI.js y los lee el nodo lector al ejecutarse.
+        window.JETLReaderFileStore = new WeakMap();
 
         function JETLClearObject(obj) {
             Object.keys(obj).forEach((k) => { delete obj[k]; });
@@ -2980,6 +2983,40 @@ body.modal-open {
             window.isEngineCancelled = !!value;
         }
         window.JETLSetEngineCancelled = JETLSetEngineCancelled;
+
+        // =============================================
+        // 1.b EVENTOS
+        // =============================================
+        // Las capas bajas (nodos, motor, estado) anuncian lo que ocurre y la UI se
+        // suscribe; así ninguna depende de la que la pinta. emit devuelve cuántos
+        // oyentes había para que el emisor pueda degradar a consola.
+        const JETLEvents = (() => {
+            const handlers = {};
+            return {
+                on(type, fn) {
+                    (handlers[type] = handlers[type] || []).push(fn);
+                    return () => { handlers[type] = (handlers[type] || []).filter((h) => h !== fn); };
+                },
+                emit(type, detail) {
+                    const list = (handlers[type] || []).slice();
+                    list.forEach((fn) => {
+                        try { fn(detail); } catch (e) { console.error(`[JETLEvents] ${type}:`, e); }
+                    });
+                    return list.length;
+                }
+            };
+        })();
+        window.JETLEvents = JETLEvents;
+
+        // Registro y avisos: los pinta visualization.js; antes de que cargue van a consola.
+        function log(message, level) {
+            if (!JETLEvents.emit('log', { message, level })) console.log(`[JETL] ${message}`);
+        }
+        function showToast(message, type) {
+            if (!JETLEvents.emit('toast', { message, type })) console.log(message);
+        }
+        window.log = log;
+        window.showToast = showToast;
 
         // Descargas: un único punto, sustituible en pruebas con JETLSetDownloadHandler.
         let JETLDownloadHandler = null;
@@ -3025,6 +3062,29 @@ body.modal-open {
             if (geo.type === 'GeometryCollection') return turf.featureCollection(geo.geometries.map(g => turf.feature(g)));
             return turf.featureCollection([turf.feature(geo)]);
         };
+
+        // Resultado de un nodo -> FeatureCollection (o el mapa output_* si tiene varios puertos).
+        function normalizeResult(res) {
+            if (!res) return null;
+            if (res.type === 'Feature') return turf.featureCollection([res]);
+            if (res.type === 'FeatureCollection') return res;
+            if (Array.isArray(res) && res.length && res[0].type) return turf.featureCollection(res);
+            const keys = Object.keys(res || {});
+            if (keys.some(k => k && k.startsWith && k.startsWith('output_'))) return res;
+            if (res && res.geometry) return turf.featureCollection([turf.feature(res.geometry, res.properties || {})]);
+            return res;
+        }
+
+        function resolvePort(parentRes, parentPort) {
+            if (!parentRes) return null;
+            if (parentRes.type === 'FeatureCollection' || parentRes.type === 'Feature') return normalizeResult(parentRes);
+            if (typeof parentRes === 'object') {
+                if (parentPort && parentRes[parentPort]) return normalizeResult(parentRes[parentPort]);
+                if (parentRes.output_1) return normalizeResult(parentRes.output_1);
+                if (parentRes.output) return normalizeResult(parentRes.output);
+            }
+            return null;
+        }
 
         function JETLCloneFallback(value, seen) {
             if (value === null || value === undefined) return value;

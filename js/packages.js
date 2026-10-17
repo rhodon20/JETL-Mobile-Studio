@@ -76,17 +76,8 @@
     }
 
     function _refreshToolsUi() {
-        // Durante el arranque el motor pinta el catálogo una sola vez, después
-        // de registrar también los paquetes comunitarios. Evita un render DOM
-        // completo duplicado antes de que el editor esté montado.
-        const editorReady = !!(window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready');
-        if (editorReady && typeof renderSidebar === 'function') {
-            const f = document.getElementById('sidebar-filter-input');
-            renderSidebar(f ? String(f.value || '') : '');
-        }
-        if (window.JETLSchemaUI && typeof window.JETLSchemaUI.refreshAll === 'function') {
-            setTimeout(() => window.JETLSchemaUI.refreshAll(), 0);
-        }
+        // El catálogo (engine.js) y los controles de nodo (schemaUI.js) se repintan solos.
+        JETLEvents.emit('tools:changed');
     }
 
     function _registerPackage(pkg) {
