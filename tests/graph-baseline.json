@@ -1,11 +1,1 @@
-[
-  "cycle: inline:head <-> inline:loader <-> js/basemap.js <-> js/engine.js <-> js/formats.js <-> js/mobile.js <-> js/nodes/readers.js <-> js/schemaUI.js <-> js/visualization.js",
-  "upward: inline:head (boot) uses JETLEnsureMotion from inline:loader (services)",
-  "upward: inline:head (boot) uses JETLEnsureRuntime from inline:loader (services)",
-  "upward: inline:head (boot) uses JETLRuntimeReady from inline:loader (services)",
-  "upward: inline:head (boot) uses addNodeClick from js/engine.js (app)",
-  "upward: inline:head (boot) uses ensureJETLMap from js/visualization.js (ui)",
-  "upward: inline:head (boot) uses runEngine from js/engine.js (app)",
-  "upward: inline:head (boot) uses switchTab from js/visualization.js (ui)",
-  "upward: js/templates.js (state) uses addNode from js/engine.js (app)"
-]
+[]

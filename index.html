@@ -55,6 +55,11 @@
                     : `Cargando ${nextName} (${loaded}/${total})…`;
             }
         };
+    </script>
+    <script data-jetl-nav>
+        // Navegación nativa de la vista móvil. Va en la cabecera para que los
+        // botones respondan antes de que lleguen los scripts diferidos; las
+        // acciones (añadir nodo, ejecutar, ver resultados) se resuelven al pulsar.
         window.JETLMarkInteraction = function (action) {
             window.__JETL_LAST_INTERACTION = { action: action, at: Date.now() };
             var dot = document.getElementById('sys-status');
@@ -154,6 +159,8 @@
             if (!state || !state.classList || !state.classList.contains('mobile-view-state') || !state.checked) return;
             window.JETLNativeNav(state.id.replace('mobile-state-', ''));
         });
+    </script>
+    <script>
         window.addEventListener('error', (event) => {
             reportJETLBootError(event.message || 'Error de JavaScript');
         });

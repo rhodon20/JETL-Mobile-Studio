@@ -5,7 +5,10 @@ import vm from 'node:vm';
 
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const mobile = readFileSync(new URL('../js/mobile.js', import.meta.url), 'utf8');
-const headScript = index.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+// The head boot code is split into consecutive inline scripts (boot primitives,
+// data-jetl-nav navigation, error reporting); together they are the startup code.
+const headScript = [...index.slice(0, index.indexOf('</head>')).matchAll(/<script(?:\s+data-jetl-nav)?>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1]).join('\n') || undefined;
 
 class ClassList {
     constructor(...values) { this.values = new Set(values); }

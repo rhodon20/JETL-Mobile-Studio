@@ -31,9 +31,9 @@ const LAYERS = {
     nodes: ['js/nodes/readers.js', 'js/nodes/geometry.js', 'js/nodes/utils.js', 'js/nodes/spatial.js',
         'js/nodes/attributes.js', 'js/nodes/raster.js', 'js/nodes/writers.js', 'js/tools.js'],
     engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js'],
-    state: ['js/state/history.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/templates.js', 'js/packages.js'],
-    app: ['js/engine.js'],
-    ui: ['js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js'],
+    state: ['js/state/history.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/packages.js'],
+    app: ['js/engine.js', 'js/templates.js'],
+    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js'],
     shell: ['js/shell.js'],
     dev: ['js/smoke.js']
 };
@@ -55,13 +55,17 @@ const BROWSER_GLOBALS = new Set([...Object.getOwnPropertyNames(globalThis), 'win
 
 function readSources() {
     const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-    const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)]
+        .map(m => ({ attrs: m[1], code: m[2] }));
+    // The core inline block is made of js/ files (scripts/inline-assets.mjs) and is
+    // analysed through them; data-jetl-nav is the early mobile navigation; the last
+    // inline script is the runtime loader; the other inline scripts in the head are
+    // the boot code.
+    const loader = inline[inline.length - 1];
     const sources = {
-        // The first inline script is the head boot code; the core inline block is made
-        // of js/ files (scripts/inline-assets.mjs) and is analysed through them; the
-        // last one is the runtime loader.
-        'inline:head': inline[0],
-        'inline:loader': inline[inline.length - 1]
+        'inline:head': inline.filter(s => s !== loader && !/data-jetl-(nav|core-inline)/.test(s.attrs)).map(s => s.code).join('\n'),
+        'inline:nav': inline.filter(s => /data-jetl-nav/.test(s.attrs)).map(s => s.code).join('\n'),
+        'inline:loader': loader.code
     };
     Object.values(LAYERS).flat().filter(f => !f.startsWith('inline:'))
         .forEach(f => { sources[f] = fs.readFileSync(path.join(ROOT, f), 'utf8'); });

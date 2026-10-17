@@ -216,10 +216,7 @@ function addNodeClick(k) {
     selectCanvasNode(id);
     if (inserted && typeof showToast === 'function') showToast('Nodo insertado en la conexión', 'success');
     else if (connected && typeof showToast === 'function') showToast('Nodo añadido y conectado', 'success');
-    if (window.innerWidth < 768) {
-        window.JETLNativeNav?.('flow');
-        JETLEvents.emit('canvas:fit');
-    }
+    if (window.innerWidth < 768) JETLEvents.emit('flow:show');
     return id;
 }
 

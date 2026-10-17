@@ -1034,7 +1034,7 @@ function togglePanelHeight() {
 
     if (isMobile) {
         body.classList.remove('mobile-results-open');
-        if (window.JETLMobile) window.JETLMobile.closeTransientViews();
+        JETLEvents.emit('results:closed');
         document.querySelectorAll('[data-mobile-view]').forEach((item) => {
             item.classList.toggle('active', item.dataset.mobileView === 'flow');
         });

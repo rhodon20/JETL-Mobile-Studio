@@ -135,4 +135,10 @@
 
     window.JETLMobile = { openView, closeTransientViews, fitFlowToViewport, runFlow };
     JETLEvents.on('canvas:fit', fitFlowToViewport);
+    JETLEvents.on('results:closed', closeTransientViews);
+    // Tras insertar un nodo en el móvil se vuelve al lienzo y se encuadra el flujo.
+    JETLEvents.on('flow:show', () => {
+        window.JETLNativeNav?.('flow');
+        fitFlowToViewport();
+    });
 })();
