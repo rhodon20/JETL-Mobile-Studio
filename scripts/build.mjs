@@ -74,15 +74,18 @@ html = html.replace(/(\b(?:src|href)=")((?:js|css)\/[^"?]+)(?:\?v=[^"]*)?"/g, (_
 // them alongside the entry modules instead of one import after another. Browsers
 // without import maps load them unversioned: still a single instance each.
 const entries = [...html.matchAll(/<script type="module" src="(js\/[^"?]+)/g)].map((m) => m[1]);
+// Modules the loader imports on demand: their URL carries their group's version,
+// but what they import goes through the import map like everything else.
+const onDemand = [...listed('JETL_EXTRA_MODULES'), ...[...html.matchAll(/import\('\.\/(js\/[^'?]+)/g)].map((m) => m[1])];
 const imported = new Set();
-const queue = [...entries];
+const queue = [...entries, ...onDemand];
 while (queue.length) {
     const file = queue.pop();
     const ast = acorn.parse(fs.readFileSync(path.join(DIST, file), 'utf8'), { ecmaVersion: 2022, sourceType: 'module' });
     for (const node of ast.body) {
         if (!node.source || !/^(Import|Export(Named|All))Declaration$/.test(node.type)) continue;
         const target = path.posix.join(path.posix.dirname(file), node.source.value);
-        if (entries.includes(target)) throw new Error(`[build] ${target} has a tag and is also imported by ${file}: it would load twice`);
+        if (entries.includes(target) || onDemand.includes(target)) throw new Error(`[build] ${target} is loaded on its own and also imported by ${file}: it would load twice`);
         if (!imported.has(target)) { imported.add(target); queue.push(target); }
     }
 }

@@ -52,7 +52,11 @@ violaciones ni ciclos.
   explícitamente con `Object.assign(window, {...})`; el resto es privado.
 - Los módulos bajo demanda (`visualization`, `schemaUI`, `modalSystem`,
   `templates`, `packages`) los carga el cargador con `import()`; nadie puede
-  importarlos de forma estática sin perder la carga diferida.
+  importarlos de forma estática sin perder la carga diferida. Lo que ellos
+  importan (p. ej. `ui/notify.js`, registro y avisos) también va versionado.
+- `visualization.js` (mapa, tabla, inspector de puertos, caché de entidades,
+  simbología y paneles) es un único módulo a propósito: comparten la selección y
+  el puerto mostrado de cada nodo y se llaman entre sí.
 
 | Capa | Archivos | Qué hace |
 |---|---|---|
