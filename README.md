@@ -67,6 +67,10 @@ Al cambiar un script, sube su `?v=` en `index.html` (o `JETL_RUNTIME_VERSION` /
 
 Pruebas: `npm test` (grafo, unitarias, smoke, flujo de la app y mapa base).
 
+Versión desplegada: pulsa «JETL Studio» en la cabecera. Muestra el despliegue
+que estás viendo y avisa (con botón Recargar) si hay uno más reciente; el sello
+lo pone `scripts/build.mjs` en `index.html` y `version.json`.
+
 ## Smoke test rapido
 En consola del navegador:
 

@@ -6,6 +6,8 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
     <meta name="theme-color" content="#202020">
+    <!-- Sellado por scripts/build.mjs con el commit y el número de despliegue. -->
+    <meta name="jetl-build" content="dev">
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1820,6 +1822,19 @@ body.modal-open {
         transition: none !important;
     }
 }
+
+/* Marca de la cabecera: botón que muestra la versión desplegada. */
+button.brand { padding:0; border:0; background:none; font-family:inherit; line-height:inherit; cursor:pointer; }
+button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; border-radius:6px; }
+.build-info { position:fixed; z-index:3000; width:min(300px,calc(100vw - 16px)); padding:12px 14px; display:flex; flex-direction:column; gap:6px; color:#d7d7da; background:var(--surface-1,#1e1e20); border:1px solid var(--surface-border,rgba(255,255,255,.1)); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.45); font-size:.78rem; }
+.build-info[hidden] { display:none; }
+.build-info strong { color:#f4f4f5; font-size:.88rem; }
+.build-info p { margin:0; }
+.build-info-version { color:#b9bbc0; font-variant-numeric:tabular-nums; }
+.build-info-status { color:#929298; }
+.build-info-status[data-state="latest"] { color:#68d895; }
+.build-info-status[data-state="outdated"] { color:#e0b766; }
+.build-info-reload { align-self:flex-start; min-height:32px; padding:0 12px; border:0; border-radius:8px; color:#fff; background:#2f80c0; font:inherit; cursor:pointer; }
 /* ---- css/mobile.css ---- */
 :root {
     --mobile-dock-height: 72px;
@@ -2460,10 +2475,11 @@ body.modal-open {
 
     <div id="header">
         <button class="btn" data-ui-action="toggle-sidebar"><i class="fas fa-bars"></i></button>
-        <div class="brand" style="margin-left:10px">
-            <div class="status-dot" id="sys-status" title="Sistema Listo"></div>&nbsp;JETL Studio
+        <button type="button" class="brand" id="brand-button" style="margin-left:10px"
+            aria-haspopup="dialog" aria-controls="build-info" aria-expanded="false" title="Ver versión desplegada">
+            <i class="status-dot" id="sys-status" title="Sistema Listo"></i>&nbsp;JETL Studio
             <span>v2026.03.05</span>
-        </div>
+        </button>
         <div id="quick-search" role="search">
             <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
             <input type="search" id="qs-input" placeholder="Buscar nodo" aria-label="Buscar y añadir un nodo" autocomplete="off">
@@ -2668,6 +2684,8 @@ body.modal-open {
             <div id="flow-navigator-list" class="flow-navigator-list"></div>
         </div>
     </div>
+    <div id="build-info" class="build-info" role="dialog" aria-label="Versión de JETL Studio" hidden></div>
+
     <div id="run-history-modal" class="modal" role="dialog" aria-modal="true"
         aria-labelledby="run-history-title" aria-hidden="true">
         <div class="modal-content run-history-content">
@@ -3968,6 +3986,9 @@ window.JETLBootModuleLoaded(1, 20, "readers.js");
     <script defer src="js/mobile.js?v=20260814-10"
         onload="window.JETLBootModuleLoaded(19, 20, &quot;shell.js&quot;)"
         onerror="reportJETLBootError(&quot;No se pudo descargar js/mobile.js&quot;)"></script>
+
+    <script type="module" src="js/ui/buildInfo.js?v=20261018-1"
+        onerror="console.warn(&quot;No se pudo descargar js/ui/buildInfo.js&quot;)"></script>
 
     <script type="module" src="js/shell.js?v=20261018-1"
         onload="window.JETLBootModuleLoaded(20, 20, &quot;listo&quot;)"

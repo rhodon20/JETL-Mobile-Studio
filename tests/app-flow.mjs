@@ -95,6 +95,36 @@ try {
     check('monitor points at the failing node', failed.monitor === 'error' && failed.focusHidden === false && failed.focusNode === failed.c, JSON.stringify(failed));
     check('failing node marked on the canvas', failed.nodeState === 'error', failed.nodeState);
 
+    // The brand shows the deployed version and whether it is the latest one.
+    const stamped = await page.evaluate(() => document.querySelector('meta[name="jetl-build"]').content);
+    const openBuildInfo = async () => {
+        // Close it first if open, so each call renders from scratch.
+        await page.evaluate(() => { if (!document.getElementById('build-info').hidden) document.getElementById('brand-button').click(); });
+        await page.evaluate(() => document.getElementById('brand-button').click());
+        await page.waitForFunction(() => {
+            const status = document.querySelector('#build-info .build-info-status');
+            return status && !/Comprobando/.test(status.textContent);
+        });
+        return page.evaluate(() => ({
+            visible: !document.getElementById('build-info').hidden,
+            version: document.querySelector('#build-info .build-info-version')?.textContent,
+            state: document.querySelector('#build-info .build-info-status')?.dataset.state || 'dev',
+            reload: !!document.querySelector('#build-info .build-info-reload')
+        }));
+    };
+    if (stamped === 'dev') {
+        const info = await openBuildInfo();
+        check('brand shows the development version', info.visible && info.state === 'dev', JSON.stringify(info));
+    } else {
+        const latest = await openBuildInfo();
+        check('brand shows the deployed version as latest', latest.visible && latest.state === 'latest' && latest.version.includes(stamped), JSON.stringify(latest));
+        await page.route('**/version.json*', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ sha: '0000000', run: '999', builtAt: new Date().toISOString() }) }));
+        const outdated = await openBuildInfo();
+        check('brand flags a newer deploy and offers to reload', outdated.state === 'outdated' && outdated.reload, JSON.stringify(outdated));
+        await page.unroute('**/version.json*');
+    }
+    await page.keyboard.press('Escape');
+
     // Zooming the editor moves the canvas grid with it.
     const grid = await page.evaluate(async () => {
         editor.zoom_in();

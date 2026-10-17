@@ -634,3 +634,16 @@ body.modal-open {
         transition: none !important;
     }
 }
+
+/* Marca de la cabecera: botón que muestra la versión desplegada. */
+button.brand { padding:0; border:0; background:none; font-family:inherit; line-height:inherit; cursor:pointer; }
+button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; border-radius:6px; }
+.build-info { position:fixed; z-index:3000; width:min(300px,calc(100vw - 16px)); padding:12px 14px; display:flex; flex-direction:column; gap:6px; color:#d7d7da; background:var(--surface-1,#1e1e20); border:1px solid var(--surface-border,rgba(255,255,255,.1)); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.45); font-size:.78rem; }
+.build-info[hidden] { display:none; }
+.build-info strong { color:#f4f4f5; font-size:.88rem; }
+.build-info p { margin:0; }
+.build-info-version { color:#b9bbc0; font-variant-numeric:tabular-nums; }
+.build-info-status { color:#929298; }
+.build-info-status[data-state="latest"] { color:#68d895; }
+.build-info-status[data-state="outdated"] { color:#e0b766; }
+.build-info-reload { align-self:flex-start; min-height:32px; padding:0 12px; border:0; border-radius:8px; color:#fff; background:#2f80c0; font:inherit; cursor:pointer; }
