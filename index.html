@@ -2387,8 +2387,29 @@ body.modal-open {
     .run-history-list { padding:6px; border-right:0; border-bottom:1px solid var(--surface-border); }
     .run-history-item { grid-template-columns:9px minmax(0,1fr) auto; min-height:58px; }
     .run-history-item .run-history-badge { display:none; }
-    .run-history-kpis { grid-template-columns:repeat(3,minmax(82px,1fr)); overflow:visible; }
-    .run-history-node-table { min-width:560px; }
+    /* El detalle se desplaza entero: cabecera y KPIs salen de la vista y la
+       lista de nodos usa toda la altura; el filtro queda fijo arriba. Cada nodo
+       es una fila de dos líneas con su tiempo a la derecha, sin scroll lateral. */
+    .run-history-detail { overflow-y:auto; overscroll-behavior:contain; }
+    .run-history-detail-head { padding:9px 12px; }
+    .run-history-kpis { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; padding:8px 12px; overflow:visible; }
+    .run-history-kpis>div { min-width:0; padding:5px 7px; }
+    .run-history-kpis strong { margin-top:1px; font-size:.8rem; }
+    .run-history-filter { position:sticky; top:0; z-index:2; margin:0; padding:0 14px; border-width:1px 0; border-radius:0; }
+    .run-history-table-wrap { flex:none; overflow:visible; }
+    .run-history-node-table, .run-history-node-table tbody { display:block; }
+    .run-history-node-table thead { display:none; }
+    .run-history-node-table tr {
+        display:grid; grid-template-columns:minmax(0,1fr) auto;
+        grid-template-areas:"node time" "state count";
+        gap:4px 10px; padding:9px 14px; border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .run-history-node-table td { min-width:0; padding:0; border:0; }
+    .run-history-node-table td:nth-child(1) { grid-area:node; }
+    .run-history-node-table td:nth-child(2) { grid-area:state; }
+    .run-history-node-table td:nth-child(3) { grid-area:count; text-align:right; color:#b9bbc0; }
+    .run-history-node-table td:nth-child(3)::before { content:'Features '; color:#85858b; font-size:.62rem; }
+    .run-history-node-table td:nth-child(4) { grid-area:time; text-align:right; color:#eeeef0; font-weight:600; }
 
     body.modal-open #mobile-dock {
         visibility: hidden;
