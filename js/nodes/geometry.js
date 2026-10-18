@@ -722,7 +722,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <span style="font-size:0.7em;color:#aaa">Tolerancia (Grados)</span>
                 <input type="number" df-tol value="0.0001" step="0.0001" class="node-control">
             </div>
-            <div style="font-size:0.6em;color:#888">Reduce vÃ©rtices manteniendo la forma.</div>`,
+            <div style="font-size:0.6em;color:#888">Reduce vértices manteniendo la forma.</div>`,
         run: async (id, inputs, dom) => {
             const tol = parseFloat(dom.querySelector('[df-tol]').value) || 0.0001;
             if (JETLWorkersEnabled()) {
@@ -745,7 +745,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_topo_simplify: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Topo Simplify', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
-        help: 'SimplificaciÃ³n con limpieza topolÃ³gica (cleanCoords).',
+        help: 'Simplificación con limpieza topológica (cleanCoords).',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Tolerancia (Grados)</span>
@@ -755,7 +755,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <input type="checkbox" df-preserve-boundary>
                 Mantener bordes limite sin simplificar
             </label>
-            <div style="font-size:0.6em;color:#888">Simplifica y limpia geometrÃ­as.</div>`,
+            <div style="font-size:0.6em;color:#888">Simplifica y limpia geometrías.</div>`,
         run: async (id, inputs, dom) => {
             const tol = parseFloat(dom.querySelector('[df-tol]').value) || 0.00005;
             const preserveBoundary = !!dom.querySelector('[df-preserve-boundary]')?.checked;
@@ -945,7 +945,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_reproject: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Reproject', icon: 'fa-sync', color: '#2980b9', in: 1, out: 1,
-        help: 'Reproyecta geometrÃ­as con proj4 (EPSG:4326 -> EPSG:3857, etc).',
+        help: 'Reproyecta geometrías con proj4 (EPSG:4326 -> EPSG:3857, etc).',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Origen (EPSG)</span>
@@ -1024,7 +1024,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_repair: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Geometry Repair', icon: 'fa-toolbox', color: '#2980b9', in: 1, out: 1,
-        help: 'Repara geometrÃ­as invÃ¡lidas (worker con JSTS).',
+        help: 'Repara geometrías inválidas (worker con JSTS).',
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">makeValid / buffer(0)</div>`,
         run: async (id, inputs) => {
             const features = inputs[0];
@@ -1037,7 +1037,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (wres && wres.status === 'ok') return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker repair fallÃ³, fallback local:", e);
+                    console.warn("Worker repair falló, fallback local:", e);
                 }
             }
             // Fallback local
@@ -1100,7 +1100,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     chunks.features.forEach(c => c.properties = { ...f.properties });
                     res.push(...chunks.features);
                 } else {
-                    res.push(f); // Pasar geometrÃ­a no lineal tal cual
+                    res.push(f); // Pasar geometría no lineal tal cual
                 }
             });
             return turf.featureCollection(res);
@@ -1113,7 +1113,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Disolver por campos</span>
                 <input type="text" df-fields class="node-control" placeholder="Ej: building, height">
-                <div style="font-size:0.6em;color:#666;font-style:italic">Dejar vacÃ­o para disolver todo en uno.</div>
+                <div style="font-size:0.6em;color:#666;font-style:italic">Dejar vacío para disolver todo en uno.</div>
             </div>`,
         run: async (id, inputs, dom) => {
             const rawFields = dom.querySelector('[df-fields]').value;
@@ -1145,7 +1145,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             // Limpiamos y separamos los campos (ej: "building,  height " -> ["building", "height"])
             const fieldsLocal = rawFields.split(',').map(f => f.trim()).filter(f => f !== '');
 
-            // Creamos una propiedad temporal Ãºnica que concatena los valores de los campos elegidos
+            // Creamos una propiedad temporal única que concatena los valores de los campos elegidos
             const tempProp = '_dissolve_key_';
 
             const taggedFeatures = features.map(f => {
@@ -1157,7 +1157,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const key = fieldsLocal.map(field => {
                     const val = newF.properties[field];
                     return val !== undefined && val !== null ? val : 'null';
-                }).join('_|_'); // Separador poco comÃºn para evitar colisiones
+                }).join('_|_'); // Separador poco común para evitar colisiones
 
                 newF.properties[tempProp] = key;
                 return newF;
@@ -1168,16 +1168,16 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             let dissolved;
             try {
-                // 'Unable to find segment' en SweepLine tree es un bug hiper-comÃºn de Turf.js (derivado de polygon-clipping)
-                // al procesar vÃ©rtices muy juntos o superpuestos con precisiÃ³n flotante inestable.
-                // Limpiamos coordenadas antes de procesar para reducir riesgos drÃ¡sticamente.
+                // 'Unable to find segment' en SweepLine tree es un bug hiper-común de Turf.js (derivado de polygon-clipping)
+                // al procesar vértices muy juntos o superpuestos con precisión flotante inestable.
+                // Limpiamos coordenadas antes de procesar para reducir riesgos drásticamente.
                 const cleanForDissolve = turf.cleanCoords(fc, { mutate: true });
                 dissolved = turf.dissolve(cleanForDissolve, { propertyName: tempProp });
             } catch (e) {
-                console.warn("[Dissolver] FallÃ³ turf.dissolve (bug SweepLine). Realizando uniÃ³n lÃ³gica (Atributos), omitiendo fusiÃ³n de geometrÃ­a plana.", e);
+                console.warn("[Dissolver] Falló turf.dissolve (bug SweepLine). Realizando unión lógica (Atributos), omitiendo fusión de geometría plana.", e);
                 // Fallback de emergencia: 
-                // Si la topologÃ­a no se puede unir por el bug, agrupamos los datos (Features)
-                // dejando las geometrÃ­as en un GeometryCollection o MultiPolygon por el mismo tempProp
+                // Si la topología no se puede unir por el bug, agrupamos los datos (Features)
+                // dejando las geometrías en un GeometryCollection o MultiPolygon por el mismo tempProp
 
                 const groupMap = {};
                 fc.features.forEach(f => {
@@ -1225,7 +1225,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
-            // turf.flatten convierte cualquier Multi(Point|Line|Polygon) en una colecciÃ³n individual
+            // turf.flatten convierte cualquier Multi(Point|Line|Polygon) en una colección individual
             const flat = turf.flatten(fc);
             // IMPORTANTE: Clonamos los atributos (properties) superficialmente
             // para romper referencias compartidas originadas por flatten.
@@ -1240,12 +1240,12 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_vertex_creator: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Vertex Creator', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
-        // CORRECCIÃ“N: Usamos tpl explÃ­cito para compatibilidad con tu index.html actual
+        // CORRECCIÓN: Usamos tpl explícito para compatibilidad con tu index.html actual
         tpl: () => `
             <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Modo de ExtracciÃ³n</span>
+                <span style="font-size:0.7em;color:#aaa">Modo de Extracción</span>
                 <select df-mode class="node-control">
-                    <option value="All Vertices">Todos los vÃ©rtices</option>
+                    <option value="All Vertices">Todos los vértices</option>
                     <option value="Start Points">Solo Inicio (Start)</option>
                     <option value="End Points">Solo Final (End)</option>
                     <option value="Start & End">Inicio y Final</option>
@@ -1284,7 +1284,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             };
 
             if (mode === 'Dangles') {
-                // LÃ³gica TopolÃ³gica: Buscar nodos que aparecen exactamente 1 vez en todo el dataset
+                // Lógica Topológica: Buscar nodos que aparecen exactamente 1 vez en todo el dataset
                 const counts = {};
 
                 // 1. Contar ocurrencias
@@ -1298,7 +1298,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     });
                 });
 
-                // 2. Extraer Ãºnicos
+                // 2. Extraer únicos
                 Object.entries(counts).forEach(([key, cnt]) => {
                     if (cnt === 1) {
                         const [x, y] = key.split(',').map(Number);
@@ -1307,7 +1307,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 });
 
             } else {
-                // LÃ³gica por Entidad
+                // Lógica por Entidad
                 features.forEach(f => {
                     if (mode === 'All Vertices') {
                         turf.explode(f).features.forEach(p => {
@@ -1351,21 +1351,21 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             }
 
-            // Primero aplanamos para asegurar que no hay MultiPolÃ­gonos complejos
+            // Primero aplanamos para asegurar que no hay MultiPolígonos complejos
             turf.flatten(inputs[0]).features.forEach(f => {
                 const type = turf.getType(f);
 
-                // Solo procesamos PolÃ­gonos
+                // Solo procesamos Polígonos
                 if (type === 'Polygon') {
                     try {
                         const tin = turf.tesselate(f);
-                        // Transferimos los atributos del padre a cada triÃ¡ngulo hijo
+                        // Transferimos los atributos del padre a cada triángulo hijo
                         tin.features.forEach(triangle => {
                             triangle.properties = f.properties;
                             res.push(triangle);
                         });
                     } catch (e) {
-                        // Si falla (ej: polÃ­gono invÃ¡lido), lo ignoramos o logueamos
+                        // Si falla (ej: polígono inválido), lo ignoramos o logueamos
                         console.warn('Fallo al triangular feature', f);
                     }
                 }
@@ -1402,10 +1402,10 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const type = turf.getType(f);
                 if (type === 'Polygon') {
                     const coords = f.geometry.coordinates;
-                    // El Ã­ndice 0 es el contorno exterior, los siguientes (1, 2, ...) son agujeros
+                    // El índice 0 es el contorno exterior, los siguientes (1, 2, ...) son agujeros
                     if (coords.length > 1) {
                         for (let i = 1; i < coords.length; i++) {
-                            // Creamos un nuevo polÃ­gono por cada agujero
+                            // Creamos un nuevo polígono por cada agujero
                             const holePoly = turf.polygon([coords[i]], f.properties);
                             holes.push(holePoly);
                         }
@@ -1446,12 +1446,12 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 const type = turf.getType(f);
                 if (type === 'LineString') {
                     try {
-                        // turf.lineToPolygon cierra automÃ¡ticamente la lÃ­nea
+                        // turf.lineToPolygon cierra automáticamente la línea
                         const poly = turf.lineToPolygon(f);
                         poly.properties = f.properties;
                         polys.push(poly);
                     } catch (e) {
-                        console.warn('No se pudo cerrar la lÃ­nea', f);
+                        console.warn('No se pudo cerrar la línea', f);
                     }
                 }
                 if (i % 400 === 0) await new Promise(r => setTimeout(r, 0));
@@ -1594,7 +1594,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_bbox: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Envelope', icon: 'fa-square-full', color: '#2980b9', in: 1, out: 1,
-        tpl: () => `<div>Caja LÃ­mite</div>`,
+        tpl: () => `<div>Caja Límite</div>`,
         run: async (id, i) => {
             const fc = i[0] || turf.featureCollection([]);
             const inCount = (fc && Array.isArray(fc.features)) ? fc.features.length : 0;
@@ -1615,7 +1615,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     geo_voronoi: {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Voronoi', icon: 'fa-th-large', color: '#2980b9', in: 1, out: 1,
-        tpl: () => `<div>PolÃ­gonos</div>`,
+        tpl: () => `<div>Polígonos</div>`,
         run: async (id, i) => {
             const inputs = i[0];
             if (!inputs || !inputs.features) throw new Error("Sin datos");
@@ -1630,13 +1630,13 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                         features: inputs.features
                     };
 
-                    // Voronoi es rÃ¡pido con RBush, pero lento en construcciÃ³n inicial
+                    // Voronoi es rápido con RBush, pero lento en construcción inicial
                     const wres = await postWorkerTask(payload, 30000);
                     if (wres && wres.status === 'ok') return wres.data;
 
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Voronoi fallÃ³, fallback local:", e);
+                    console.warn("Worker Voronoi falló, fallback local:", e);
                 }
             }
 
@@ -1654,7 +1654,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 }
             });
 
-            if (cleanPoints.length === 0) throw new Error("No hay puntos vÃ¡lidos");
+            if (cleanPoints.length === 0) throw new Error("No hay puntos válidos");
             const fc = turf.featureCollection(cleanPoints);
 
             const bbox = turf.bbox(fc);
@@ -1712,7 +1712,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
             const features = inputs[0];
 
-            if (!features || !features.features.length) throw new Error("Input vacÃ­o");
+            if (!features || !features.features.length) throw new Error("Input vacío");
 
             // --- INTENTO VIA WORKER ---
             if (JETLWorkersEnabled()) {
@@ -1733,7 +1733,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Buffer fallÃ³, fallback local:", e);
+                    console.warn("Worker Buffer falló, fallback local:", e);
                 }
             }
 
@@ -1747,11 +1747,11 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         cat: '2.1 VECTOR - GEOMETRY', label: 'Random Fill', icon: 'fa-braille', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">Puntos por PolÃ­gono</span>
+                <span style="font-size:0.7em;color:#aaa">Puntos por Polígono</span>
                 <input type="number" df-n class="node-control" value="50" min="1">
             </div>
             <div style="font-size:0.6em;color:#888">
-                Genera puntos aleatorios restringidos al interior de cada geometrÃ­a.
+                Genera puntos aleatorios restringidos al interior de cada geometría.
             </div>`,
         run: async (id, inputs, dom) => {
             const count = parseInt(dom.querySelector('[df-n]').value) || 10;

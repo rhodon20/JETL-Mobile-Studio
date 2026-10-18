@@ -6,7 +6,7 @@
 - Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
 - Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
   comprobada en CI (`tests/check-graph.mjs`).
-- Pruebas: `npm test` (grafo, 111 unitarias, smoke estable 30/30, flujo de la
+- Pruebas: `npm test` (grafo, 112 unitarias, smoke estable 30/30, flujo de la
   app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 

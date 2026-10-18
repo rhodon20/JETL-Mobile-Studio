@@ -775,7 +775,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <select df-field class="node-control"></select>
             </div>
             <div>
-                <span style="font-size:0.7em;color:#aaa">DirecciÃ³n</span>
+                <span style="font-size:0.7em;color:#aaa">Dirección</span>
                 <select df-dir class="node-control">
                     <option value="asc">Ascendente (A-Z, 0-9)</option>
                     <option value="desc">Descendente (Z-A, 9-0)</option>
@@ -799,7 +799,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (wres && wres.status === 'ok') return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Sorter fallÃƒÂ³, fallback local:", e);
+                    console.warn("Worker Sorter falló, fallback local:", e);
                 }
             }
 
@@ -809,14 +809,14 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
                 if (valA === valB) return 0;
 
-                // DetecciÃ³n automÃ¡tica de tipo (NÃºmero vs Texto)
+                // Detección automática de tipo (Número vs Texto)
                 const isNum = typeof valA === 'number' && typeof valB === 'number';
 
                 let comparison = 0;
                 if (isNum) {
                     comparison = valA - valB;
                 } else {
-                    // ComparaciÃ³n segura de strings (nulls al final)
+                    // Comparación segura de strings (nulls al final)
                     comparison = String(valA || '').localeCompare(String(valB || ''), undefined, { numeric: true });
                 }
 
@@ -1169,7 +1169,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                                 val = val + arg1;
                                 break;
                             case 'pad': {
-                                // Arg1: Longitud total, Arg2: CarÃ¡cter relleno (defecto '0')
+                                // Arg1: Longitud total, Arg2: Carácter relleno (defecto '0')
                                 const len = parseInt(arg1) || 3;
                                 const char = arg2 || '0';
                                 val = val.padStart(len, char);
@@ -1217,7 +1217,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         cat: '2.3 VECTOR - ATTRIBUTES', label: 'Feature Merger', icon: 'fa-code-branch', color: '#27ae60', in: 2, out: 3,
         tpl: () => `
             <div style="margin-bottom:4px">
-                <span style="font-size:0.7em;color:#aaa">RelaciÃ³n (Input1 : Input2)</span>
+                <span style="font-size:0.7em;color:#aaa">Relación (Input1 : Input2)</span>
                 <input type="text" df-map class="node-control" placeholder="tipo:TIPO, id:ID_REF">
                 <div style="font-size:0.6em;color:#666;font-style:italic">Separar pares por comas.</div>
             </div>
@@ -1236,12 +1236,12 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             </div>`,
         run: async (id, inputs, dom) => {
             const mapStr = resolveParamText(dom.querySelector('[df-map]').value);
-            const reqFeatures = inputs[0].features; // Requestor (Mantiene geometrÃ­a)
+            const reqFeatures = inputs[0].features; // Requestor (Mantiene geometría)
             const supFeatures = inputs[1].features; // Supplier (Aporta atributos)
 
             // Parsear el mapeo "campo1:campo2, campoA:campoB"
             const joinPairs = mapStr.split(',').map(p => p.split(':').map(s => s.trim()));
-            if (joinPairs.length === 0 || !joinPairs[0][0]) throw new Error("Define campos de uniÃ³n");
+            if (joinPairs.length === 0 || !joinPairs[0][0]) throw new Error("Define campos de unión");
             if (JETLWorkersEnabled()) {
                 try {
                     if (!window.geoWorker) createGeoWorker();
@@ -1255,11 +1255,11 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (wres && wres.status === 'ok') return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Feature Merger fallÃ³, fallback local:", e);
+                    console.warn("Worker Feature Merger falló, fallback local:", e);
                 }
             }
 
-            // FunciÃ³n auxiliar para generar Hash Keys
+            // Función auxiliar para generar Hash Keys
             const getKey = (props, fields) => fields.map(f => String(props[f] || 'null')).join('|_|');
 
             // 1. Indexar el Supplier (Input 2)
@@ -1290,7 +1290,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
                     // Clonamos feature para no mutar original
                     const newF = JETLClone(f);
-                    // Fusionamos atributos (Supplier sobrescribe a Requestor en caso de colisiÃ³n)
+                    // Fusionamos atributos (Supplier sobrescribe a Requestor en caso de colisión)
                     newF.properties = { ...newF.properties, ...supData.props };
                     merged.push(newF);
                 } else {
@@ -1302,14 +1302,14 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             // 3. Recolectar Unused Suppliers (Input 2 que sobraron)
             const unusedSup = supFeatures.filter((f, idx) => {
                 // Como supMap solo guarda el primero de cada serie duplicada, 
-                // necesitamos una forma de saber si este feature especÃ­fico fue "tocado".
-                // Una forma robusta es volver a generar su key y ver si esa key estÃ¡ marcada como usada en el mapa.
+                // necesitamos una forma de saber si este feature específico fue "tocado".
+                // Una forma robusta es volver a generar su key y ver si esa key está marcada como usada en el mapa.
                 const key = getKey(f.properties, supKeys);
                 const mapEntry = supMap.get(key);
                 // Si la entrada del mapa fue usada, consideramos todos los duplicados de esa clave como usados?
                 // Generalmente en FeatureMerger 1:1, los duplicados del supplier que no se usaron son "Unused".
-                // Pero para simplificar lÃ³gica visual: Si la clave se usÃ³, el "concepto" se usÃ³.
-                // AquÃ­ seremos estrictos: Solo devolvemos los que NO fueron la fuente de datos.
+                // Pero para simplificar lógica visual: Si la clave se usó, el "concepto" se usó.
+                // Aquí seremos estrictos: Solo devolvemos los que NO fueron la fuente de datos.
 
                 return !mapEntry || !mapEntry.used;
             });
@@ -1375,7 +1375,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (wres && wres.status === 'ok') return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Attribute Join fallÃ³, fallback local:", e);
+                    console.warn("Worker Attribute Join falló, fallback local:", e);
                 }
             }
             const getKey = (props, fields) => fields.map(f => String(props[f] || 'null')).join('|_|');
@@ -1509,10 +1509,10 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             <div>
                 <span style="font-size:0.7em;color:#aaa">Unidades</span>
                 <select df-unit class="node-control">
-                    <option value="1">Metros cuadrados (mÂ²)</option>
-                    <option value="0.000001">KilÃ³metros cuadrados (kmÂ²)</option>
-                    <option value="0.0001">HectÃ¡reas (ha)</option>
-                    <option value="10.7639">Pies cuadrados (ftÂ²)</option>
+                    <option value="1">Metros cuadrados (m²)</option>
+                    <option value="0.000001">Kilómetros cuadrados (km²)</option>
+                    <option value="0.0001">Hectáreas (ha)</option>
+                    <option value="10.7639">Pies cuadrados (ft²)</option>
                 </select>
             </div>
             <div style="margin-top:4px">
@@ -1549,9 +1549,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             inputs[0].features.forEach((f) => {
                 if (!f.properties) f.properties = {};
                 try {
-                    // Turf siempre calcula en mÂ²
+                    // Turf siempre calcula en m²
                     const areaSqM = turf.area(f);
-                    // Aplicamos el factor de conversiÃ³n
+                    // Aplicamos el factor de conversión
                     f.properties[fieldName] = parseFloat((areaSqM * multiplier).toFixed(4));
                     passed.push(f);
                 } catch (e) {
@@ -1587,9 +1587,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
             <div>
                 <span style="font-size:0.7em;color:#aaa">Unidades</span>
                 <select df-unit class="node-control">
-                    <option value="kilometers">KilÃ³metros (km)</option>
+                    <option value="kilometers">Kilómetros (km)</option>
                     <option value="meters">Metros (m)</option>
-                    <option value="centimeters">CentÃ­metros (cm)</option>
+                    <option value="centimeters">Centímetros (cm)</option>
                     <option value="miles">Millas</option>
                     <option value="feet">Pies</option>
                 </select>
@@ -1638,7 +1638,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                         // Turf no tiene 'centimeters' nativo en versiones antiguas, calculamos en metros * 100
                         length = turf.length(f, { units: 'meters' }) * 100;
                     } else {
-                        // Para el resto usamos la conversiÃ³n nativa de Turf
+                        // Para el resto usamos la conversión nativa de Turf
                         length = turf.length(f, { units: unit });
                     }
 
@@ -1674,7 +1674,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <span style="font-size:0.7em;color:#aaa">Criterio de Coincidencia</span>
                 <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px">
                     <label style="font-size:0.8em; display:flex; align-items:center; color:#ddd">
-                        <input type="checkbox" df-geo checked style="margin-right:6px"> GeometrÃ­a
+                        <input type="checkbox" df-geo checked style="margin-right:6px"> Geometría
                     </label>
                     <label style="font-size:0.8em; display:flex; align-items:center; color:#ddd">
                         <input type="checkbox" df-attr style="margin-right:6px"> Atributos
@@ -1685,9 +1685,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                 <span style="font-size:0.7em;color:#aaa">Campos (Si Atributos = ON)</span>
                 <input type="text" df-fields class="node-control" placeholder="Ej: id, type">
                 <div df-matcher-fields style="max-height:110px; overflow:auto; border:1px solid #333; border-radius:4px; padding:6px; background:#151515; margin-top:4px"></div>
-                <div style="font-size:0.6em;color:#666;font-style:italic">VacÃ­o = Todos los campos.</div>
+                <div style="font-size:0.6em;color:#666;font-style:italic">Vacío = Todos los campos.</div>
             </div>
-            <div style="font-size:0.6em;color:#888;margin-top:4px">Out 1: Ãšnicos | Out 2: Duplicados</div>`,
+            <div style="font-size:0.6em;color:#888;margin-top:4px">Out 1: Únicos | Out 2: Duplicados</div>`,
         run: async (id, inputs, dom) => {
             const matchGeo = dom.querySelector('[df-geo]').checked;
             const matchAttr = dom.querySelector('[df-attr]').checked;
@@ -1713,23 +1713,23 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     if (wres && wres.status === 'ok') return wres.data;
                 } catch (e) {
                     if (typeof window.JETLIsCancelledError === 'function' && window.JETLIsCancelledError(e)) throw e;
-                    console.warn("Worker Matcher fallÃƒÂ³, fallback local:", e);
+                    console.warn("Worker Matcher falló, fallback local:", e);
                 }
             }
 
             inputs[0].features.forEach(f => {
                 let hashParts = [];
 
-                // 1. Huella de GeometrÃ­a
+                // 1. Huella de Geometría
                 if (matchGeo) {
-                    // Usamos stringify de las coordenadas para comparaciÃ³n exacta
+                    // Usamos stringify de las coordenadas para comparación exacta
                     hashParts.push(JSON.stringify(f.geometry));
                 }
 
                 // 2. Huella de Atributos
                 if (matchAttr) {
                     if (targetFields && targetFields.length > 0) {
-                        // Concatenar solo campos especÃ­ficos
+                        // Concatenar solo campos específicos
                         const attrVal = targetFields.map(k => {
                             const val = f.properties[k];
                             return val !== undefined && val !== null ? val : 'null';
@@ -1746,7 +1746,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
                     }
                 }
 
-                // Si no se selecciona nada, asumimos que no hay criterio => todos son Ãºnicos (o error)
+                // Si no se selecciona nada, asumimos que no hay criterio => todos son únicos (o error)
                 if (hashParts.length === 0) {
                     uniques.push(f);
                     return;
