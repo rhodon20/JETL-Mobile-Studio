@@ -681,3 +681,11 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
 .draft-recovery-content { width:min(420px, calc(100vw - 32px)); }
 .draft-recovery-content .modal-help { border-bottom:0; font-size:.85rem; }
 .draft-recovery-content .btn { min-height:42px; padding:0 18px; display:inline-flex; align-items:center; gap:8px; }
+
+/* Selector de columnas de la tabla. */
+#table-columns-panel { padding:8px 10px 10px; border-top:1px solid var(--surface-border); }
+#table-columns-panel[hidden] { display:none; }
+.table-columns-list { display:flex; flex-wrap:wrap; gap:6px; max-height:30vh; overflow-y:auto; margin-bottom:8px; }
+.table-columns-list label { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 10px; border:1px solid var(--surface-border); border-radius:17px; font-size:13px; cursor:pointer; }
+.table-columns-list input { margin:0; }
+[data-table-action="columns"] { display:inline-flex; align-items:center; gap:6px; }

@@ -26,6 +26,10 @@ let mapPanelExpanded = false;
 let prevBottomPanelHeight = '';
 const FEATURE_CACHE_BROWSER_KEY = 'JETLFeatureCacheBrowserState';
 let featureCacheBrowserState = { nodeId: '', port: '' };
+// Campos ocultos en la tabla, por nodo (sólo durante la sesión).
+let tableHiddenFields = {};
+// Entidad elegida en la tabla que no está pintada (quedó fuera del muestreo).
+let tableFocusLayer = null;
 
 function loadFeatureCacheBrowserState() {
     try {
@@ -353,7 +357,42 @@ function bindTableToolbarActions() {
         else if (action === 'export-geojson') exportSelection('geojson');
         else if (action === 'export-csv') exportSelection('csv');
         else if (action === 'clear-selection') clearSelection();
+        else if (action === 'columns') toggleTableColumnsPanel(btn);
+        else if (action === 'show-all-columns') {
+            delete tableHiddenFields[currentNodeId];
+            rebuildCurrentTable();
+        }
     });
+    toolbar.addEventListener('change', (e) => {
+        const box = e.target.closest('input[data-table-column]');
+        if (!box || !currentNodeId) return;
+        const field = decodeURIComponent(box.getAttribute('data-table-column'));
+        const hidden = tableHiddenFields[currentNodeId] || (tableHiddenFields[currentNodeId] = new Set());
+        if (box.checked) hidden.delete(field);
+        else hidden.add(field);
+        rebuildCurrentTable();
+    });
+}
+
+function rebuildCurrentTable() {
+    if (currentNodeId && executionData[currentNodeId]) buildTable(executionData[currentNodeId].data);
+}
+
+function toggleTableColumnsPanel(button) {
+    const panel = document.getElementById('table-columns-panel');
+    if (!panel) return;
+    panel.hidden = !panel.hidden;
+    button.setAttribute('aria-expanded', String(!panel.hidden));
+}
+
+// Lista de campos con su casilla y el contador del botón («Columnas 3/12»).
+function renderTableColumnsPanel(headers, hidden) {
+    const panel = document.getElementById('table-columns-panel');
+    const count = document.getElementById('table-columns-count');
+    if (count) count.textContent = hidden.size ? `Columnas ${headers.length - hidden.size}/${headers.length}` : 'Columnas';
+    if (!panel) return;
+    const items = headers.map((h) => `<label><input type="checkbox" data-table-column="${encodeURIComponent(h)}" ${hidden.has(h) ? '' : 'checked'}><span>${JETLEscapeHtml(h)}</span></label>`).join('');
+    panel.innerHTML = `<div class="table-columns-list">${items}</div>${hidden.size ? '<button class="btn" type="button" data-table-action="show-all-columns">Mostrar todas</button>' : ''}`;
 }
 
 function bindTableInteractions() {
@@ -543,6 +582,7 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     ensureStableFeatureIndex(data);
 
     // Limpieza
+    clearTableFocusLayer();
     if (mapLayers[id]) {
         map.removeLayer(mapLayers[id]);
         layerControl.removeLayer(mapLayers[id]);
@@ -807,7 +847,9 @@ function buildTable(data) {
     }
 
     const firstProps = features[0].properties || {};
-    const headers = Object.keys(firstProps).filter(k => !k.startsWith('_'));
+    const allHeaders = Object.keys(firstProps).filter(k => !k.startsWith('_'));
+    const hiddenFields = tableHiddenFields[currentNodeId] || new Set();
+    const headers = allHeaders.filter(h => !hiddenFields.has(h));
     const fieldSel = document.getElementById('table-filter-field');
     if (fieldSel) {
         const prev = tableFilter.field || '';
@@ -816,13 +858,13 @@ function buildTable(data) {
         optEmpty.value = '';
         optEmpty.textContent = 'Todos los campos';
         fieldSel.appendChild(optEmpty);
-        headers.forEach(h => {
+        allHeaders.forEach(h => {
             const opt = document.createElement('option');
             opt.value = h;
             opt.textContent = h;
             fieldSel.appendChild(opt);
         });
-        fieldSel.value = headers.includes(prev) ? prev : '';
+        fieldSel.value = allHeaders.includes(prev) ? prev : '';
     }
 
     // Header HTML con iconos de ordenación
@@ -886,6 +928,8 @@ function buildTable(data) {
     html += '</tbody></table>';
     container.innerHTML = html;
     if (toolbar) container.prepend(toolbar);
+    // Tras volver a insertar la barra: mientras estaba fuera del documento no se encuentra por id.
+    renderTableColumnsPanel(allHeaders, hiddenFields);
 
     if (selectedFeatureIndex !== null) syncTableFocus();
 }
@@ -910,7 +954,11 @@ function selectRow(idx, nodeId) {
     });
 
     if (mapLayers[nodeId]) mapLayers[nodeId].resetStyle();
-    showToast(`Registro #${idx + 1} enfocado.`, 'success');
+    // En móvil tabla y mapa son pestañas: tocar una fila lleva al mapa, que se
+    // centra en la entidad (switchTab llama a syncMapFocus). Al volver a la tabla
+    // la fila sigue seleccionada y visible.
+    switchTab('map');
+    showToast(`Registro #${idx + 1} en el mapa`, 'success');
 }
 
 function applyTableFilter() {
@@ -1149,18 +1197,40 @@ function switchTab(t) {
 window.switchTab = switchTab;
 
 // Sincronización
+function clearTableFocusLayer() {
+    if (tableFocusLayer && map) map.removeLayer(tableFocusLayer);
+    tableFocusLayer = null;
+}
+
 function syncMapFocus(nodeId) {
-    if (selectedFeatureIndex === null || !mapLayers[nodeId]) return;
+    if (selectedFeatureIndex === null || !map) return;
+    clearTableFocusLayer();
 
     const layerGroup = mapLayers[nodeId];
-    const layers = layerGroup.getLayers ? layerGroup.getLayers() : [];
+    const layers = layerGroup && layerGroup.getLayers ? layerGroup.getLayers() : [];
     const target = layers.find(l => l.feature && l.feature.properties._idx === selectedFeatureIndex);
 
     if (target) {
         if (target.getBounds) map.fitBounds(target.getBounds(), { maxZoom: 18, padding: [50, 50] });
         else if (target.getLatLng) map.setView(target.getLatLng(), 18);
         target.openPopup();
+        return;
     }
+
+    // No está pintada (el mapa muestrea las capas grandes): se dibuja aparte,
+    // resaltada, a partir de la entidad original del nodo.
+    const data = _resolveNodePortData(nodeId).data;
+    const feature = data && Array.isArray(data.features)
+        ? data.features.find(f => f && f.properties && f.properties._idx === selectedFeatureIndex)
+        : null;
+    if (!feature || !feature.geometry) return;
+    const display = toDisplayCrs(turf.featureCollection([feature]), detectCrs(data));
+    tableFocusLayer = L.geoJSON(display.collection, {
+        style: { color: '#e74c3c', weight: 4, opacity: 1, fillColor: '#e74c3c', fillOpacity: 0.45 },
+        pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 9, color: '#f1c40f', weight: 3, fillColor: '#e74c3c', fillOpacity: 0.95 })
+    }).addTo(map);
+    const bounds = tableFocusLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 18, padding: [50, 50] });
 }
 
 function syncTableFocus() {
@@ -1255,6 +1325,7 @@ function clearCanvas() {
         window.JETLRuntimeCache.clearAll();
     }
     clearDraft();
+    clearTableFocusLayer();
     Object.values(mapLayers).forEach(l => { map.removeLayer(l); layerControl.removeLayer(l); });
     JETLClearObject(mapLayers);
     JETLClearObject(executionData);

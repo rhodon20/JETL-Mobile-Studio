@@ -221,10 +221,39 @@ try {
         await showOnMap(id);
         const drawn = mapLayers[id].getLayers().length;
         const kept = executionData[id].data.features.length;
-        editor.removeNodeId('node-' + id);
-        return { drawn, kept, indicator: document.getElementById('map-perf-indicator')?.textContent || '' };
+        return { id, drawn, kept, indicator: document.getElementById('map-perf-indicator')?.textContent || '' };
     });
     check('large polygon layers are sampled on the map only', shapes.drawn === 5000 && shapes.kept === 6000 && shapes.indicator.includes('mostrando'), JSON.stringify(shapes));
+
+    // Tapping a table row takes the map to that feature, even one left out of the sample.
+    const focusOn = async (idx) => {
+        await page.evaluate(() => switchTab('table'));
+        await page.click(`#tr-row-${idx} td:nth-child(3)`);
+        await page.waitForTimeout(500);
+        return page.evaluate((idx) => {
+            const c = map.getCenter();
+            const f = executionData[currentNodeId].data.features[idx].geometry.coordinates[0][0];
+            const mapActive = document.querySelector('#panel-tabs [data-results-view="map"]').classList.contains('active');
+            return { mapActive, zoom: map.getZoom(), near: Math.abs(c.lng - f[0]) < 0.001 && Math.abs(c.lat - f[1]) < 0.001 };
+        }, idx);
+    };
+    await page.evaluate((id) => { JETLNativeNav('results'); currentNodeId = id; buildTable(executionData[id].data); }, shapes.id);
+    const drawnFocus = await focusOn(0);
+    const sampledOutFocus = await focusOn(5);
+    check('tapping a row centres the map on that feature', drawnFocus.mapActive && drawnFocus.near && drawnFocus.zoom >= 15, JSON.stringify(drawnFocus));
+    check('a feature left out of the map sample can still be focused', sampledOutFocus.mapActive && sampledOutFocus.near, JSON.stringify(sampledOutFocus));
+    // Columns can be hidden from the table toolbar and shown again.
+    await page.evaluate(() => switchTab('table'));
+    await page.click('[data-table-action="columns"]');
+    await page.uncheck('input[data-table-column="i"]');
+    const hiddenCol = await page.evaluate(() => ({
+        headers: [...document.querySelectorAll('#table-container thead th')].map((th) => th.textContent.trim()),
+        label: document.getElementById('table-columns-count').textContent
+    }));
+    await page.click('[data-table-action="show-all-columns"]');
+    const shownCol = await page.evaluate(() => [...document.querySelectorAll('#table-container thead th')].map((th) => th.textContent.trim()));
+    check('a table column can be hidden and shown again', !hiddenCol.headers.includes('i') && hiddenCol.label === 'Columnas 0/1' && shownCol.includes('i'), JSON.stringify({ hiddenCol, shownCol }));
+    await page.evaluate((id) => { editor.removeNodeId('node-' + id); JETLNativeNav('flow'); }, shapes.id);
 
     // Draft recovery: after a reload the app asks before touching the saved flow.
     const reloadAndReadPrompt = async () => {

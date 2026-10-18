@@ -59,7 +59,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | --- | --- | --- |
 | Consola, tabla y mapa | Implementado | Conservar tabs táctiles y estado por salida |
 | Reproyectar a EPSG:4326 al pintar | Implementado (`js/core/crs.js`): reproyecta sólo para pintar, con el CRS de `metadata.crs`, el `crs` de GeoJSON o `_crs`; avisa si no conoce el CRS. Desktop además descarga definiciones de epsg.io | Ampliar definiciones sin red si hacen falta más CRS |
-| Tabla: centrar la entidad en el mapa al tocar una fila, columnas fijas, mostrar/ocultar campos, carga progresiva | Pendiente (`focusTableFeatureOnMap`, `toggleTablePinnedField`) | Prioritario en móvil por el ancho de las tablas |
+| Tabla: centrar la entidad en el mapa al tocar una fila, columnas fijas, mostrar/ocultar campos, carga progresiva | Parcial: tocar una fila abre el mapa centrado en la entidad (también si quedó fuera del muestreo del mapa) y «Columnas» muestra u oculta campos por nodo durante la sesión. Sin columnas fijas (`toggleTablePinnedField`); la tabla ya pinta por ventanas de 200 filas | Columnas fijas si el uso real lo pide |
 | Gestor de capas | Parcial: control estándar de Leaflet (Desktop: aislar, renombrar, zoom) | — |
 | Herramienta de medir | Pendiente (`toggleMeasure`) | — |
 | Visor 3D vectorial | Fuera de alcance (decisión del 18 de octubre de 2026): aporta poco en móvil y es pesado, aunque `vectorViewer3D.js` sea JS sin backend | — |
@@ -90,7 +90,7 @@ Propuesta de orden, por impacto en el uso real en un teléfono:
 2. Lectura sin pérdida de la configuración de proyectos Desktop (aplazado por decisión del usuario; ver `ROADMAP.md`).
 3. ~~Recuperación automática del borrador~~ (hecho).
 4. ~~Perfil de baja memoria~~ (hecho en el mapa; ver la fila de perfiles).
-5. Tabla: centrar la entidad al tocar la fila y columnas visibles.
+5. ~~Tabla: centrar la entidad al tocar la fila y columnas visibles~~ (hecho).
 6. Multiselección táctil con operaciones en lote; después, grupos plegables.
 7. Validación del flujo antes de ejecutar.
 8. Inspector de esquema sin ejecutar.
