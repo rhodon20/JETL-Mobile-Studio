@@ -313,6 +313,45 @@ try {
     });
     check('during a run the centre button cancels it', cancelLabel === 'Cancelar', cancelLabel);
 
+    // «Validar flujo» lists problems before running; tapping one goes to its node.
+    const valIds = await page.evaluate(() => {
+        editor.clear();
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_buffer');
+        const c = addNode('geo_centroid');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        editor.node_selected = null;
+        JETLNativeNav('flow');
+        return { a, b, c };
+    });
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="validate"]');
+    const validation = await page.evaluate(() => ({
+        open: document.getElementById('validation-modal').classList.contains('is-open'),
+        summary: document.getElementById('validation-summary').textContent,
+        items: [...document.querySelectorAll('.validation-item')].map((el) => `${el.className.match(/is-(\w+)/)[1]}|${el.getAttribute('data-validation-node')}|${el.textContent.replace(/\s+/g, ' ').trim()}`)
+    }));
+    check('validation lists the unconnected input as an error', validation.open && validation.items[0]?.startsWith(`error|${valIds.c}|`) && validation.items[0].includes('Entrada sin conectar') && validation.summary.includes('1 error'), JSON.stringify(validation));
+    await page.click(`.validation-item[data-validation-node="${valIds.c}"]`);
+    await page.waitForTimeout(300);
+    const jumped = await page.evaluate((c) => {
+        const node = document.getElementById('node-' + c).getBoundingClientRect();
+        const view = document.getElementById('drawflow').getBoundingClientRect();
+        return { closed: !document.getElementById('validation-modal').classList.contains('is-open'), centred: Math.abs((node.left + node.width / 2) - (view.left + view.width / 2)) < 30 };
+    }, valIds.c);
+    check('tapping a problem goes to its node', jumped.closed && jumped.centred, JSON.stringify(jumped));
+    await page.evaluate(({ b, c }) => {
+        editor.addConnection(b, c, 'output_1', 'input_1');
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        editor.node_selected = null;
+    }, valIds);
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="validate"]');
+    const clean = await page.evaluate(() => ({ ok: !!document.querySelector('#validation-list .validation-ok'), summary: document.getElementById('validation-summary').textContent }));
+    await page.click('[data-validation-close]');
+    check('a correct flow validates clean', clean.ok && clean.summary === 'Sin incidencias', JSON.stringify(clean));
+
     // Nodes snap to the 25 px canvas grid by default when created or dropped.
     const snapIds = await page.evaluate(() => { editor.clear(); const id = addNode('geo_buffer'); JETLNativeNav('flow'); JETLEvents.emit('canvas:fit'); return id; });
     await page.waitForTimeout(200);

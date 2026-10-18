@@ -31,8 +31,8 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Multiselección y operaciones en lote | Implementado en móvil: «Seleccionar varios» en el panel «Acciones»; tocar marca, arrastrar uno marcado mueve el grupo, duplicar conserva las conexiones internas y eliminar; todo con un solo deshacer. Sin selección por recuadro, autoorganizar ni insertar Junction (Desktop `engine.js`) | Selección por recuadro si el uso lo pide |
 | Marcadores/grupos y anotaciones | Pendiente (`engine.js`: grupos plegables con color y anotaciones, guardados en el proyecto) | Crear, plegar, editar y persistir en `.jetl` |
 | Selector de puerto asistido | Pendiente (`portSemantics.js`) | Elegir puerto al conectar en vez del primero compatible |
-| Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel validar y anotaciones |
-| Validar el flujo antes de ejecutar | Pendiente (`validateCurrentFlow`) | Lista de problemas con salto al nodo |
+| Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel las anotaciones |
+| Validar el flujo antes de ejecutar | Implementado (Acciones > Validar flujo; `js/engine/validate.js`): flujo vacío, tipo desconocido, entradas sin conectar, ciclos, lectores sin origen, `${parámetros}` no definidos y nodos aislados; tocar una incidencia lleva al nodo. Sin las comprobaciones por nodo de Desktop (campos inexistentes en el esquema, extensión del writer…), que leen claves de configuración distintas en Studio | Comprobaciones por nodo cuando se unifique la configuración |
 | Soltar un archivo en el lienzo crea su lector | Pendiente (`_handleDroppedFile`) | En móvil: abrir archivo → lector adecuado |
 | Ajuste a cuadrícula | Implementado: 25 px como Desktop, activado por defecto al crear y al soltar nodos (un grupo se ajusta entero); se desactiva en Proyecto > Cuadrícula | — |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
@@ -92,7 +92,7 @@ Propuesta de orden, por impacto en el uso real en un teléfono:
 4. ~~Perfil de baja memoria~~ (hecho en el mapa; ver la fila de perfiles).
 5. ~~Tabla: centrar la entidad al tocar la fila y columnas visibles~~ (hecho).
 6. ~~Multiselección táctil con operaciones en lote~~ (hecho); después, grupos plegables.
-7. Validación del flujo antes de ejecutar.
+7. ~~Validación del flujo antes de ejecutar~~ (hecho).
 8. Inspector de esquema sin ejecutar.
 
 ## Regla de mantenimiento

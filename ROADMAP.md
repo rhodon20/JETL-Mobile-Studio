@@ -6,7 +6,7 @@
 - Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
 - Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
   comprobada en CI (`tests/check-graph.mjs`).
-- Pruebas: `npm test` (grafo, 112 unitarias, smoke estable 30/30, flujo de la
+- Pruebas: `npm test` (grafo, 116 unitarias, smoke estable 30/30, flujo de la
   app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 
@@ -17,8 +17,8 @@
    difieren; `scripts/audit-node-params.mjs`). Orden acordado: reproyectar al
    pintar (hecho), aviso de recuperación del borrador (hecho), límites de
    memoria al pintar (hecho), tabla → mapa y columnas visibles (hecho),
-   panel «Acciones» y multiselección táctil (hecho). Siguen: validar el flujo
-   y notas/anotaciones, ambas como acciones del panel.
+   panel «Acciones», multiselección táctil, ajuste a cuadrícula y validar el
+   flujo (hecho). Sigue: notas/anotaciones como acción del panel.
 2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
    bloqueo de arranque en Safari) aprovechando las URLs versionadas por
    contenido; validar en iPhone antes de publicar.

@@ -1933,6 +1933,22 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
     color:#e5e7eb; font-size:14px; font-weight:600; background:rgba(31,32,35,.96); border:1px solid rgba(52,152,219,.6); box-shadow:0 6px 18px rgba(0,0,0,.45); }
 #multi-select-banner i { color:#71b9ff; }
 #multi-select-banner button { min-height:32px; padding:0 14px; border:0; border-radius:16px; color:#fff; font:inherit; background:#237fbe; cursor:pointer; }
+
+/* Panel «Validar flujo» (js/ui/validationPanel.js). */
+.validation-content { width:min(520px, calc(100vw - 32px)); }
+#validation-list { display:flex; flex-direction:column; gap:6px; padding:12px; max-height:60dvh; overflow-y:auto; }
+.validation-item { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; padding:8px 12px; border:1px solid var(--surface-border); border-radius:12px; background:var(--surface-2); color:#d1d5db; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+.validation-item:disabled { cursor:default; }
+.validation-item > i:first-child { font-size:18px; flex:0 0 auto; }
+.validation-item span { display:flex; flex-direction:column; gap:2px; flex:1; }
+.validation-item strong { color:#f3f4f6; font-size:13px; }
+.validation-item.is-error > i:first-child { color:#ff8a80; }
+.validation-item.is-warn > i:first-child { color:#f1c40f; }
+.validation-item.is-info > i:first-child { color:#71b9ff; }
+.validation-go { color:#6b7280; }
+.validation-ok { display:flex; flex-direction:column; align-items:center; gap:6px; padding:28px 12px; color:#9ca3af; text-align:center; }
+.validation-ok i { font-size:34px; color:#2ecc71; }
+.validation-ok strong { color:#e5e7eb; font-size:16px; }
 /* ---- css/mobile.css ---- */
 :root {
     --mobile-dock-height: 72px;

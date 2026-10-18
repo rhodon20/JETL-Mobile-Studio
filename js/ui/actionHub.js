@@ -13,11 +13,13 @@ import { formatRunDuration } from './runPanel.js';
 import { focusFlowNode } from './catalog.js';
 import { isSelecting, pickedIds, startSelection, stopSelection, setPicked, pickAll } from './multiSelect.js';
 import { duplicateNodes, removeNodes } from '../engine.js';
+import { openValidation } from './validationPanel.js';
 
 let running = false;
 
 const FLOW_ITEMS = [
     { icon: 'fa-magnifying-glass-location', label: 'Buscar en el lienzo', ui: 'open-flow-navigator' },
+    { icon: 'fa-list-check', label: 'Validar flujo', hub: 'validate' },
     { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
     { icon: 'fa-expand', label: 'Encuadrar', hub: 'fit' },
     { icon: 'fa-layer-group', label: 'Plantillas', ui: 'open-templates' },
@@ -127,6 +129,10 @@ async function runHubAction(action, nodeId) {
             removeNodes(ids);
             showToast(`${plural(ids.length)} eliminados · Deshacer los recupera`, 'success');
         }
+        return;
+    }
+    if (action === 'validate') {
+        openValidation();
         return;
     }
     if (action === 'run-all') {

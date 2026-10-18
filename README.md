@@ -17,8 +17,8 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   para recuperarlo o descartarlo al abrir la app.
 - Interfaz móvil: barra inferior (Nodos / Historial / Acciones / Resultados /
   Proyecto) y gestos en el lienzo. «Acciones» abre un panel según el contexto:
-  sin selección, ejecutar todo, buscar en el lienzo, encuadrar, plantillas y
-  parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
+  sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
+  problemas que lleva a cada nodo), encuadrar, plantillas y parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
   duplicarlo, centrarlo o eliminarlo. «Seleccionar varios» activa un modo en el que
   tocar un nodo lo marca y arrastrar uno marcado mueve el grupo; el panel ofrece
   entonces duplicar (con sus conexiones), eliminar, todos y ninguno. Durante una
