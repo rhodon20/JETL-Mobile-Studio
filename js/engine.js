@@ -196,7 +196,7 @@ function duplicateNodes(nodeIds) {
             const id = addNode(source.name);
             copyOf[source.id] = id;
             editor.updateNodeDataFromId(id, JSON.parse(JSON.stringify(source.data || {})));
-            moveNodeTo(id, source.pos_x + 40, source.pos_y + 40);
+            moveNodeTo(id, source.pos_x + CANVAS_GRID_SIZE * 2, source.pos_y + CANVAS_GRID_SIZE * 2);
         });
         sources.forEach((source) => {
             Object.entries(source.outputs || {}).forEach(([output, port]) => {
@@ -224,6 +224,32 @@ function removeNodes(nodeIds) {
     const mutation = () => nodeIds.forEach((id) => editor.removeNodeId('node-' + id));
     if (typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
     else mutation();
+}
+
+// Ajuste a la cuadrícula del lienzo (25 px, la misma que dibuja el fondo y que usa
+// Desktop). Activado por defecto: con el dedo es difícil alinear a mano.
+const CANVAS_GRID_SIZE = 25;
+const GRID_SNAP_KEY = 'jetl_canvas_grid_enabled';
+
+function isGridSnapEnabled() {
+    return SafeStorage.load(GRID_SNAP_KEY) !== '0';
+}
+
+function setGridSnapEnabled(enabled) {
+    SafeStorage.save(GRID_SNAP_KEY, enabled ? '1' : '0');
+}
+
+// Lleva el nodo al punto de la cuadrícula más cercano. Devuelve el desplazamiento
+// aplicado ({ dx, dy }) o null si no hacía falta o el ajuste está desactivado.
+function snapNodeToGrid(nodeId) {
+    const node = editor.drawflow.drawflow.Home.data[nodeId];
+    if (!node || !isGridSnapEnabled()) return null;
+    const snap = (value) => Math.round(Number(value || 0) / CANVAS_GRID_SIZE) * CANVAS_GRID_SIZE;
+    const dx = snap(node.pos_x) - node.pos_x;
+    const dy = snap(node.pos_y) - node.pos_y;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return null;
+    moveNodeTo(nodeId, node.pos_x + dx, node.pos_y + dy);
+    return { dx, dy };
 }
 
 // Mueve un nodo (datos y DOM) y redibuja sus conexiones.
@@ -539,5 +565,6 @@ export {
     selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
     cancelEngineRun, saveProject, loadProject, duplicateNode, duplicateNodes, removeNodes, moveNodeTo,
+    snapNodeToGrid, isGridSnapEnabled, setGridSnapEnabled,
     getSingleSelectedCanvasNodeId
 };

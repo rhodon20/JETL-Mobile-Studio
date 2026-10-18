@@ -313,6 +313,25 @@ try {
     });
     check('during a run the centre button cancels it', cancelLabel === 'Cancelar', cancelLabel);
 
+    // Nodes snap to the 25 px canvas grid by default when created or dropped.
+    const snapIds = await page.evaluate(() => { editor.clear(); const id = addNode('geo_buffer'); JETLNativeNav('flow'); JETLEvents.emit('canvas:fit'); return id; });
+    await page.waitForTimeout(200);
+    const dragBy = async (id, dx, dy) => {
+        const box = await page.locator(`#node-${id} .node-head`).boundingBox();
+        await page.mouse.move(box.x + 20, box.y + 10);
+        await page.mouse.down();
+        for (let k = 1; k <= 4; k++) await page.mouse.move(box.x + 20 + dx * k / 4, box.y + 10 + dy * k / 4);
+        await page.mouse.up();
+        return page.evaluate((id) => { const n = editor.drawflow.drawflow.Home.data[id]; return [n.pos_x, n.pos_y]; }, id);
+    };
+    const snapped = await dragBy(snapIds, 37, 13);
+    check('a dropped node snaps to the canvas grid', snapped.every((v) => v % 25 === 0), JSON.stringify(snapped));
+    await page.evaluate(() => { document.querySelector('[data-ui-action="toggle-grid-snap"]').click(); });
+    const free = await dragBy(snapIds, 37, 13);
+    const toggled = await page.evaluate(() => document.querySelector('[data-ui-action="toggle-grid-snap"]').getAttribute('aria-pressed'));
+    await page.evaluate(() => { document.querySelector('[data-ui-action="toggle-grid-snap"]').click(); });
+    check('grid snap can be turned off from Proyecto', toggled === 'false' && free.some((v) => v % 25 !== 0), JSON.stringify({ toggled, free }));
+
     // Multi-select: tap to pick, drag one to move the group, act on the group from the panel.
     const ms = await page.evaluate(() => {
         editor.clear();

@@ -34,7 +34,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel validar y anotaciones |
 | Validar el flujo antes de ejecutar | Pendiente (`validateCurrentFlow`) | Lista de problemas con salto al nodo |
 | Soltar un archivo en el lienzo crea su lector | Pendiente (`_handleDroppedFile`) | En móvil: abrir archivo → lector adecuado |
-| Ajuste a cuadrícula | Pendiente (`snapNodeToCanvasGrid`) | Opcional en móvil |
+| Ajuste a cuadrícula | Implementado: 25 px como Desktop, activado por defecto al crear y al soltar nodos (un grupo se ajusta entero); se desactiva en Proyecto > Cuadrícula | — |
 | Deshacer/rehacer | Implementado | Cubrir también conexiones y cambios de formulario |
 | Atajos de teclado configurables | Pendiente (`appSettings.js`) | Baja prioridad en móvil |
 | Nodo compacto + editor modal estilo Desktop | Implementado en Attributes, Geometry, Spatial, Readers, FeatureReader y Utils | Extender a Writers avanzados |

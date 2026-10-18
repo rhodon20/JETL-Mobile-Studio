@@ -9,7 +9,8 @@ import { closeRunMonitor } from './ui/runPanel.js';
 import './mobile.js';
 import {
     selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
-    startNewProject, restoreLocalDraft, addNodeClick, cancelEngineRun, runEnginePartial, saveProject, loadProject
+    startNewProject, restoreLocalDraft, addNodeClick, cancelEngineRun, runEnginePartial, saveProject, loadProject,
+    snapNodeToGrid, moveNodeTo, isGridSnapEnabled, setGridSnapEnabled
 } from './engine.js';
 import { clearNodeDirty, invalidateAllNodes, invalidateNodeAndDownstream } from './engine/dirty.js';
 import { downloadRunReport } from './state/runHistory.js';
@@ -17,7 +18,7 @@ import { undo, redo, initHistory } from './state/history.js';
 import { saveDraft } from './state/draft.js';
 import { offerDraftRecovery } from './ui/draftPrompt.js';
 import { initActionHub } from './ui/actionHub.js';
-import { initMultiSelect } from './ui/multiSelect.js';
+import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 
 let jetlAppInitialized = false;
 // Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
@@ -99,7 +100,21 @@ function initializeJETLApp() {
                 invalidateAllNodes('node_removed');
                 if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts(removedId);
             } else if (ev === 'nodeCreated') {
+                snapNodeToGrid(String(payload));
                 invalidateNodeAndDownstream(String(payload), 'node_created');
+            } else if (ev === 'nodeMoved') {
+                // Este listener va antes que el del historial: el ajuste entra en el
+                // mismo paso de deshacer. Un grupo se desplaza entero con el ajuste
+                // del nodo arrastrado para conservar su disposición.
+                const movedId = String(payload);
+                const delta = snapNodeToGrid(movedId);
+                if (delta && isSelecting() && pickedIds().includes(movedId)) {
+                    pickedIds().forEach((id) => {
+                        if (id === movedId) return;
+                        const node = editor.drawflow.drawflow.Home.data[id];
+                        moveNodeTo(id, node.pos_x + delta.dx, node.pos_y + delta.dy);
+                    });
+                }
             } else if (ev === 'connectionCreated' || ev === 'connectionRemoved') {
                 const srcId = payload && payload.output_id ? String(payload.output_id) : null;
                 const dstId = payload && payload.input_id ? String(payload.input_id) : null;
@@ -226,7 +241,16 @@ window.addEventListener('load', () => {
     if (!jetlAppInitialized) initializeJETLApp();
 }, { once: true });
 
+function syncGridSnapButton() {
+    const on = isGridSnapEnabled();
+    document.querySelectorAll('[data-ui-action="toggle-grid-snap"]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(on));
+        button.querySelector('span').textContent = on ? 'Cuadrícula: sí' : 'Cuadrícula: no';
+    });
+}
+
 function initEngineDelegation() {
+    syncGridSnapButton();
     document.addEventListener('click', (e) => {
         const schemaActionEl = e.target.closest('[data-schema-action]');
         if (schemaActionEl && !window.JETLSchemaUI) {
@@ -268,6 +292,11 @@ function initEngineDelegation() {
         else if (action === 'new-project') startNewProject();
         else if (action === 'restore-draft') restoreLocalDraft();
         else if (action === 'open-flow-navigator') openFlowNavigator();
+        else if (action === 'toggle-grid-snap') {
+            setGridSnapEnabled(!isGridSnapEnabled());
+            syncGridSnapButton();
+            showToast(isGridSnapEnabled() ? 'Ajuste a la cuadrícula activado' : 'Ajuste a la cuadrícula desactivado', 'info');
+        }
         else if (action === 'close-flow-navigator') closeFlowNavigator();
         else if (action === 'save-project') saveProject();
         else if (action === 'open-project') {
