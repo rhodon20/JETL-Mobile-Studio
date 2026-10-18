@@ -201,7 +201,7 @@ function _importHistoryState(state) {
     editor.clear();
     editor.import(_cloneState(state));
     saveDraft(editor.export());
-    setTimeout(() => JETLEvents.emit('workspace:replaced'), 0);
+    setTimeout(() => JETLEvents.emit('workspace:replaced', { source: 'history' }), 0);
 }
 
 function addToHistory() {

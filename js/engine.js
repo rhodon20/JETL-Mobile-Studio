@@ -184,31 +184,60 @@ function selectCanvasNode(nodeId) {
     editor.dispatch?.('nodeSelected', String(nodeId));
 }
 
-// Copia de un nodo con su configuración, desplazada para que se vea; un solo
-// paso de deshacer. No copia lo que vive fuera de node.data (p. ej. el archivo
-// elegido en un lector local, que el navegador no permite duplicar).
-function duplicateNode(nodeId) {
-    const source = editor.getNodeFromId(nodeId);
-    if (!source || !TOOL_REGISTRY[source.name]) return null;
-    let id = null;
+// Copia nodos con su configuración y las conexiones entre ellos, desplazados para
+// que se vean; un solo paso de deshacer. Devuelve los ids nuevos en el mismo orden.
+// No copia lo que vive fuera de node.data (p. ej. el archivo elegido en un lector
+// local, que el navegador no permite duplicar).
+function duplicateNodes(nodeIds) {
+    const sources = nodeIds.map((id) => editor.getNodeFromId(id)).filter((node) => node && TOOL_REGISTRY[node.name]);
+    const copyOf = {};
     const mutation = () => {
-        id = addNode(source.name);
-        editor.updateNodeDataFromId(id, JSON.parse(JSON.stringify(source.data || {})));
-        const node = editor.drawflow.drawflow.Home.data[id];
-        node.pos_x = source.pos_x + 40;
-        node.pos_y = source.pos_y + 40;
-        const el = document.getElementById('node-' + id);
-        if (el) {
-            el.style.left = node.pos_x + 'px';
-            el.style.top = node.pos_y + 'px';
-        }
+        sources.forEach((source) => {
+            const id = addNode(source.name);
+            copyOf[source.id] = id;
+            editor.updateNodeDataFromId(id, JSON.parse(JSON.stringify(source.data || {})));
+            moveNodeTo(id, source.pos_x + 40, source.pos_y + 40);
+        });
+        sources.forEach((source) => {
+            Object.entries(source.outputs || {}).forEach(([output, port]) => {
+                (port.connections || []).forEach((link) => {
+                    if (copyOf[link.node]) editor.addConnection(copyOf[source.id], copyOf[link.node], output, link.output);
+                });
+            });
+        });
     };
     if (typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
     else mutation();
     // Guarda el borrador con la configuración copiada.
-    editor.dispatch('nodeDataChanged', String(id));
-    selectCanvasNode(id);
-    return id;
+    Object.values(copyOf).forEach((id) => editor.dispatch('nodeDataChanged', String(id)));
+    return sources.map((source) => copyOf[source.id]);
+}
+
+function duplicateNode(nodeId) {
+    const [id] = duplicateNodes([nodeId]);
+    if (id) selectCanvasNode(id);
+    return id || null;
+}
+
+// Elimina varios nodos como un solo paso de deshacer.
+function removeNodes(nodeIds) {
+    const mutation = () => nodeIds.forEach((id) => editor.removeNodeId('node-' + id));
+    if (typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
+    else mutation();
+}
+
+// Mueve un nodo (datos y DOM) y redibuja sus conexiones.
+function moveNodeTo(nodeId, x, y) {
+    const node = editor.drawflow.drawflow.Home.data[nodeId];
+    if (!node) return;
+    node.pos_x = x;
+    node.pos_y = y;
+    const el = document.getElementById('node-' + nodeId);
+    if (el) {
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+    }
+    editor.updateConnectionNodes('node-' + nodeId);
 }
 
 function addNodeClick(k) {
@@ -509,5 +538,6 @@ Object.assign(window, { addNode, addNodeClick, runEngine, runEnginePartial, canc
 export {
     selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
-    cancelEngineRun, saveProject, loadProject, duplicateNode, getSingleSelectedCanvasNodeId
+    cancelEngineRun, saveProject, loadProject, duplicateNode, duplicateNodes, removeNodes, moveNodeTo,
+    getSingleSelectedCanvasNodeId
 };

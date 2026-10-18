@@ -19,7 +19,10 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   Proyecto) y gestos en el lienzo. «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, encuadrar, plantillas y
   parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
-  duplicarlo, centrarlo o eliminarlo. Durante una ejecución, el botón la cancela.
+  duplicarlo, centrarlo o eliminarlo. «Seleccionar varios» activa un modo en el que
+  tocar un nodo lo marca y arrastrar uno marcado mueve el grupo; el panel ofrece
+  entonces duplicar (con sus conexiones), eliminar, todos y ninguno. Durante una
+  ejecución, el botón la cancela.
 
 ### Formatos
 - Lectura: GeoJSON/JSON, KML, Shapefile (ZIP), OSM (Overpass), WKT, GeoTIFF,

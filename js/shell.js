@@ -17,6 +17,7 @@ import { undo, redo, initHistory } from './state/history.js';
 import { saveDraft } from './state/draft.js';
 import { offerDraftRecovery } from './ui/draftPrompt.js';
 import { initActionHub } from './ui/actionHub.js';
+import { initMultiSelect } from './ui/multiSelect.js';
 
 let jetlAppInitialized = false;
 // Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
@@ -164,6 +165,7 @@ function initializeJETLApp() {
             ['historial', initHistory],
             ['menú contextual', initContextMenu],
             ['panel de acciones', initActionHub],
+            ['multiselección', initMultiSelect],
             ['navegador de flujo', initFlowNavigator],
             ['búsqueda rápida', initQuickSearch]
         ];

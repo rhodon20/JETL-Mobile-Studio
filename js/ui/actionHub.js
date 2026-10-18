@@ -11,11 +11,14 @@ import { _getGraphDataSafe } from '../engine/dirty.js';
 import { loadRunHistory } from '../state/runHistory.js';
 import { formatRunDuration } from './runPanel.js';
 import { focusFlowNode } from './catalog.js';
+import { isSelecting, pickedIds, startSelection, stopSelection, setPicked, pickAll } from './multiSelect.js';
+import { duplicateNodes, removeNodes } from '../engine.js';
 
 let running = false;
 
 const FLOW_ITEMS = [
     { icon: 'fa-magnifying-glass-location', label: 'Buscar en el lienzo', ui: 'open-flow-navigator' },
+    { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
     { icon: 'fa-expand', label: 'Encuadrar', hub: 'fit' },
     { icon: 'fa-layer-group', label: 'Plantillas', ui: 'open-templates' },
     { icon: 'fa-sliders', label: 'Parámetros', ui: 'open-params' }
@@ -25,9 +28,16 @@ const NODE_ITEMS = [
     { icon: 'fa-map-location-dot', label: 'Ver resultado', hub: 'view' },
     { icon: 'fa-clone', label: 'Duplicar', hub: 'duplicate' },
     { icon: 'fa-crosshairs', label: 'Centrar', hub: 'center' },
-    { icon: 'fa-magnifying-glass-location', label: 'Buscar en el lienzo', ui: 'open-flow-navigator' },
+    { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
     { icon: 'fa-play', label: 'Ejecutar todo', hub: 'run-all' },
     { icon: 'fa-trash-can', label: 'Eliminar', hub: 'delete', danger: true }
+];
+
+const SELECTION_ITEMS = [
+    { icon: 'fa-check-double', label: 'Todos', hub: 'pick-all' },
+    { icon: 'fa-ban', label: 'Ninguno', hub: 'pick-none' },
+    { icon: 'fa-check', label: 'Terminar', hub: 'select-done' },
+    { icon: 'fa-trash-can', label: 'Eliminar', hub: 'delete-group', danger: true }
 ];
 
 function lastFullRun() {
@@ -46,7 +56,17 @@ function itemHtml(item) {
     return `<button type="button" class="action-hub-item${item.danger ? ' danger' : ''}" ${attr}><i class="fas ${item.icon}" aria-hidden="true"></i><span>${item.label}</span></button>`;
 }
 
+const plural = (n) => `${n} ${n === 1 ? 'nodo' : 'nodos'}`;
+
 function render(panel) {
+    if (isSelecting()) {
+        const count = pickedIds().length;
+        panel.dataset.nodeId = '';
+        panel.innerHTML = `<div class="action-hub-head">Selección · ${plural(count)}</div>
+            <button type="button" class="action-hub-primary" data-hub-action="duplicate-group" ${count ? '' : 'disabled'}><i class="fas fa-clone" aria-hidden="true"></i><span>Duplicar ${plural(count)}</span><small>con sus conexiones</small></button>
+            <div class="action-hub-grid">${SELECTION_ITEMS.map(itemHtml).join('')}</div>`;
+        return;
+    }
     const nodeId = getSingleSelectedCanvasNodeId();
     const node = nodeId && editor.getNodeFromId(nodeId);
     let head, primary, items;
@@ -90,6 +110,25 @@ function showFlow() {
 }
 
 async function runHubAction(action, nodeId) {
+    if (action === 'select') {
+        showFlow();
+        startSelection(nodeId);
+        return;
+    }
+    if (isSelecting()) {
+        const ids = pickedIds();
+        if (action === 'pick-all') pickAll();
+        else if (action === 'pick-none') setPicked([]);
+        else if (action === 'select-done') stopSelection();
+        else if (action === 'duplicate-group' && ids.length) {
+            setPicked(duplicateNodes(ids));
+            showToast(`${plural(ids.length)} duplicados`, 'success');
+        } else if (action === 'delete-group' && ids.length) {
+            removeNodes(ids);
+            showToast(`${plural(ids.length)} eliminados · Deshacer los recupera`, 'success');
+        }
+        return;
+    }
     if (action === 'run-all') {
         showFlow();
         await window.JETLRunAll?.();

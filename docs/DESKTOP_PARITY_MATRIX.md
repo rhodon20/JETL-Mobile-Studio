@@ -28,10 +28,10 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Insertar un nodo sobre una conexión | Implementado | Dividir la conexión, preservar puertos y un solo deshacer |
 | Pan, zoom, selección y centrado | Implementado | Regresión táctil en Safari y Chromium móvil |
 | Navegador del flujo | Parcial: búsqueda de nodos sí; sin minimapa (`canvasNavigator.js`); la búsqueda «por atributos» mira la configuración del nodo, no los campos de los datos como Desktop | Minimapa y búsqueda por campos del esquema |
-| Multiselección y operaciones en lote | Pendiente (`engine.js`: selección por recuadro, duplicar, autoorganizar, insertar Junction) | Modo de selección táctil; mover, duplicar y eliminar el conjunto |
+| Multiselección y operaciones en lote | Implementado en móvil: «Seleccionar varios» en el panel «Acciones»; tocar marca, arrastrar uno marcado mueve el grupo, duplicar conserva las conexiones internas y eliminar; todo con un solo deshacer. Sin selección por recuadro, autoorganizar ni insertar Junction (Desktop `engine.js`) | Selección por recuadro si el uso lo pide |
 | Marcadores/grupos y anotaciones | Pendiente (`engine.js`: grupos plegables con color y anotaciones, guardados en el proyecto) | Crear, plegar, editar y persistir en `.jetl` |
 | Selector de puerto asistido | Pendiente (`portSemantics.js`) | Elegir puerto al conectar en vez del primero compatible |
-| Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel multiselección, validar y anotaciones |
+| Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel validar y anotaciones |
 | Validar el flujo antes de ejecutar | Pendiente (`validateCurrentFlow`) | Lista de problemas con salto al nodo |
 | Soltar un archivo en el lienzo crea su lector | Pendiente (`_handleDroppedFile`) | En móvil: abrir archivo → lector adecuado |
 | Ajuste a cuadrícula | Pendiente (`snapNodeToCanvasGrid`) | Opcional en móvil |
@@ -91,7 +91,7 @@ Propuesta de orden, por impacto en el uso real en un teléfono:
 3. ~~Recuperación automática del borrador~~ (hecho).
 4. ~~Perfil de baja memoria~~ (hecho en el mapa; ver la fila de perfiles).
 5. ~~Tabla: centrar la entidad al tocar la fila y columnas visibles~~ (hecho).
-6. Multiselección táctil con operaciones en lote; después, grupos plegables.
+6. ~~Multiselección táctil con operaciones en lote~~ (hecho); después, grupos plegables.
 7. Validación del flujo antes de ejecutar.
 8. Inspector de esquema sin ejecutar.
 

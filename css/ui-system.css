@@ -710,3 +710,21 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
 #mobile-run.is-cancel { background:linear-gradient(145deg,#c0392b,#962d22); box-shadow:0 8px 20px rgba(192,57,43,.42); }
 @keyframes action-hub-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { body.action-hub-open #action-hub { animation:none; } }
+.action-hub-primary:disabled { opacity:.45; box-shadow:none; cursor:default; }
+
+/* Multiselección (js/ui/multiSelect.js): en el modo, un toque marca el nodo; sus
+   controles y puertos no reaccionan. Cada nodo muestra un círculo en la esquina. */
+.multi-select-mode .drawflow-node .node-body *,
+.multi-select-mode .drawflow-node .node-actions,
+.multi-select-mode .drawflow-node .input,
+.multi-select-mode .drawflow-node .output { pointer-events:none; }
+.multi-select-mode .drawflow-node::after { content:''; position:absolute; top:-13px; right:-13px; z-index:5; width:26px; height:26px; box-sizing:border-box; border-radius:50%;
+    border:2px solid rgba(255,255,255,.55); background:rgba(0,0,0,.35); font:900 13px/22px "Font Awesome 6 Free"; color:#fff; text-align:center; }
+.multi-select-mode .drawflow-node.is-picked { outline:3px solid #3498db; outline-offset:3px; }
+.multi-select-mode .drawflow-node.is-picked::after { content:'\f00c'; border-color:#3498db; background:#3498db; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+#multi-select-banner { display:none; }
+.multi-select-mode #multi-select-banner { position:fixed; top:calc(var(--mobile-safe-top, 0px) + 66px); left:50%; transform:translateX(-50%); z-index:1100;
+    display:flex; align-items:center; gap:8px; padding:6px 6px 6px 14px; border-radius:22px; white-space:nowrap;
+    color:#e5e7eb; font-size:14px; font-weight:600; background:rgba(31,32,35,.96); border:1px solid rgba(52,152,219,.6); box-shadow:0 6px 18px rgba(0,0,0,.45); }
+#multi-select-banner i { color:#71b9ff; }
+#multi-select-banner button { min-height:32px; padding:0 14px; border:0; border-radius:16px; color:#fff; font:inherit; background:#237fbe; cursor:pointer; }

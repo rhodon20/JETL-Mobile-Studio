@@ -313,6 +313,69 @@ try {
     });
     check('during a run the centre button cancels it', cancelLabel === 'Cancelar', cancelLabel);
 
+    // Multi-select: tap to pick, drag one to move the group, act on the group from the panel.
+    const ms = await page.evaluate(() => {
+        editor.clear();
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_buffer');
+        const c = addNode('geo_centroid');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        editor.addConnection(b, c, 'output_1', 'input_1');
+        const place = (id, x, y) => { const n = editor.drawflow.drawflow.Home.data[id]; n.pos_x = x; n.pos_y = y; const el = document.getElementById('node-' + id); el.style.left = x + 'px'; el.style.top = y + 'px'; editor.updateConnectionNodes('node-' + id); };
+        place(a, 20, 20); place(b, 20, 260); place(c, 20, 520);
+        addToHistory();
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        editor.node_selected = null;
+        JETLNativeNav('flow');
+        JETLEvents.emit('canvas:fit');
+        return { a, b, c };
+    });
+    await page.waitForTimeout(300);
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="select"]');
+    await page.click(`#node-${ms.a} .node-head`);
+    await page.click(`#node-${ms.b} .node-head`);
+    const picking = await page.evaluate(() => ({
+        mode: document.body.classList.contains('multi-select-mode'),
+        banner: document.getElementById('multi-select-banner').textContent,
+        picked: [...document.querySelectorAll('.drawflow-node.is-picked')].length
+    }));
+    check('select mode picks nodes with a tap', picking.mode && picking.picked === 2 && picking.banner.includes('2 nodos'), JSON.stringify(picking));
+
+    const posOf = (id) => page.evaluate((id) => { const n = editor.drawflow.drawflow.Home.data[id]; return [n.pos_x, n.pos_y]; }, id);
+    const [beforeA, beforeB, beforeC] = [await posOf(ms.a), await posOf(ms.b), await posOf(ms.c)];
+    const head = await page.locator(`#node-${ms.a} .node-head`).boundingBox();
+    await page.mouse.move(head.x + 20, head.y + 10);
+    await page.mouse.down();
+    for (let k = 1; k <= 5; k++) await page.mouse.move(head.x + 20 + k * 12, head.y + 10 + k * 6);
+    await page.mouse.up();
+    const [afterA, afterB, afterC] = [await posOf(ms.a), await posOf(ms.b), await posOf(ms.c)];
+    const moved = [afterA[0] - beforeA[0], afterA[1] - beforeA[1]];
+    check('dragging a picked node moves the whole group', moved[0] > 0 && Math.abs((afterB[0] - beforeB[0]) - moved[0]) < 0.5 && Math.abs((afterB[1] - beforeB[1]) - moved[1]) < 0.5 && afterC[0] === beforeC[0], JSON.stringify({ moved, b: [afterB[0] - beforeB[0], afterB[1] - beforeB[1]], c: afterC[0] - beforeC[0] }));
+    await page.evaluate(() => undo());
+    check('the group move undoes in one step', JSON.stringify([await posOf(ms.a), await posOf(ms.b)]) === JSON.stringify([beforeA, beforeB]));
+
+    await page.click('#mobile-run');
+    const groupHub = await hubState();
+    await page.click('#action-hub [data-hub-action="duplicate-group"]');
+    const dup = await page.evaluate(({ a, b }) => {
+        const data = editor.export().drawflow.Home.data;
+        const copies = Object.values(data).filter((n) => ![a, b].map(String).includes(String(n.id)) && ['reader_bbox_gen', 'geo_buffer'].includes(n.name) );
+        const copyA = copies.find((n) => n.name === 'reader_bbox_gen');
+        const copyB = copies.find((n) => n.name === 'geo_buffer');
+        const linked = copyA && copyB && (copyA.outputs.output_1.connections || []).some((l) => String(l.node) === String(copyB.id));
+        return { nodes: Object.keys(data).length, linked, picked: [...document.querySelectorAll('.drawflow-node.is-picked')].map((el) => el.id.replace('node-', '')).sort().join() === [copyA?.id, copyB?.id].map(String).sort().join() };
+    }, ms);
+    check('the panel duplicates the picked group with its connection', groupHub.primary === 'Duplicar 2 nodos' && dup.nodes === 5 && dup.linked && dup.picked, JSON.stringify({ groupHub: groupHub.primary, dup }));
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="delete-group"]');
+    const afterDelete = await hubState();
+    await page.evaluate(() => undo());
+    const afterUndo = await hubState();
+    check('deleting the group is one undo step', afterDelete.nodes === 3 && afterUndo.nodes === 5, JSON.stringify({ afterDelete: afterDelete.nodes, afterUndo: afterUndo.nodes }));
+    await page.click('#multi-select-banner button');
+    check('Listo leaves select mode', await page.evaluate(() => !document.body.classList.contains('multi-select-mode') && !document.querySelector('.drawflow-node.is-picked')));
+
     // Draft recovery: after a reload the app asks before touching the saved flow.
     const reloadAndReadPrompt = async () => {
         await page.reload({ waitUntil: 'load' });
