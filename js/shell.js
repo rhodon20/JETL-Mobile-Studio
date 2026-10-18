@@ -16,6 +16,7 @@ import { downloadRunReport } from './state/runHistory.js';
 import { undo, redo, initHistory } from './state/history.js';
 import { saveDraft } from './state/draft.js';
 import { offerDraftRecovery } from './ui/draftPrompt.js';
+import { initActionHub } from './ui/actionHub.js';
 
 let jetlAppInitialized = false;
 // Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
@@ -162,6 +163,7 @@ function initializeJETLApp() {
             ['controles principales', initEngineDelegation],
             ['historial', initHistory],
             ['menú contextual', initContextMenu],
+            ['panel de acciones', initActionHub],
             ['navegador de flujo', initFlowNavigator],
             ['búsqueda rápida', initQuickSearch]
         ];

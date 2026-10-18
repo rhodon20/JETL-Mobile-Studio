@@ -255,6 +255,64 @@ try {
     check('a table column can be hidden and shown again', !hiddenCol.headers.includes('i') && hiddenCol.label === 'Columnas 0/1' && shownCol.includes('i'), JSON.stringify({ hiddenCol, shownCol }));
     await page.evaluate((id) => { editor.removeNodeId('node-' + id); JETLNativeNav('flow'); }, shapes.id);
 
+    // The centre button opens the actions panel; its contents follow the selection.
+    const hubState = () => page.evaluate(() => ({
+        open: document.body.classList.contains('action-hub-open'),
+        head: document.querySelector('#action-hub .action-hub-head')?.textContent || '',
+        primary: document.querySelector('#action-hub .action-hub-primary span')?.textContent || '',
+        items: [...document.querySelectorAll('#action-hub .action-hub-item span')].map((el) => el.textContent),
+        nodes: Object.keys(editor.export().drawflow.Home.data).length,
+        button: document.getElementById('mobile-run').textContent.trim()
+    }));
+    const hubIds = await page.evaluate(() => {
+        editor.clear();
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_buffer');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        editor.node_selected = null;
+        JETLNativeNav('flow');
+        return { a, b };
+    });
+    await page.click('#mobile-run');
+    const flowHub = await hubState();
+    check('actions panel offers the flow actions with nothing selected', flowHub.open && flowHub.primary === 'Ejecutar todo' && flowHub.items.includes('Buscar en el lienzo') && flowHub.head.includes('2 nodos'), JSON.stringify(flowHub));
+    await page.click('#mobile-dock [data-mobile-view="results"]');
+    const closedByDock = await page.evaluate(() => !document.body.classList.contains('action-hub-open'));
+    check('another dock button closes the actions panel', closedByDock);
+    await page.evaluate(() => JETLNativeNav('flow'));
+    await page.click('#mobile-run');
+    await page.click('#action-hub .action-hub-primary');
+    await page.waitForFunction(() => window.lastRunReport?.scope === 'full' && document.getElementById('mobile-run').textContent.includes('Acciones'), null, { timeout: 15000 });
+    check('its primary action runs the whole flow', await page.evaluate(() => window.lastRunReport.status === 'ok' && !document.body.classList.contains('action-hub-open')));
+
+    await page.evaluate((b) => {
+        const el = document.querySelector(`#node-${b} [df-dist]`);
+        el.value = '250';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('node-' + b).classList.add('selected');
+        editor.node_selected = document.getElementById('node-' + b);
+    }, hubIds.b);
+    await page.click('#mobile-run');
+    const nodeHub = await hubState();
+    check('with a node selected the panel offers that node', nodeHub.primary === 'Ejecutar hasta aquí' && nodeHub.head.includes(`#${hubIds.b}`) && nodeHub.items.includes('Duplicar'), JSON.stringify(nodeHub));
+    await page.click('#action-hub [data-hub-action="duplicate"]');
+    const duplicated = await page.evaluate((b) => {
+        const data = editor.export().drawflow.Home.data;
+        const copy = Object.values(data).find((n) => String(n.id) !== String(b) && n.name === 'geo_buffer');
+        return { nodes: Object.keys(data).length, copied: copy && JSON.stringify(copy.data) === JSON.stringify(data[b].data) && Object.keys(copy.data).length > 0 };
+    }, hubIds.b);
+    await page.evaluate(() => undo());
+    const undone = await hubState();
+    check('duplicate copies the node configuration and undoes in one step', duplicated.nodes === 3 && duplicated.copied && undone.nodes === 2, JSON.stringify({ duplicated, undone: undone.nodes }));
+    const cancelLabel = await page.evaluate(() => {
+        JETLEvents.emit('run:start', { label: 'x', plannedIds: [] });
+        const during = document.getElementById('mobile-run').textContent.trim();
+        JETLEvents.emit('run:finish', { label: 'x', status: 'cancelled' });
+        return during;
+    });
+    check('during a run the centre button cancels it', cancelLabel === 'Cancelar', cancelLabel);
+
     // Draft recovery: after a reload the app asks before touching the saved flow.
     const reloadAndReadPrompt = async () => {
         await page.reload({ waitUntil: 'load' });

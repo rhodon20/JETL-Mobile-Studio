@@ -36,11 +36,15 @@ test('el gesto del catálogo distingue tap de scroll', () => {
     assert.doesNotMatch(sidebarMarkup, /ontouchend|this\.click\(\)/);
 });
 
-test('el botón protagonista ejecuta exclusivamente el flujo completo', () => {
+// El botón central abre el panel «Acciones» (decisión del usuario del 18 de
+// octubre); ejecutar todo pasa a ser su acción principal sin selección.
+test('el botón protagonista abre el panel de acciones, que sigue ofreciendo ejecutar todo', () => {
     const runButton = index.match(/<button[^>]+id="mobile-run"[^>]*>/)?.[0] ?? '';
-    assert.match(runButton, /aria-label="Ejecutar todo el flujo"/);
-    assert.match(runButton, /JETLRunAll\(\)/);
-    assert.doesNotMatch(runButton, /runEnginePartial|currentNodeId/);
+    assert.match(runButton, /aria-label="Acciones"/);
+    assert.match(runButton, /aria-haspopup="dialog"/);
+    assert.doesNotMatch(runButton, /onclick=|runEnginePartial|currentNodeId/);
+    const hub = readFileSync(new URL('../js/ui/actionHub.js', import.meta.url), 'utf8');
+    assert.match(hub, /action === 'run-all'[\s\S]*?window\.JETLRunAll/);
     assert.match(index, /window\.JETLRunAll = async function[\s\S]*?window\.runEngine\(\)/);
 });
 

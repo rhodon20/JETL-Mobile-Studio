@@ -15,8 +15,11 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   transformadores, simbología por atributos.
 - Proyectos `.jetl` (guardar/cargar) y borrador local en el navegador, con aviso
   para recuperarlo o descartarlo al abrir la app.
-- Interfaz móvil: barra inferior (Nodos / Historial / Ejecutar todo /
-  Resultados / Proyecto), gestos en el lienzo.
+- Interfaz móvil: barra inferior (Nodos / Historial / Acciones / Resultados /
+  Proyecto) y gestos en el lienzo. «Acciones» abre un panel según el contexto:
+  sin selección, ejecutar todo, buscar en el lienzo, encuadrar, plantillas y
+  parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
+  duplicarlo, centrarlo o eliminarlo. Durante una ejecución, el botón la cancela.
 
 ### Formatos
 - Lectura: GeoJSON/JSON, KML, Shapefile (ZIP), OSM (Overpass), WKT, GeoTIFF,

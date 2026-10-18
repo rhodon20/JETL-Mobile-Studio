@@ -31,7 +31,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Multiselección y operaciones en lote | Pendiente (`engine.js`: selección por recuadro, duplicar, autoorganizar, insertar Junction) | Modo de selección táctil; mover, duplicar y eliminar el conjunto |
 | Marcadores/grupos y anotaciones | Pendiente (`engine.js`: grupos plegables con color y anotaciones, guardados en el proyecto) | Crear, plegar, editar y persistir en `.jetl` |
 | Selector de puerto asistido | Pendiente (`portSemantics.js`) | Elegir puerto al conectar en vez del primero compatible |
-| Menú contextual | Parcial: ejecutar, ver, eliminar (Desktop añade duplicar, junction, marcador, anotación, autoorganizar, crear transformador, validar) | Acciones de nodo completas con pulsación larga |
+| Menú contextual | Parcial: el panel «Acciones» del dock ofrece, para el nodo seleccionado, ejecutar hasta él, ver resultado, duplicar, centrar y eliminar (Desktop añade junction, marcador, anotación, autoorganizar, crear transformador, validar). El menú de clic derecho sólo aparece en Android: Safari no lo lanza con pulsación larga | Añadir al panel multiselección, validar y anotaciones |
 | Validar el flujo antes de ejecutar | Pendiente (`validateCurrentFlow`) | Lista de problemas con salto al nodo |
 | Soltar un archivo en el lienzo crea su lector | Pendiente (`_handleDroppedFile`) | En móvil: abrir archivo → lector adecuado |
 | Ajuste a cuadrícula | Pendiente (`snapNodeToCanvasGrid`) | Opcional en móvil |

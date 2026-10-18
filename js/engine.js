@@ -184,6 +184,33 @@ function selectCanvasNode(nodeId) {
     editor.dispatch?.('nodeSelected', String(nodeId));
 }
 
+// Copia de un nodo con su configuración, desplazada para que se vea; un solo
+// paso de deshacer. No copia lo que vive fuera de node.data (p. ej. el archivo
+// elegido en un lector local, que el navegador no permite duplicar).
+function duplicateNode(nodeId) {
+    const source = editor.getNodeFromId(nodeId);
+    if (!source || !TOOL_REGISTRY[source.name]) return null;
+    let id = null;
+    const mutation = () => {
+        id = addNode(source.name);
+        editor.updateNodeDataFromId(id, JSON.parse(JSON.stringify(source.data || {})));
+        const node = editor.drawflow.drawflow.Home.data[id];
+        node.pos_x = source.pos_x + 40;
+        node.pos_y = source.pos_y + 40;
+        const el = document.getElementById('node-' + id);
+        if (el) {
+            el.style.left = node.pos_x + 'px';
+            el.style.top = node.pos_y + 'px';
+        }
+    };
+    if (typeof window.JETLHistoryTransaction === 'function') window.JETLHistoryTransaction(mutation);
+    else mutation();
+    // Guarda el borrador con la configuración copiada.
+    editor.dispatch('nodeDataChanged', String(id));
+    selectCanvasNode(id);
+    return id;
+}
+
 function addNodeClick(k) {
     const rect = document.getElementById('drawflow').getBoundingClientRect();
     const connection = getSelectedCanvasConnection();
@@ -482,5 +509,5 @@ Object.assign(window, { addNode, addNodeClick, runEngine, runEnginePartial, canc
 export {
     selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
-    cancelEngineRun, saveProject, loadProject
+    cancelEngineRun, saveProject, loadProject, duplicateNode, getSingleSelectedCanvasNodeId
 };

@@ -298,4 +298,4 @@ window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render
 window.JETLOpenRunHistory = openRunHistory;
 window.JETLCloseRunHistory = closeRunHistory;
 
-export { closeRunMonitor };
+export { closeRunMonitor, formatRunDuration };
