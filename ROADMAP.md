@@ -15,8 +15,8 @@
    `7797aa1`): `docs/DESKTOP_PARITY_MATRIX.md` (capacidades, con prioridades para
    móvil) y `docs/NODE_CATALOG_PARITY.md` > Paridad de configuración (53/115 nodos
    difieren; `scripts/audit-node-params.mjs`). Orden acordado: reproyectar al
-   pintar (hecho), aviso de recuperación del borrador (hecho), perfil de baja
-   memoria, tabla → mapa y columnas visibles, multiselección táctil.
+   pintar (hecho), aviso de recuperación del borrador (hecho), límites de
+   memoria al pintar (hecho), tabla → mapa y columnas visibles, multiselección táctil.
 2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
    bloqueo de arranque en Safari) aprovechando las URLs versionadas por
    contenido; validar en iPhone antes de publicar.

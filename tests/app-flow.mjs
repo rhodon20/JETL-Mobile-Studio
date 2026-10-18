@@ -210,6 +210,22 @@ try {
         check('published scripts are fetched with their version', unversioned.length === 0, unversioned.join(', '));
     }
 
+    // Large polygon layers are sampled on the map only; the node keeps every feature.
+    const shapes = await page.evaluate(async () => {
+        const id = addNode('geo_buffer');
+        const features = Array.from({ length: 6000 }, (_, i) => {
+            const x = -3.7 + (i % 100) * 0.001, y = 40.4 + Math.floor(i / 100) * 0.001;
+            return turf.polygon([[[x, y], [x + 0.0005, y], [x + 0.0005, y + 0.0005], [x, y]]], { i });
+        });
+        executionData[id] = { data: turf.featureCollection(features) };
+        await showOnMap(id);
+        const drawn = mapLayers[id].getLayers().length;
+        const kept = executionData[id].data.features.length;
+        editor.removeNodeId('node-' + id);
+        return { drawn, kept, indicator: document.getElementById('map-perf-indicator')?.textContent || '' };
+    });
+    check('large polygon layers are sampled on the map only', shapes.drawn === 5000 && shapes.kept === 6000 && shapes.indicator.includes('mostrando'), JSON.stringify(shapes));
+
     // Draft recovery: after a reload the app asks before touching the saved flow.
     const reloadAndReadPrompt = async () => {
         await page.reload({ waitUntil: 'load' });

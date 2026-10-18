@@ -49,7 +49,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Cancelación | Implementado | — |
 | Monitor y diagnóstico durante el run | Implementado (más detallado que Desktop) | — |
 | Historial e informe JSON/CSV | Implementado (exporta la ejecución seleccionada; Desktop también todo el historial) | — |
-| Perfiles normal/baja memoria/automático | **Pendiente** (`core.js` `getJETLRuntimeProfile`); antes figuraba como Parcial, pero Studio sólo tiene umbrales fijos al pintar el mapa | Perfil automático en móvil: límites de mapa/tabla y compactación |
+| Perfiles normal/baja memoria/automático | Parcial, por medición: en móvil Desktop activa siempre el perfil de baja memoria, así que Studio aplica directamente sus límites donde se midió el problema. El mapa pinta como mucho 5.000 líneas/polígonos y 20.000 puntos (50.000 polígonos: de 293 MB y 1,5 s a 31 MB y 0,4 s); la tabla ya pagina. Sin portar, por no haberse medido como problema: compactar la caché de resultados (3 nodos × 50.000 entidades ≈ 120 MB) ni limitar los workers (hasta 6) | Medir en un teléfono real antes de compactar la caché o reducir workers |
 | Aviso al terminar una ejecución | Pendiente (`_notifyRunCompletion`) | API Notification web |
 | Ejecución por lotes y workspace runner | No aplica (`batchDeploy.js`, `workspaceRunner.js` usan `pywebview` y el backend) | — |
 
@@ -89,7 +89,7 @@ Propuesta de orden, por impacto en el uso real en un teléfono:
 1. ~~Reproyectar al pintar~~ (hecho).
 2. Lectura sin pérdida de la configuración de proyectos Desktop (aplazado por decisión del usuario; ver `ROADMAP.md`).
 3. ~~Recuperación automática del borrador~~ (hecho).
-4. Perfil de baja memoria.
+4. ~~Perfil de baja memoria~~ (hecho en el mapa; ver la fila de perfiles).
 5. Tabla: centrar la entidad al tocar la fila y columnas visibles.
 6. Multiselección táctil con operaciones en lote; después, grupos plegables.
 7. Validación del flujo antes de ejecutar.

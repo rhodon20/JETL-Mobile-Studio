@@ -557,18 +557,28 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     const allPoints = srcFeatures.length > 0 && srcFeatures.every(isPointGeom);
     const PERF_POINT_THRESHOLD = 30000;
     const PERF_POINT_MAX_DRAW = 20000;
+    // Líneas y polígonos pesan mucho más en Leaflet (~6 KB por polígono frente a
+    // ~1 KB por punto): 50.000 buffers ocupaban 293 MB y 1,5 s al pintarse; con
+    // este tope, 30 MB y 0,2 s. Medido en Chromium con pantalla de móvil.
+    const PERF_SHAPE_MAX_DRAW = 5000;
     const PERF_GENERIC_THRESHOLD = 12000;
     let drawData = data;
     let perfSampleInfo = null;
-
-    // Modo rendimiento para capas masivas de puntos:
-    // se aligera solo la vista del mapa sin tocar el dataset real del nodo.
-    if (allPoints && srcFeatures.length > PERF_POINT_THRESHOLD) {
-        const step = Math.ceil(srcFeatures.length / PERF_POINT_MAX_DRAW);
+    // Exactamente maxDraw entidades repartidas por todo el dataset (un paso entero
+    // ceil(total/maxDraw) se quedaba en 3.000 de 6.000 con un tope de 5.000).
+    const sampleForMap = (maxDraw) => {
         const sampled = [];
-        for (let i = 0; i < srcFeatures.length; i += step) sampled.push(srcFeatures[i]);
+        for (let i = 0; i < maxDraw; i++) sampled.push(srcFeatures[Math.floor(i * srcFeatures.length / maxDraw)]);
         drawData = turf.featureCollection(sampled);
         perfSampleInfo = { shown: sampled.length, total: srcFeatures.length, reason: 'sampling' };
+    };
+
+    // Modo rendimiento para capas masivas: se aligera solo la vista del mapa sin
+    // tocar el dataset real del nodo (la tabla y las exportaciones lo usan entero).
+    if (allPoints && srcFeatures.length > PERF_POINT_THRESHOLD) {
+        sampleForMap(PERF_POINT_MAX_DRAW);
+    } else if (!allPoints && srcFeatures.length > PERF_SHAPE_MAX_DRAW) {
+        sampleForMap(PERF_SHAPE_MAX_DRAW);
     } else if (srcFeatures.length > PERF_GENERIC_THRESHOLD) {
         perfSampleInfo = { shown: srcFeatures.length, total: srcFeatures.length, reason: 'interaction' };
     }
