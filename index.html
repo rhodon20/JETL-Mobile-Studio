@@ -1881,6 +1881,11 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
     .boot-splash-t { animation:none; stroke-dashoffset:0; }
     .boot-splash-dot { animation:none; transform:scale(1); }
 }
+
+/* Aviso de recuperación del borrador al abrir la app. */
+.draft-recovery-content { width:min(420px, calc(100vw - 32px)); }
+.draft-recovery-content .modal-help { border-bottom:0; font-size:.85rem; }
+.draft-recovery-content .btn { min-height:42px; padding:0 18px; display:inline-flex; align-items:center; gap:8px; }
 /* ---- css/mobile.css ---- */
 :root {
     --mobile-dock-height: 72px;
@@ -2741,6 +2746,22 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
     </div>
     <div id="build-info" class="build-info" role="dialog" aria-label="Versión de JETL Studio" hidden></div>
 
+    <div id="draft-recovery-modal" class="modal" role="alertdialog" aria-modal="true"
+        aria-labelledby="draft-recovery-title" aria-describedby="draft-recovery-detail" aria-hidden="true">
+        <div class="modal-content draft-recovery-content">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-clock-rotate-left"></i><div>
+                    <strong id="draft-recovery-title">Tienes un flujo sin guardar</strong>
+                    <small id="draft-recovery-detail"></small>
+                </div></div>
+            </div>
+            <div class="modal-help">Quedó guardado en este dispositivo la última vez que usaste JETL Studio. Si lo descartas, no podrás recuperarlo.</div>
+            <div class="modal-footer">
+                <button class="btn" type="button" data-draft-recovery="discard">Descartar</button>
+                <button class="btn btn-primary" type="button" data-draft-recovery="restore"><i class="fas fa-clock-rotate-left"></i> Recuperar</button>
+            </div>
+        </div>
+    </div>
     <div id="run-history-modal" class="modal" role="dialog" aria-modal="true"
         aria-labelledby="run-history-title" aria-hidden="true">
         <div class="modal-content run-history-content">

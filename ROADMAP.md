@@ -6,7 +6,7 @@
 - Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
 - Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
   comprobada en CI (`tests/check-graph.mjs`).
-- Pruebas: `npm test` (grafo, 109 unitarias, smoke estable 30/30, flujo de la
+- Pruebas: `npm test` (grafo, 111 unitarias, smoke estable 30/30, flujo de la
   app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 
@@ -14,14 +14,27 @@
 1. **Paridad con JETL Desktop.** Revisión hecha el 18 de octubre (Desktop
    `7797aa1`): `docs/DESKTOP_PARITY_MATRIX.md` (capacidades, con prioridades para
    móvil) y `docs/NODE_CATALOG_PARITY.md` > Paridad de configuración (53/115 nodos
-   difieren; `scripts/audit-node-params.mjs`). Falta decidir qué se porta y en
-   qué orden; la propuesta empieza por reproyectar al pintar y leer sin pérdida
-   la configuración de proyectos Desktop.
+   difieren; `scripts/audit-node-params.mjs`). Orden acordado: reproyectar al
+   pintar (hecho), aviso de recuperación del borrador (hecho), perfil de baja
+   memoria, tabla → mapa y columnas visibles, multiselección táctil.
 2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
    bloqueo de arranque en Safari) aprovechando las URLs versionadas por
    contenido; validar en iPhone antes de publicar.
 3. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
+
+## Ideas para más adelante (sin fecha)
+- **Usar flujos de JETL Desktop en Studio.** Aplazado por decisión del usuario
+  (18 de octubre): hoy no se abren procesos de Desktop en Studio. Si se retoma,
+  el punto de partida es la lectura sin pérdida de la configuración de los
+  53 nodos que difieren (`docs/NODE_CATALOG_PARITY.md`).
+- **Accesos directos de la app instalada** (pulsación larga en el icono de
+  Android). Hoy el manifiesto declara «Nuevo flujo» (`?new=1`), pero la app no
+  lee ese parámetro y abre lo de siempre. Ampliarlos y hacer que funcionen:
+  nuevo flujo, cargar proyecto, recuperar el último borrador, abrir plantillas,
+  ver el historial de ejecuciones. Cuidado: abrir un archivo exige un gesto del
+  usuario, así que «cargar proyecto» debe abrir la app con el selector listo
+  para pulsar, no lanzarlo solo. iOS no admite estos accesos.
 
 ## Deuda conocida
 - Definiciones proj4 repetidas en cuatro sitios: `GEOMETRY_PROJ4_DEFS_COMPAT` y

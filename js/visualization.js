@@ -7,6 +7,7 @@
 // (el inspector repinta tabla y mapa, el mapa la tabla y el inspector...).
 import { showPortPickerToast } from './ui/notify.js';
 import { detectCrs, toDisplayCrs } from './core/crs.js';
+import { clearDraft } from './state/draft.js';
 
 // Variables de estado
 let selectedFeatureIndex = null;
@@ -1243,7 +1244,7 @@ function clearCanvas() {
     if (window.JETLRuntimeCache && typeof window.JETLRuntimeCache.clearAll === 'function') {
         window.JETLRuntimeCache.clearAll();
     }
-    SafeStorage.clear('jetl_flow_optimized');
+    clearDraft();
     Object.values(mapLayers).forEach(l => { map.removeLayer(l); layerControl.removeLayer(l); });
     JETLClearObject(mapLayers);
     JETLClearObject(executionData);

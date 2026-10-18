@@ -210,6 +210,38 @@ try {
         check('published scripts are fetched with their version', unversioned.length === 0, unversioned.join(', '));
     }
 
+    // Draft recovery: after a reload the app asks before touching the saved flow.
+    const reloadAndReadPrompt = async () => {
+        await page.reload({ waitUntil: 'load' });
+        await page.waitForFunction(() => window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready', null, { timeout: 30000 });
+        return page.evaluate(() => {
+            const modal = document.getElementById('draft-recovery-modal');
+            return {
+                open: modal.classList.contains('is-open'),
+                detail: document.getElementById('draft-recovery-detail').textContent,
+                editorNodes: Object.keys(editor.export().drawflow.Home.data).length
+            };
+        });
+    };
+    const savedNodes = await page.evaluate(() => {
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_centroid');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        return Object.keys(editor.export().drawflow.Home.data).length;
+    });
+    const offered = await reloadAndReadPrompt();
+    check('reopening offers the unsaved flow without loading it', offered.open && offered.editorNodes === 0 && offered.detail.includes(`${savedNodes} nodos`) && offered.detail.includes('Guardado'), JSON.stringify(offered));
+    await page.click('[data-draft-recovery="restore"]');
+    const restored = await page.evaluate(() => ({
+        nodes: Object.keys(editor.export().drawflow.Home.data).length,
+        open: document.getElementById('draft-recovery-modal').classList.contains('is-open')
+    }));
+    check('recover restores the flow', restored.nodes === savedNodes && !restored.open, JSON.stringify(restored));
+    await reloadAndReadPrompt();
+    await page.click('[data-draft-recovery="discard"]');
+    const discarded = await reloadAndReadPrompt();
+    check('discard deletes the draft for good', !discarded.open && discarded.editorNodes === 0 && await page.evaluate(() => !window.JETLProjects.hasDraft()), JSON.stringify(discarded));
+
     for (const c of checks) console.log(`[app-flow] ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` — ${c.detail}`}`);
     checks.filter((c) => !c.ok).forEach((c) => problems.push(`${c.name}: ${c.detail}`));
 } catch (error) {

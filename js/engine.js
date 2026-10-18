@@ -7,6 +7,7 @@ import {
     getRunErrorNodeId, buildExecutionPlan, collectRequiredNodeIds, beginRunTrace, buildRunReport
 } from './engine/runPlan.js';
 import { publishRunReport } from './state/runHistory.js';
+import { saveDraft, loadDraft, clearDraft, hasDraft } from './state/draft.js';
 import { processNode } from './processNode.js';
 
 let selectedCanvasConnection = null;
@@ -14,15 +15,9 @@ let selectedCanvasConnection = null;
 function setSelectedCanvasConnection(connection) {
     selectedCanvasConnection = connection;
 }
-const LOCAL_DRAFT_KEY = 'jetl_flow_optimized';
-
-function hasLocalDraft() {
-    return !!SafeStorage.load(LOCAL_DRAFT_KEY);
-}
-
 function updateLocalDraftUI() {
     const button = document.querySelector('[data-ui-action="restore-draft"]');
-    const available = hasLocalDraft();
+    const available = hasDraft();
     if (button) {
         button.disabled = !available;
         button.setAttribute('aria-disabled', String(!available));
@@ -45,20 +40,19 @@ function startNewProject() {
     const graph = _getGraphDataSafe();
     if (Object.keys(graph).length > 0 && !window.confirm('¿Crear un proyecto nuevo y borrar el flujo actual?')) return;
     resetEditorState();
-    SafeStorage.clear(LOCAL_DRAFT_KEY);
+    clearDraft();
     updateLocalDraftUI();
     if (typeof window.showToast === 'function') window.showToast('Proyecto nuevo', 'success');
 }
 
 function restoreLocalDraft() {
-    const saved = SafeStorage.load(LOCAL_DRAFT_KEY);
-    if (!saved) {
-        updateLocalDraftUI();
-        if (typeof window.showToast === 'function') window.showToast('No hay borrador local', 'warning');
-        return false;
-    }
     try {
-        const flow = JSON.parse(saved);
+        const flow = loadDraft();
+        if (!flow) {
+            updateLocalDraftUI();
+            if (typeof window.showToast === 'function') window.showToast('No hay borrador local', 'warning');
+            return false;
+        }
         resetEditorState();
         editor.import(flow);
         invalidateAllNodes('draft_restored');
@@ -67,14 +61,14 @@ function restoreLocalDraft() {
         return true;
     } catch (error) {
         console.error('[JETL] Borrador local inválido', error);
-        SafeStorage.clear(LOCAL_DRAFT_KEY);
+        clearDraft();
         updateLocalDraftUI();
         if (typeof window.showToast === 'function') window.showToast('El borrador local estaba dañado', 'error');
         return false;
     }
 }
 
-window.JETLProjects = { startNew: startNewProject, restoreDraft: restoreLocalDraft, hasDraft: hasLocalDraft };
+window.JETLProjects = { startNew: startNewProject, restoreDraft: restoreLocalDraft, hasDraft };
 
 
 
@@ -463,7 +457,7 @@ function loadProject(input) {
                 ? window.JETLProjectPersistence.restoreReaderWorkingCopies(document, parsedProject.readerWorkingCopies)
                 : { restored: 0, skipped: 0 };
 
-            SafeStorage.save('jetl_flow_optimized', JSON.stringify(flowData));
+            saveDraft(flowData);
             JETLEvents.emit('workspace:replaced');
             if (restoreReport.skipped) {
                 showToast(`Proyecto cargado; ${restoreReport.skipped} copias de trabajo no eran válidas`, "warning");
@@ -486,7 +480,7 @@ function loadProject(input) {
 Object.assign(window, { addNode, addNodeClick, runEngine, runEnginePartial, cancelEngineRun });
 
 export {
-    selectedCanvasConnection, setSelectedCanvasConnection, LOCAL_DRAFT_KEY, updateLocalDraftUI,
+    selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
     cancelEngineRun, saveProject, loadProject
 };

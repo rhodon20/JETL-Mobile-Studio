@@ -8,12 +8,14 @@ import {
 import { closeRunMonitor } from './ui/runPanel.js';
 import './mobile.js';
 import {
-    selectedCanvasConnection, setSelectedCanvasConnection, LOCAL_DRAFT_KEY, updateLocalDraftUI,
+    selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNodeClick, cancelEngineRun, runEnginePartial, saveProject, loadProject
 } from './engine.js';
 import { clearNodeDirty, invalidateAllNodes, invalidateNodeAndDownstream } from './engine/dirty.js';
 import { downloadRunReport } from './state/runHistory.js';
 import { undo, redo, initHistory } from './state/history.js';
+import { saveDraft } from './state/draft.js';
+import { offerDraftRecovery } from './ui/draftPrompt.js';
 
 let jetlAppInitialized = false;
 // Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
@@ -81,8 +83,8 @@ function initializeJETLApp() {
     });
     editor.on('connectionUnselected', () => { setSelectedCanvasConnection(null); });
 
-    // El borrador local no se restaura silenciosamente. El usuario puede
-    // recuperarlo desde Proyecto > Restaurar.
+    // El borrador local no se restaura silenciosamente: al terminar el arranque
+    // se ofrece recuperarlo (y sigue en Proyecto > Restaurar).
     updateLocalDraftUI();
 
     ['nodeCreated', 'nodeRemoved', 'nodeMoved', 'connectionCreated', 'connectionRemoved'].forEach(ev => {
@@ -107,7 +109,7 @@ function initializeJETLApp() {
                     setSelectedCanvasConnection(null);
                 }
             }
-            SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+            saveDraft(editor.export());
             updateLocalDraftUI();
             if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') {
                 setTimeout(() => JETLSchemaUI.refreshAll(), 0);
@@ -116,7 +118,7 @@ function initializeJETLApp() {
     });
     editor.on('nodeDataChanged', (nodeId) => {
         invalidateNodeAndDownstream(String(nodeId), 'node_data_changed');
-        SafeStorage.save(LOCAL_DRAFT_KEY, JSON.stringify(editor.export()));
+        saveDraft(editor.export());
         updateLocalDraftUI();
     });
 
@@ -139,6 +141,7 @@ function initializeJETLApp() {
 
     setJETLStartupStatus('ready', 'Sistema listo');
     if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
+    offerDraftRecovery();
     // La pantalla de arranque se desvanece cuando ha terminado su animación de
     // entrada (~1,2 s desde la navegación; sólo retrasa arranques más rápidos que
     // eso). El segundo temporizador la retira aunque no haya transición

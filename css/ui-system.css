@@ -676,3 +676,8 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
     .boot-splash-t { animation:none; stroke-dashoffset:0; }
     .boot-splash-dot { animation:none; transform:scale(1); }
 }
+
+/* Aviso de recuperación del borrador al abrir la app. */
+.draft-recovery-content { width:min(420px, calc(100vw - 32px)); }
+.draft-recovery-content .modal-help { border-bottom:0; font-size:.85rem; }
+.draft-recovery-content .btn { min-height:42px; padding:0 18px; display:inline-flex; align-items:center; gap:8px; }

@@ -72,7 +72,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Capacidad Desktop | Estado Studio | Próximo criterio de aceptación |
 | --- | --- | --- |
 | Importar/exportar proyecto | Implementado (descarga/subida). Desktop guarda además marcadores, anotaciones y transformadores custom; los parámetros globales no van en el proyecto en ninguno de los dos | Lectura sin pérdida de proyectos Desktop (ver configuración de nodos) |
-| Autoguardado y recuperación | Parcial: borrador en cada cambio, restauración manual sin aviso (Desktop: `autosave.js` con aviso de recuperación) | Aviso de recuperación al abrir; IndexedDB |
+| Autoguardado y recuperación | Implementado: borrador en cada cambio (`js/state/draft.js`) y aviso al abrir con antigüedad y nodos para recuperar o descartar (`js/ui/draftPrompt.js`). A diferencia de Desktop, no caduca a las 24 h: en móvil la app puede pasar días cerrada | IndexedDB si el tamaño de `localStorage` se queda corto |
 | Proyectos recientes | Pendiente (Desktop lo guarda en el backend) | IndexedDB con miniatura |
 | Editor de Readers | Implementado con copias de trabajo en el proyecto (Desktop además escribe en el archivo original, que no aplica) | Recuperación/versionado |
 | Transformadores custom | **Pendiente** (`customTransformers.js`: subgrafo desde una selección) | Depende de la multiselección |
@@ -87,8 +87,8 @@ del backend Python, de `pywebview` o del sistema de archivos).
 ## Prioridades para un usuario móvil
 Propuesta de orden, por impacto en el uso real en un teléfono:
 1. ~~Reproyectar al pintar~~ (hecho).
-2. Lectura sin pérdida de la configuración de proyectos Desktop.
-3. Recuperación automática del borrador (los navegadores móviles cierran pestañas).
+2. Lectura sin pérdida de la configuración de proyectos Desktop (aplazado por decisión del usuario; ver `ROADMAP.md`).
+3. ~~Recuperación automática del borrador~~ (hecho).
 4. Perfil de baja memoria.
 5. Tabla: centrar la entidad al tocar la fila y columnas visibles.
 6. Multiselección táctil con operaciones en lote; después, grupos plegables.

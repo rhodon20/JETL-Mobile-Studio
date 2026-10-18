@@ -1,3 +1,5 @@
+import { saveDraft } from './draft.js';
+
 const historyStack = [];
 let historyIndex = -1;
 let isUndoRedoAction = false;
@@ -198,7 +200,7 @@ function _applyDiffToState(baseState, diff) {
 function _importHistoryState(state) {
     editor.clear();
     editor.import(_cloneState(state));
-    SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
+    saveDraft(editor.export());
     setTimeout(() => JETLEvents.emit('workspace:replaced'), 0);
 }
 

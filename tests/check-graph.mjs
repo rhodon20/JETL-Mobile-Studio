@@ -31,9 +31,9 @@ const LAYERS = {
     nodes: ['js/nodes/readers.js', 'js/nodes/geometry.js', 'js/nodes/utils.js', 'js/nodes/spatial.js',
         'js/nodes/attributes.js', 'js/nodes/raster.js', 'js/nodes/writers.js', 'js/tools.js'],
     engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js'],
-    state: ['js/state/history.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/packages.js'],
+    state: ['js/state/history.js', 'js/state/draft.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/packages.js'],
     app: ['js/engine.js', 'js/templates.js'],
-    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js'],
+    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js', 'js/ui/draftPrompt.js'],
     shell: ['js/shell.js'],
     dev: ['js/smoke.js']
 };

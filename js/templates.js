@@ -3,6 +3,7 @@
 // =============================================
 import { addToHistory, clearHistory } from './state/history.js';
 import { addNode } from './engine.js';
+import { saveDraft } from './state/draft.js';
 
 (function () {
     const CUSTOM_TEMPLATES_KEY = 'jetl_custom_templates_v1';
@@ -146,7 +147,7 @@ import { addNode } from './engine.js';
             layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
         }
         if (typeof addToHistory === 'function') addToHistory();
-        SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
+        saveDraft(editor.export());
         JETLEvents.emit('workspace:replaced');
     }
 
@@ -499,7 +500,7 @@ import { addNode } from './engine.js';
                 editor.import(tpl.graph);
                 setTimeout(() => JETLEvents.emit('workspace:replaced'), 0);
                 if (typeof addToHistory === 'function') addToHistory();
-                SafeStorage.save('jetl_flow_optimized', JSON.stringify(editor.export()));
+                saveDraft(editor.export());
             } else {
                 throw new Error('Plantilla invalida');
             }

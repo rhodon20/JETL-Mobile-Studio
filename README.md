@@ -13,7 +13,8 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   nodo, e inspector de datos por puerto.
 - Plantillas de flujo, parámetros globales (`${param}`), paquetes de
   transformadores, simbología por atributos.
-- Proyectos `.jetl` (guardar/cargar) y borrador local en el navegador.
+- Proyectos `.jetl` (guardar/cargar) y borrador local en el navegador, con aviso
+  para recuperarlo o descartarlo al abrir la app.
 - Interfaz móvil: barra inferior (Nodos / Historial / Ejecutar todo /
   Resultados / Proyecto), gestos en el lienzo.
 
