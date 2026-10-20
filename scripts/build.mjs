@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outArg = process.argv.indexOf('--out');
 const DIST = outArg >= 0 ? path.resolve(process.argv[outArg + 1]) : path.join(ROOT, 'dist');
-const ENTRIES = ['index.html', 'manifest.json', 'sw.js', 'icons', 'css', 'js'];
+const ENTRIES = ['index.html', 'privacy.html', 'manifest.json', 'sw.js', 'icons', 'css', 'js'];
 
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
@@ -117,7 +117,7 @@ fs.writeFileSync(path.join(DIST, 'version.json'), JSON.stringify(build) + '\n');
 // exact URLs this build requests. Left out: MapLibre (the basemap needs the
 // network anyway), raster libraries (out of scope) and the iOS startup images.
 const groupVersion = (name) => html.match(new RegExp(`const ${name} = '([^']*)'`))[1];
-const precache = new Set(['./', 'index.html', 'manifest.json', workerUrl]);
+const precache = new Set(['./', 'index.html', 'privacy.html', 'manifest.json', workerUrl]);
 for (const m of html.matchAll(/\b(?:src|href)="((?:js|css|icons)\/[^"]+)"/g)) if (!m[1].startsWith('icons/startup/')) precache.add(m[1]);
 for (const m of html.matchAll(/"\.\/(js\/[^"]+\?v=[^"]+)"/g)) precache.add(m[1]);
 listed('JETL_EXTRA_MODULES').forEach((file) => precache.add(`${file}?v=${groupVersion('JETL_EXTRAS_VERSION')}`));

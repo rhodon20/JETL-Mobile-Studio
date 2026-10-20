@@ -587,6 +587,30 @@ try {
     const discarded = await reloadAndReadPrompt();
     check('discard deletes the draft for good', !discarded.open && discarded.editorNodes === 0 && await page.evaluate(() => !window.JETLProjects.hasDraft()), JSON.stringify(discarded));
 
+    // Home-screen shortcuts (manifest.json): ?action=… is handled once and removed from the URL.
+    const launch = async (action) => {
+        await page.goto(`${server.origin}/index.html?action=${action}`, { waitUntil: 'load' });
+        await page.waitForFunction(() => window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready', null, { timeout: 30000 });
+        await page.waitForTimeout(200);
+        return page.evaluate(() => ({
+            search: location.search,
+            nodes: Object.keys(editor.export().drawflow.Home.data).length,
+            prompt: document.getElementById('draft-recovery-modal').classList.contains('is-open'),
+            history: document.getElementById('run-history-modal').classList.contains('is-open'),
+            project: document.body.classList.contains('mobile-sheet-open')
+        }));
+    };
+    await page.evaluate(() => { editor.clear(); const a = addNode('reader_bbox_gen'); const b = addNode('geo_buffer'); editor.addConnection(a, b, 'output_1', 'input_1'); });
+    const viaDraft = await launch('draft');
+    check('shortcut «Borrador» restores the draft without asking', viaDraft.nodes === 2 && !viaDraft.prompt && viaDraft.search === '', JSON.stringify(viaDraft));
+    const viaNew = await launch('new');
+    check('shortcut «Nuevo» starts empty but still offers an unsaved draft', viaNew.nodes === 0 && viaNew.prompt, JSON.stringify(viaNew));
+    await page.click('[data-draft-recovery="discard"]');
+    const viaHistory = await launch('history');
+    check('shortcut «Historial» opens the history sheet', viaHistory.history && viaHistory.search === '', JSON.stringify(viaHistory));
+    const viaOpen = await launch('open');
+    check('shortcut «Abrir» opens the Proyecto sheet', viaOpen.project, JSON.stringify(viaOpen));
+
     for (const c of checks) console.log(`[app-flow] ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}${c.ok ? '' : ` — ${c.detail}`}`);
     checks.filter((c) => !c.ok).forEach((c) => problems.push(`${c.name}: ${c.detail}`));
 } catch (error) {

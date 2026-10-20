@@ -45,7 +45,11 @@ async function render(panel) {
     const title = document.createElement('strong');
     title.textContent = 'JETL Studio';
     const status = line('build-info-status', loaded ? 'Comprobando si es la última versión…' : 'Versión de desarrollo (sin desplegar)');
-    panel.replaceChildren(title, line('build-info-version', loaded ? describe(loaded) : 'Local'), status);
+    const privacy = document.createElement('a');
+    privacy.className = 'build-info-privacy';
+    privacy.href = 'privacy.html';
+    privacy.textContent = 'Política de privacidad';
+    panel.replaceChildren(title, line('build-info-version', loaded ? describe(loaded) : 'Local'), status, privacy);
     if (!loaded) return;
 
     try {

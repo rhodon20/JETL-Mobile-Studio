@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Privacidad · JETL Studio</title>
+    <meta name="description" content="Política de privacidad de JETL Studio">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <style>
+        :root { color-scheme: dark; }
+        body { margin: 0; background: #121212; color: #d1d5db; font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        main { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+        h1 { color: #fff; font-size: 1.8rem; margin: 0 0 4px; }
+        h2 { color: #fff; font-size: 1.15rem; margin: 32px 0 8px; }
+        .updated { color: #8d8d93; margin: 0 0 24px; }
+        a { color: #71b9ff; }
+        ul { padding-left: 1.2em; }
+        li { margin: 6px 0; }
+        .summary { padding: 14px 16px; border-radius: 12px; background: #1f2023; border: 1px solid rgba(255, 255, 255, .08); }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Política de privacidad</h1>
+    <p class="updated">JETL Studio · Última actualización: 20 de octubre de 2026</p>
+
+    <p class="summary"><strong>En resumen:</strong> JETL Studio procesa tus datos en tu dispositivo. No tiene cuentas de
+        usuario, no recoge ni envía tus datos a servidores propios, no usa analítica, publicidad ni cookies de
+        seguimiento.</p>
+
+    <h2>Qué datos trata la app y dónde</h2>
+    <ul>
+        <li><strong>Tus archivos y flujos</strong> (GeoJSON, KML, Shapefile, CSV, proyectos <code>.jetl</code>…) se leen
+            y procesan en el propio dispositivo. Nunca se suben a un servidor de JETL Studio.</li>
+        <li><strong>En el almacenamiento del navegador del dispositivo</strong> se guardan el borrador del flujo, los
+            parámetros, el historial de ejecuciones y algunas preferencias (por ejemplo, el ajuste a la cuadrícula).
+            Puedes borrarlos desde la propia app o borrando los datos del sitio o de la aplicación.</li>
+        <li><strong>Para funcionar sin conexión</strong>, la app guarda en el dispositivo una copia de sus propios
+            archivos (código, estilos e iconos). No contiene datos tuyos.</li>
+    </ul>
+
+    <h2>Conexiones a servicios externos</h2>
+    <p>Algunas funciones necesitan conectarse a servicios de terceros. Como en cualquier conexión a internet, esos
+        servicios reciben la dirección IP de tu dispositivo y la petición concreta. JETL Studio no les envía ningún
+        otro dato:</p>
+    <ul>
+        <li><strong>Mapa base</strong>: <a href="https://openfreemap.org">OpenFreeMap</a> y, si no responde,
+            <a href="https://www.openstreetmap.org">OpenStreetMap</a>, para descargar las teselas de la zona que
+            miras.</li>
+        <li><strong>Lector OSM</strong>: <a href="https://nominatim.openstreetmap.org">Nominatim</a> (OpenStreetMap)
+            para localizar el lugar que escribes y <a href="https://overpass-api.de">Overpass API</a> para descargar
+            sus datos.</li>
+        <li><strong>Lectores HTTP</strong>: las direcciones que tú introduzcas.</li>
+        <li><strong>Formatos GeoPackage, Parquet y Excel, y escritura de Shapefile</strong>: la primera vez que los
+            usas se descargan sus librerías desde las redes de distribución <a href="https://unpkg.com">unpkg</a> y
+            <a href="https://www.jsdelivr.com">jsDelivr</a>.</li>
+    </ul>
+    <p>Cada uno de esos servicios tiene su propia política de privacidad.</p>
+
+    <h2>Lo que JETL Studio no hace</h2>
+    <ul>
+        <li>No pide registro ni inicio de sesión.</li>
+        <li>No usa analítica, publicidad ni rastreo, ni comparte datos con terceros.</li>
+        <li>No accede a tu ubicación, contactos, cámara ni micrófono.</li>
+    </ul>
+
+    <h2>Menores</h2>
+    <p>JETL Studio es una herramienta profesional de procesamiento de datos geoespaciales y no está dirigida a menores
+        de 13 años.</p>
+
+    <h2>Cambios y contacto</h2>
+    <p>Si esta política cambia, se actualizará esta página y su fecha. Para cualquier consulta sobre privacidad,
+        escribe al correo de contacto que figura en la ficha de JETL Studio en Google Play.</p>
+
+    <p><a href="./">Volver a JETL Studio</a></p>
+</main>
+</body>
+</html>

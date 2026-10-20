@@ -6,7 +6,7 @@
 - Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
 - Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
   comprobada en CI (`tests/check-graph.mjs`).
-- Pruebas: `npm test` (grafo, 117 unitarias, smoke estable 30/30, flujo de la
+- Pruebas: `npm test` (grafo, 119 unitarias, smoke estable 30/30, flujo de la
   app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 
@@ -32,13 +32,11 @@
   (18 de octubre): hoy no se abren procesos de Desktop en Studio. Si se retoma,
   el punto de partida es la lectura sin pérdida de la configuración de los
   53 nodos que difieren (`docs/NODE_CATALOG_PARITY.md`).
-- **Accesos directos de la app instalada** (pulsación larga en el icono de
-  Android). Hoy el manifiesto declara «Nuevo flujo» (`?new=1`), pero la app no
-  lee ese parámetro y abre lo de siempre. Ampliarlos y hacer que funcionen:
-  nuevo flujo, cargar proyecto, recuperar el último borrador, abrir plantillas,
-  ver el historial de ejecuciones. Cuidado: abrir un archivo exige un gesto del
-  usuario, así que «cargar proyecto» debe abrir la app con el selector listo
-  para pulsar, no lanzarlo solo. iOS no admite estos accesos.
+- **Accesos directos de la app instalada**: hechos (Nuevo flujo, Recuperar borrador,
+  Abrir proyecto, Historial; `js/ui/launchActions.js`). iOS no los admite.
+- **Librerías de formatos desde CDN.** GeoPackage, Parquet, Excel y la escritura
+  de Shapefile descargan sus librerías de unpkg/jsDelivr al usarse: no funcionan
+  sin conexión y esas CDN reciben la IP. Alojarlas en el propio sitio.
 
 ## Deuda conocida
 - Definiciones proj4 repetidas en cuatro sitios: `GEOMETRY_PROJ4_DEFS_COMPAT` y

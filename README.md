@@ -18,7 +18,9 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
 - Interfaz móvil: barra inferior (Nodos / Historial / Acciones / Resultados /
   Proyecto); cada destino es una hoja que sube desde abajo con la misma
   apariencia (Resultados ocupa casi toda la pantalla). Al encadenar nodos el
-  flujo crece hacia abajo en dos columnas, en zigzag. «Acciones» abre un panel según el contexto:
+  flujo crece hacia abajo en dos columnas, en zigzag. En Android, mantener pulsado
+  el icono ofrece Nuevo flujo, Recuperar borrador, Abrir proyecto e Historial.
+- Política de privacidad: `privacy.html` (enlazada desde el panel de versión). «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
   problemas que lleva a cada nodo), nota en el lienzo, encuadrar, plantillas y
   parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,

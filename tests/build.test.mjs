@@ -71,7 +71,7 @@ test('el service worker publicado precachea, con su URL exacta, lo que la app pi
     const tagged = [...html.matchAll(/\b(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map((m) => m[1]);
     const runtime = html.match(/const JETL_RUNTIME_VERSION = '([^']+)'/)[1];
     const pool = fs.readFileSync(path.join(OUT, 'js/core/workerPool.js'), 'utf8').match(/'(js\/geo\.worker\.js\?v=[^']+)'/)[1];
-    for (const url of [...tagged, `js/vendor/leaflet.js?v=${runtime}`, `js/visualization.js?v=${runtime}`, pool, 'js/vendor/jsts.min.js', 'index.html']) {
+    for (const url of [...tagged, `js/vendor/leaflet.js?v=${runtime}`, `js/visualization.js?v=${runtime}`, pool, 'js/vendor/jsts.min.js', 'index.html', 'privacy.html']) {
         assert.ok(precache.includes(url), `falta en el precacheo: ${url}`);
     }
     // Fuera: el mapa base (necesita red igualmente) y las pantallas de arranque de iOS.

@@ -16,7 +16,7 @@ import { clearNodeDirty, invalidateAllNodes, invalidateNodeAndDownstream } from 
 import { downloadRunReport } from './state/runHistory.js';
 import { undo, redo, initHistory } from './state/history.js';
 import { saveDraft } from './state/draft.js';
-import { offerDraftRecovery } from './ui/draftPrompt.js';
+import { runLaunchAction } from './ui/launchActions.js';
 import { initActionHub } from './ui/actionHub.js';
 import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 import { initAnnotations } from './ui/annotations.js';
@@ -160,7 +160,7 @@ function initializeJETLApp() {
 
     setJETLStartupStatus('ready', 'Sistema listo');
     if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
-    offerDraftRecovery();
+    runLaunchAction();
     initOfflineMode();
     // La pantalla de arranque se desvanece cuando ha terminado su animación de
     // entrada (~1,2 s desde la navegación; sólo retrasa arranques más rápidos que

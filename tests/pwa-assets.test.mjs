@@ -31,3 +31,23 @@ test('iOS tiene icono de inicio y una pantalla de arranque del tamaño exacto de
         assert.deepEqual(pngSize(file), [width * ratio, height * ratio], file);
     }
 });
+
+test('cada acceso directo del manifiesto abre una acción que la app atiende, con icono PNG', () => {
+    const launch = readFileSync(new URL('js/ui/launchActions.js', root), 'utf8');
+    const handled = [...launch.matchAll(/^    (\w+): \(\) =>/gm)].map((m) => m[1]);
+    assert.ok(manifest.shortcuts.length > 0 && manifest.shortcuts.length <= 4, 'Android muestra como mucho 4');
+    for (const shortcut of manifest.shortcuts) {
+        const action = new URL(shortcut.url, 'https://x/').searchParams.get('action');
+        assert.ok(handled.includes(action), `${shortcut.name}: acción ${action} sin atender`);
+        for (const icon of shortcut.icons) assert.deepEqual(pngSize(icon.src), icon.sizes.split('x').map(Number));
+    }
+});
+
+test('la política de privacidad existe y se publica', () => {
+    const privacy = readFileSync(new URL('privacy.html', root), 'utf8');
+    assert.match(privacy, /<title>Privacidad · JETL Studio<\/title>/);
+    for (const host of ['openfreemap.org', 'nominatim.openstreetmap.org', 'overpass-api.de', 'unpkg.com', 'jsdelivr.com']) {
+        assert.ok(privacy.includes(host), `la política debe mencionar ${host}`);
+    }
+    assert.match(readFileSync(new URL('scripts/build.mjs', root), 'utf8'), /'privacy\.html'/);
+});

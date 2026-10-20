@@ -60,7 +60,9 @@ self.addEventListener('fetch', (event) => {
             try {
                 return (await event.preloadResponse) || await fetch(request);
             } catch (error) {
-                const cached = await caches.match(INDEX, { cacheName: CACHE });
+                // La página pedida (privacy.html…) o, si no está, la app.
+                const cached = await caches.match(request, { cacheName: CACHE, ignoreSearch: true })
+                    || await caches.match(INDEX, { cacheName: CACHE });
                 if (cached) return cached;
                 throw error;
             }
