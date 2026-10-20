@@ -81,7 +81,7 @@ del backend Python, de `pywebview` o del sistema de archivos).
 | Parámetros globales | Implementado | — |
 | Ajustes y apariencia | **Pendiente** (`appSettings.js`, `uiAppearance.js`); Studio sólo respeta la preferencia del sistema de reducir movimiento | Preferencias por dispositivo |
 | Idioma | No es objetivo: el i18n de Desktop existe pero no se usa; ambas interfaces están en español | — |
-| Modo sin conexión | Pendiente en Studio (service worker retirado; ver `ROADMAP.md`) | — |
+| Modo sin conexión | Implementado (`sw.js`): la app desplegada abre y ejecuta sin red; mapa base y lectores de red necesitan conexión | Validar en dispositivos |
 | Backend y sistema de archivos local | No aplica: Readers locales cuando es viable; GDB/FeatureReader declaran que requieren servicio | Sustituir sólo cuando exista una API web segura |
 
 ## Prioridades para un usuario móvil

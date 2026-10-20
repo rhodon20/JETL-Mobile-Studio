@@ -197,18 +197,6 @@
                 diagnostic.style.color = '#ffd180';
             }
         }, 45000);
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                registrations.forEach((registration) => {
-                    if (registration.scope.includes('/JETL-Mobile-Studio/')) registration.unregister();
-                });
-            }).catch(() => {});
-        }
-        if ('caches' in window) {
-            caches.keys().then((names) => Promise.all(
-                names.filter((name) => name.startsWith('jetl-')).map((name) => caches.delete(name))
-            )).catch(() => {});
-        }
     </script>
 <!-- Drawflow es la única dependencia necesaria para pintar el editor.
          Los motores GIS se cargan después de montar la interfaz. -->

@@ -29,6 +29,8 @@ jobs:
         run: npm run build
       - name: Smoke and app flow against the built site
         run: node tests/run-smoke.mjs --root dist && node tests/app-flow.mjs --root dist
+      - name: Offline (service worker) against the built site
+        run: node tests/run-smoke.mjs --offline --root dist
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:

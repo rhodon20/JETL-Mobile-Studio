@@ -25,12 +25,9 @@ try {
     console.log(`[smoke] app loaded in ${Date.now() - t0} ms (${server.origin})`);
 
     if (offline) {
-        await page.evaluate(async () => {
-            await navigator.serviceWorker.ready;
-            if (!navigator.serviceWorker.controller) {
-                await new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
-            }
-        });
+        // La app registra el service worker unos segundos después de estar lista.
+        await page.waitForFunction(() => navigator.serviceWorker.controller, null, { timeout: 20000 })
+            .catch(() => { throw new Error('el service worker no llegó a controlar la página (¿build sin desplegar?)'); });
         await context.setOffline(true);
         await page.reload({ waitUntil: 'load' });
         console.log('[smoke] reloaded offline from service worker cache');
@@ -59,6 +56,19 @@ try {
     console.log(`[smoke] ${mode}: ${summary.pass}/${summary.total} OK`);
     if (summary.omitted.length) console.log(`[smoke] omitted (counted as OK):\n  ${summary.omitted.join('\n  ')}`);
     summary.failed.forEach(f => problems.push(`smoke FAIL ${f}`));
+
+    if (offline) {
+        // Interruptor de emergencia: ?nosw=1 desregistra el service worker y borra sus cachés.
+        await context.setOffline(false);
+        await page.goto(`${server.origin}/index.html?nosw=1`, { waitUntil: 'load' });
+        const retired = await page.waitForFunction(async () => {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            const names = (await caches.keys()).filter((name) => name.startsWith('jetl-'));
+            return registrations.length === 0 && names.length === 0;
+        }, null, { timeout: 15000 }).then(() => true, () => false);
+        console.log(`[smoke] ?nosw=1 retires the service worker: ${retired ? 'yes' : 'NO'}`);
+        if (!retired) problems.push('?nosw=1 did not unregister the service worker and clear its caches');
+    }
 } catch (e) {
     problems.push(`runner: ${e && e.stack ? e.stack : e}`);
 } finally {

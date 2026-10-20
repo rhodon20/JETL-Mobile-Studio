@@ -40,5 +40,8 @@ viendo y si es el último.
   diferidos. Lo que usan otros archivos lo publican en `window`.
 - Los nodos (`js/nodes/*.js`) se cargan en las pruebas unitarias como scripts:
   sin `import`/`export`.
-- El service worker está retirado a propósito (`sw.js` se desregistra) hasta el
-  bloque de modo sin conexión.
+- Modo sin conexión (`sw.js`, registrado por `js/core/offline.js`): la
+  navegación va siempre a la red y sólo si falla se sirve el index guardado (sin
+  carreras ni temporizadores: eso bloqueó Safari en agosto); los archivos de cada
+  build se precachean con su URL exacta (`scripts/build.mjs` rellena la lista).
+  En desarrollo no se registra. `?nosw=1` lo retira en un dispositivo.

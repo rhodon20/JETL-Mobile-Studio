@@ -43,7 +43,8 @@ function rewrite(file, pattern, replacer) {
 }
 
 // The geo worker is created from workerPool.js.
-rewrite('js/core/workerPool.js', /'js\/geo\.worker\.js'/, () => `'js/geo.worker.js?v=${contentHash('js/geo.worker.js')}'`);
+const workerUrl = `js/geo.worker.js?v=${contentHash('js/geo.worker.js')}`;
+rewrite('js/core/workerPool.js', /'js\/geo\.worker\.js'/, () => `'${workerUrl}'`);
 
 // Files loaded on demand by the inline loader share one version per group.
 let html = fs.readFileSync(path.join(DIST, 'index.html'), 'utf8');
@@ -111,6 +112,35 @@ if (!html.includes(PLACEHOLDER)) throw new Error(`index.html has no ${PLACEHOLDE
 fs.writeFileSync(path.join(DIST, 'index.html'), html.replace(PLACEHOLDER,
     `<meta name="jetl-build" content="${build.sha}" data-run="${build.run}" data-built-at="${build.builtAt}">`));
 fs.writeFileSync(path.join(DIST, 'version.json'), JSON.stringify(build) + '\n');
+
+// Offline mode: sw.js precaches what working with vector data needs, with the
+// exact URLs this build requests. Left out: MapLibre (the basemap needs the
+// network anyway), raster libraries (out of scope) and the iOS startup images.
+const groupVersion = (name) => html.match(new RegExp(`const ${name} = '([^']*)'`))[1];
+const precache = new Set(['./', 'index.html', 'manifest.json', workerUrl]);
+for (const m of html.matchAll(/\b(?:src|href)="((?:js|css|icons)\/[^"]+)"/g)) if (!m[1].startsWith('icons/startup/')) precache.add(m[1]);
+for (const m of html.matchAll(/"\.\/(js\/[^"]+\?v=[^"]+)"/g)) precache.add(m[1]);
+listed('JETL_EXTRA_MODULES').forEach((file) => precache.add(`${file}?v=${groupVersion('JETL_EXTRAS_VERSION')}`));
+[...listed('JETL_RUNTIME_SCRIPTS'), 'js/visualization.js'].forEach((file) => precache.add(`${file}?v=${groupVersion('JETL_RUNTIME_VERSION')}`));
+groups.JETL_MOTION_VERSION.forEach((file) => precache.add(`${file}?v=${groupVersion('JETL_MOTION_VERSION')}`));
+[...listed('JETL_DEFERRED_STYLES'),
+    'css/vendor/fontawesome/webfonts/fa-solid-900.woff2',
+    'css/vendor/images/layers.png', 'css/vendor/images/layers-2x.png',
+    'css/vendor/images/marker-icon.png', 'css/vendor/images/marker-icon-2x.png', 'css/vendor/images/marker-shadow.png',
+    // Imported by the geo worker (importScripts) and by the Shapefile reader.
+    'js/vendor/turf.min.js', 'js/vendor/jsts.min.js', 'js/vendor/rbush.min.js', 'js/vendor/proj4.js', 'js/vendor/shp.js',
+    ...JSON.parse(fs.readFileSync(path.join(DIST, 'manifest.json'), 'utf8')).icons.map((icon) => icon.src)
+].forEach((file) => precache.add(file));
+for (const url of precache) {
+    const file = url === './' ? 'index.html' : url.split('?')[0];
+    if (!fs.existsSync(path.join(DIST, file))) throw new Error(`[build] offline precache lists a missing file: ${url}`);
+}
+const sw = fs.readFileSync(path.join(DIST, 'sw.js'), 'utf8');
+if (!sw.includes("const BUILD = 'dev';") || !sw.includes('const PRECACHE = [];')) throw new Error('[build] sw.js placeholders not found');
+fs.writeFileSync(path.join(DIST, 'sw.js'), sw
+    .replace("const BUILD = 'dev';", `const BUILD = '${build.sha}-${contentHash('index.html')}';`)
+    .replace('const PRECACHE = [];', `const PRECACHE = ${JSON.stringify([...precache].sort(), null, 4)};`));
+console.log(`[build] offline: ${precache.size} files precached by sw.js`);
 console.log(`[build] stamped ${build.sha}${build.run ? ` (deploy #${build.run})` : ''}`);
 console.log(`[build] ${path.relative(ROOT, DIST) || DIST}/ ready`);
 

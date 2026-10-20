@@ -9,7 +9,7 @@ Alcance: la app en general y los formatos complejos `GeoTIFF`, `GPKG`, `Parquet`
 | Chromium (CI, Playwright) | OK | `npm test` y pruebas contra `dist/` en cada push. |
 | iOS Safari (iPhone) | OK | Validado por el usuario en octubre de 2026 tras cada fase: arranque, añadir/conectar nodos, ejecutar (incluido OSM Reader), historial, panel de versión. |
 | Safari < 16.4 | PARCIAL (simulado) | Sin *import maps*: funciona, pero los módulos importados se descargan sin versión de caché. |
-| Sin conexión | N/A | Sin service worker por ahora (`ROADMAP.md`). |
+| Sin conexión | OK (Chromium, CI) | Service worker en el sitio desplegado: abre y ejecuta flujos sin red (smoke estable sin red en CI). Sin mapa base ni lectores de red. Pendiente validar en iPhone y Android. |
 
 ## Leyenda
 - `OK`: flujo validado manualmente en navegador.

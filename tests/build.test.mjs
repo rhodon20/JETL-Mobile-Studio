@@ -58,3 +58,22 @@ test('los módulos importados tienen una única URL versionada y se precargan', 
     }
     assert.ok(html.indexOf('type="importmap"') < html.indexOf('<script type="module"'), 'el import map debe ir antes de cualquier módulo');
 });
+
+test('el service worker publicado precachea, con su URL exacta, lo que la app pide', () => {
+    const sw = fs.readFileSync(path.join(OUT, 'sw.js'), 'utf8');
+    assert.doesNotMatch(sw, /const BUILD = 'dev'/);
+    const precache = JSON.parse(sw.match(/const PRECACHE = (\[[\s\S]*?\]);/)[1]);
+    for (const url of precache) {
+        const file = url === './' ? 'index.html' : url.split('?')[0];
+        assert.ok(fs.existsSync(path.join(OUT, file)), `${url} no existe`);
+    }
+    // El arranque (tags e import map), los grupos diferidos y el worker, tal y como se piden.
+    const tagged = [...html.matchAll(/\b(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map((m) => m[1]);
+    const runtime = html.match(/const JETL_RUNTIME_VERSION = '([^']+)'/)[1];
+    const pool = fs.readFileSync(path.join(OUT, 'js/core/workerPool.js'), 'utf8').match(/'(js\/geo\.worker\.js\?v=[^']+)'/)[1];
+    for (const url of [...tagged, `js/vendor/leaflet.js?v=${runtime}`, `js/visualization.js?v=${runtime}`, pool, 'js/vendor/jsts.min.js', 'index.html']) {
+        assert.ok(precache.includes(url), `falta en el precacheo: ${url}`);
+    }
+    // Fuera: el mapa base (necesita red igualmente) y las pantallas de arranque de iOS.
+    assert.ok(!precache.some((url) => url.includes('maplibre') || url.startsWith('icons/startup/')));
+});

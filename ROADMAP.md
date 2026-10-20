@@ -6,7 +6,7 @@
 - Publicado en GitHub Pages desde `main` tras pasar el CI (`README.md`).
 - Estructura reorganizada en capas de módulos ES sin violaciones ni ciclos,
   comprobada en CI (`tests/check-graph.mjs`).
-- Pruebas: `npm test` (grafo, 116 unitarias, smoke estable 30/30, flujo de la
+- Pruebas: `npm test` (grafo, 117 unitarias, smoke estable 30/30, flujo de la
   app, mapa base) más smoke extendido (42/42) y pruebas contra `dist/` en CI.
 - Validado por el usuario en iPhone (Safari) tras cada fase.
 
@@ -19,9 +19,11 @@
    memoria al pintar (hecho), tabla → mapa y columnas visibles (hecho),
    panel «Acciones», multiselección táctil, ajuste a cuadrícula, validar el
    flujo y anotaciones (hecho). Quedan para más adelante los grupos plegables.
-2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
-   bloqueo de arranque en Safari) aprovechando las URLs versionadas por
-   contenido; validar en iPhone antes de publicar.
+2. **Publicar en Google Play** (decisión del 20 de octubre), y después migrar
+   otra app del usuario. Requisitos: modo sin conexión (hecho; validar en
+   iPhone y Android), manifiesto completo, política de privacidad, accesos
+   directos que funcionen, alojamiento en la raíz de un dominio para
+   `/.well-known/assetlinks.json` (Cloudflare Pages) y empaquetado TWA.
 3. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
 

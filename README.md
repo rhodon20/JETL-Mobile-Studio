@@ -111,9 +111,10 @@ pruebas unitarias, smoke, flujo de la app y mapa base, build de `dist/` y las
 mismas pruebas contra `dist/`. Si todo pasa, publica `dist/` en GitHub Pages.
 
 ## Limitaciones conocidas
-- **Sin modo sin conexión.** El service worker está retirado (`sw.js` se
-  desregistra) desde un bloqueo de arranque en Safari; es el siguiente bloque
-  del roadmap.
+- **Sin conexión, sin mapa base ni lectores de red.** La app instalada abre y
+  ejecuta flujos sin red (`sw.js` precachea ~3 MB en el primer uso desplegado),
+  pero el mapa base, OSM/Overpass y los lectores HTTP necesitan conexión.
+  `?nosw=1` desregistra el service worker y borra sus cachés.
 - GPKG y Parquet son experimentales; los nodos raster de Desktop están fuera de
   alcance (`docs/NODE_CATALOG_PARITY.md`).
 - Datos grandes: falta perfilar ejecuciones lentas reales.

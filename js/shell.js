@@ -20,6 +20,7 @@ import { offerDraftRecovery } from './ui/draftPrompt.js';
 import { initActionHub } from './ui/actionHub.js';
 import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 import { initAnnotations } from './ui/annotations.js';
+import { initOfflineMode } from './core/offline.js';
 
 let jetlAppInitialized = false;
 // Duración de la animación de entrada de #boot-splash (ui-system.css); sin ella
@@ -160,6 +161,7 @@ function initializeJETLApp() {
     setJETLStartupStatus('ready', 'Sistema listo');
     if (window.__JETL_BOOT) window.__JETL_BOOT.stage = 'ready';
     offerDraftRecovery();
+    initOfflineMode();
     // La pantalla de arranque se desvanece cuando ha terminado su animación de
     // entrada (~1,2 s desde la navegación; sólo retrasa arranques más rápidos que
     // eso). El segundo temporizador la retira aunque no haya transición

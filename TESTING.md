@@ -24,6 +24,8 @@ npm run test:extended          # JETLSmoke.runExtended(): añade las pruebas con
 npm run build                  # genera dist/
 node tests/run-smoke.mjs --root dist
 node tests/app-flow.mjs --root dist
+node tests/run-smoke.mjs --offline --root dist   # instala el service worker, corta la red,
+                                                 # recarga, pasa la suite y prueba ?nosw=1
 ```
 
 Contra `dist/` se comprueba además que cada script se pide con su versión de

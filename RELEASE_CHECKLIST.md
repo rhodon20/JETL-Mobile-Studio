@@ -28,6 +28,10 @@ Prioriza lo que toque el cambio.
 - [ ] Deshacer/rehacer, menú contextual, plantillas, proyecto nuevo,
       guardar/cargar `.jetl`.
 - [ ] Mapa: mapa base, zoom, capas.
+- [ ] Sin conexión (cuando el cambio toque `sw.js`, el build o el arranque): abrir
+      la app instalada con conexión, esperar unos segundos, activar el modo avión
+      y reabrirla: arranca y ejecuta un flujo con BBox. Si algo se queda colgado,
+      abrir la URL con `?nosw=1` para retirar el service worker.
 
 ## 4) Formatos (cuando el cambio les afecte)
 - [ ] GeoJSON, KML, CSV: leer, transformar, exportar y reabrir.
