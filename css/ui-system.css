@@ -692,14 +692,12 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
 
 /* Panel «Acciones» del botón central del dock (js/ui/actionHub.js). */
 #action-hub-scrim, #action-hub { display:none; }
-body.action-hub-open #action-hub-scrim { display:block; position:fixed; inset:0; z-index:2147483645; background:rgba(5,7,10,.55); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
-body.action-hub-open #action-hub { display:block; position:fixed; left:12px; right:12px; z-index:2147483646;
-    bottom:calc(var(--mobile-dock-height, 64px) + var(--mobile-safe-bottom, 0px) + 14px);
-    max-width:460px; margin:0 auto; padding:14px 12px 12px; background:#1f2023; border:1px solid rgba(255,255,255,.1);
-    border-radius:20px; box-shadow:0 18px 40px rgba(0,0,0,.55); animation:action-hub-in .18s ease-out; }
-#action-hub::after { content:''; position:absolute; left:50%; bottom:-8px; width:16px; height:16px; background:#1f2023; border-right:1px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.1); transform:translateX(-50%) rotate(45deg); }
-.action-hub-head { padding:0 6px 12px; color:#9ca3af; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
-.action-hub-head b { color:#e5e7eb; font-size:14px; letter-spacing:0; text-transform:none; }
+body.action-hub-open #action-hub-scrim { display:block; position:fixed; inset:0; z-index:2147483645; background:var(--sheet-scrim, rgba(0,0,0,.45)); }
+body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:0; z-index:2147483646;
+    bottom:calc(var(--mobile-dock-height, 64px) + var(--mobile-safe-bottom, 0px));
+    padding:18px 18px 16px; background:var(--sheet-bg, #202023); border-radius:var(--sheet-radius, 24px) var(--sheet-radius, 24px) 0 0;
+    box-shadow:var(--sheet-shadow, 0 -18px 50px rgba(0,0,0,.5)); animation:sheet-up var(--sheet-motion, .26s cubic-bezier(.2,.8,.2,1)); }
+.action-hub-head { margin-bottom:14px; }
 .action-hub-primary { display:flex; align-items:center; gap:12px; width:100%; min-height:54px; margin-bottom:10px; padding:0 16px; border:0; border-radius:14px; color:#fff; font:inherit; font-size:16px; font-weight:700; background:linear-gradient(180deg,#2a8ad0,#1f6fa8); box-shadow:0 6px 16px rgba(35,127,190,.35); cursor:pointer; }
 .action-hub-primary small { margin-left:auto; font-size:12px; font-weight:500; opacity:.8; }
 .action-hub-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
@@ -708,8 +706,6 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
 .action-hub-item:active i, .action-hub-primary:active { transform:scale(.96); }
 .action-hub-item.danger i { color:#ff8a80; }
 #mobile-run.is-cancel { background:linear-gradient(145deg,#c0392b,#962d22); box-shadow:0 8px 20px rgba(192,57,43,.42); }
-@keyframes action-hub-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-@media (prefers-reduced-motion: reduce) { body.action-hub-open #action-hub { animation:none; } }
 .action-hub-primary:disabled { opacity:.45; box-shadow:none; cursor:default; }
 
 /* Multiselección (js/ui/multiSelect.js): en el modo, un toque marca el nodo; sus

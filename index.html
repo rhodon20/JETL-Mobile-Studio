@@ -101,6 +101,8 @@
             if (sidebar) sidebar.classList.remove('open');
             if (overlay) overlay.style.display = 'none';
             if (project) project.setAttribute('aria-hidden', 'true');
+            // Las hojas que no gestiona este script (el historial) se cierran al oírlo.
+            if (window.JETLEvents) window.JETLEvents.emit('nav:view', { view: view });
 
             if (view === 'nodes') {
                 document.body.classList.add('mobile-nodes-open');
@@ -1897,14 +1899,12 @@ button.brand:focus-visible { outline:2px solid #3498db; outline-offset:3px; bord
 
 /* Panel «Acciones» del botón central del dock (js/ui/actionHub.js). */
 #action-hub-scrim, #action-hub { display:none; }
-body.action-hub-open #action-hub-scrim { display:block; position:fixed; inset:0; z-index:2147483645; background:rgba(5,7,10,.55); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
-body.action-hub-open #action-hub { display:block; position:fixed; left:12px; right:12px; z-index:2147483646;
-    bottom:calc(var(--mobile-dock-height, 64px) + var(--mobile-safe-bottom, 0px) + 14px);
-    max-width:460px; margin:0 auto; padding:14px 12px 12px; background:#1f2023; border:1px solid rgba(255,255,255,.1);
-    border-radius:20px; box-shadow:0 18px 40px rgba(0,0,0,.55); animation:action-hub-in .18s ease-out; }
-#action-hub::after { content:''; position:absolute; left:50%; bottom:-8px; width:16px; height:16px; background:#1f2023; border-right:1px solid rgba(255,255,255,.1); border-bottom:1px solid rgba(255,255,255,.1); transform:translateX(-50%) rotate(45deg); }
-.action-hub-head { padding:0 6px 12px; color:#9ca3af; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
-.action-hub-head b { color:#e5e7eb; font-size:14px; letter-spacing:0; text-transform:none; }
+body.action-hub-open #action-hub-scrim { display:block; position:fixed; inset:0; z-index:2147483645; background:var(--sheet-scrim, rgba(0,0,0,.45)); }
+body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:0; z-index:2147483646;
+    bottom:calc(var(--mobile-dock-height, 64px) + var(--mobile-safe-bottom, 0px));
+    padding:18px 18px 16px; background:var(--sheet-bg, #202023); border-radius:var(--sheet-radius, 24px) var(--sheet-radius, 24px) 0 0;
+    box-shadow:var(--sheet-shadow, 0 -18px 50px rgba(0,0,0,.5)); animation:sheet-up var(--sheet-motion, .26s cubic-bezier(.2,.8,.2,1)); }
+.action-hub-head { margin-bottom:14px; }
 .action-hub-primary { display:flex; align-items:center; gap:12px; width:100%; min-height:54px; margin-bottom:10px; padding:0 16px; border:0; border-radius:14px; color:#fff; font:inherit; font-size:16px; font-weight:700; background:linear-gradient(180deg,#2a8ad0,#1f6fa8); box-shadow:0 6px 16px rgba(35,127,190,.35); cursor:pointer; }
 .action-hub-primary small { margin-left:auto; font-size:12px; font-weight:500; opacity:.8; }
 .action-hub-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
@@ -1913,8 +1913,6 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
 .action-hub-item:active i, .action-hub-primary:active { transform:scale(.96); }
 .action-hub-item.danger i { color:#ff8a80; }
 #mobile-run.is-cancel { background:linear-gradient(145deg,#c0392b,#962d22); box-shadow:0 8px 20px rgba(192,57,43,.42); }
-@keyframes action-hub-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-@media (prefers-reduced-motion: reduce) { body.action-hub-open #action-hub { animation:none; } }
 .action-hub-primary:disabled { opacity:.45; box-shadow:none; cursor:default; }
 
 /* Multiselección (js/ui/multiSelect.js): en el modo, un toque marca el nodo; sus
@@ -1954,6 +1952,22 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
     --mobile-dock-height: 72px;
     --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-safe-top: env(safe-area-inset-top, 0px);
+    /* Hojas del dock (Nodos, Historial, Resultados, Proyecto, Acciones): todas
+       suben desde abajo con la misma superficie, asa, cabecera y animación. */
+    --sheet-bg: #202023;
+    --sheet-radius: 24px;
+    --sheet-motion: .26s cubic-bezier(.2, .8, .2, 1);
+    --sheet-shadow: 0 -18px 50px rgba(0, 0, 0, .5);
+    --sheet-top: calc(var(--mobile-safe-top) + 54px + 10px);
+    --sheet-bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+    --sheet-scrim: rgba(0, 0, 0, .45);
+}
+
+/* La cabecera de hoja del catálogo y el cierre de resultados sólo existen en móvil. */
+#sidebar > .mobile-sheet-handle,
+#sidebar > .mobile-sheet-header,
+.panel-sheet-close {
+    display: none;
 }
 
 #mobile-dock,
@@ -2069,22 +2083,30 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
     #sidebar {
         position: fixed;
         z-index: 1200;
-        top: calc(var(--mobile-safe-top) + 54px);
-        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        top: var(--sheet-top);
+        bottom: var(--sheet-bottom);
         left: 0;
-        width: min(88vw, 380px);
+        right: 0;
+        width: auto;
         max-width: none;
         height: auto;
-        border-radius: 0 22px 22px 0;
-        box-shadow: 14px 0 40px rgba(0, 0, 0, .45);
+        padding-top: 8px;
+        background: var(--sheet-bg);
+        border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+        box-shadow: var(--sheet-shadow);
+        transform: translateY(calc(100% + 4px)) !important;
+        transition: transform var(--sheet-motion);
     }
 
+    #sidebar > .mobile-sheet-handle { display: block; }
+    #sidebar > .mobile-sheet-header { display: flex; margin: 0 18px 4px; }
+
     #mobile-state-nodes:checked ~ #layout #sidebar {
-        transform: translateX(0) !important;
+        transform: translateY(0) !important;
     }
 
     body.mobile-nodes-open #sidebar {
-        transform: translateX(0) !important;
+        transform: translateY(0) !important;
     }
 
     #mobile-state-nodes:checked ~ #layout #sidebar-overlay {
@@ -2132,10 +2154,10 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
     #sidebar-overlay {
         position: fixed !important;
         z-index: 1100 !important;
-        inset: calc(var(--mobile-safe-top) + 54px) 0 calc(var(--mobile-dock-height) + var(--mobile-safe-bottom)) !important;
+        inset: 0 0 var(--sheet-bottom) !important;
         width: auto !important;
         height: auto !important;
-        backdrop-filter: blur(2px);
+        background: var(--sheet-scrim) !important;
     }
 
     #bottom-panel {
@@ -2143,15 +2165,37 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
         z-index: 1200 !important;
         left: 0;
         right: 0;
-        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
-        height: min(58dvh, 560px) !important;
-        border-radius: 22px 22px 0 0;
-        border: 1px solid var(--border);
+        bottom: var(--sheet-bottom);
+        /* Casi a pantalla completa: se abre para revisar datos. */
+        top: var(--sheet-top);
+        height: auto !important;
+        padding-top: 18px;
+        background: var(--sheet-bg);
+        border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+        border: 0;
         visibility: hidden;
         pointer-events: none;
         transform: translate3d(0, calc(100% + 4px), 0) !important;
-        transition: transform .26s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .26s;
-        box-shadow: 0 -18px 50px rgba(0, 0, 0, .45);
+        transition: transform var(--sheet-motion), visibility 0s linear .26s;
+        box-shadow: var(--sheet-shadow);
+    }
+
+    #bottom-panel::before {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        width: 42px;
+        height: 5px;
+        margin-left: -21px;
+        border-radius: 999px;
+        background: #5b5b60;
+    }
+
+    #panel-tabs .panel-sheet-close {
+        display: grid;
+        flex: 0 0 42px;
+        margin-left: 8px;
     }
 
     body.mobile-results-open #bottom-panel {
@@ -2179,6 +2223,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
     #panel-tabs .panel-tabs-main {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        flex: 1 1 auto;
         width: 100%;
         min-width: 0;
         overflow: hidden;
@@ -2343,8 +2388,8 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
         position: fixed;
         display: block;
         z-index: 1190;
-        inset: calc(var(--mobile-safe-top) + 54px) 0 calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
-        background: rgba(0, 0, 0, .42);
+        inset: 0 0 var(--sheet-bottom);
+        background: var(--sheet-scrim);
         opacity: 0;
         pointer-events: none;
         transition: opacity .22s ease;
@@ -2368,13 +2413,13 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
         z-index: 1210;
         left: 0;
         right: 0;
-        bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom));
+        bottom: var(--sheet-bottom);
         padding: 8px 18px 22px;
-        background: #202023;
-        border-radius: 24px 24px 0 0;
-        box-shadow: 0 -18px 50px rgba(0, 0, 0, .5);
+        background: var(--sheet-bg);
+        border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+        box-shadow: var(--sheet-shadow);
         transform: translateY(calc(100% + 4px));
-        transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+        transition: transform var(--sheet-motion);
     }
 
     body.mobile-sheet-open #mobile-project-sheet {
@@ -2544,6 +2589,63 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
         visibility: hidden;
         pointer-events: none;
     }
+
+    /* Historial: hoja del dock (no diálogo), con la geometría de las demás. */
+    #run-history-modal {
+        inset: 0 0 var(--sheet-bottom) !important;
+        align-items: flex-end !important;
+        justify-content: stretch !important;
+        padding: 0 !important;
+        background: var(--sheet-scrim);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    #run-history-modal .run-history-content {
+        position: relative;
+        width: 100% !important;
+        height: calc(100dvh - var(--sheet-top) - var(--sheet-bottom));
+        max-height: none;
+        padding-top: 18px;
+        border: 0;
+        border-radius: var(--sheet-radius) var(--sheet-radius) 0 0 !important;
+        background: var(--sheet-bg);
+        box-shadow: var(--sheet-shadow);
+        transform: none;
+    }
+
+    #run-history-modal.is-open .run-history-content { animation: sheet-up var(--sheet-motion); }
+    #run-history-modal .run-history-layout { height: auto; flex: 1 1 auto; min-height: 0; }
+
+    #run-history-modal .run-history-content::before,
+    #action-hub::before {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        width: 42px;
+        height: 5px;
+        margin-left: -21px;
+        border-radius: 999px;
+        background: #5b5b60;
+    }
+
+    /* Cabecera de hoja: antetítulo en versalitas sobre el título, sin icono. */
+    #run-history-modal .modal-header { padding: 4px 18px 12px; border-bottom: 0; background: transparent; }
+    #run-history-modal .modal-title > i { display: none; }
+    #run-history-modal .modal-title > div { display: flex; flex-direction: column-reverse; gap: 3px; }
+    #run-history-modal .modal-title small { color: #8d8d93; font-size: .65rem; font-weight: 700; letter-spacing: .12em; }
+    #run-history-modal .modal-title strong { color: #fff; font-size: 1.3rem; }
+    #run-history-modal .modal-close { width: 42px; height: 42px; border: 0; border-radius: 50%; color: #ddd; background: #303034; }
+}
+
+@keyframes sheet-up {
+    from { transform: translateY(calc(100% + 4px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #run-history-modal.is-open .run-history-content,
+    body.action-hub-open #action-hub { animation: none; }
 }
 
 @media (max-width: 380px) {
@@ -2639,6 +2741,11 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
 
     <div id="layout">
         <div id="sidebar">
+            <div class="mobile-sheet-handle"></div>
+            <div class="mobile-sheet-header">
+                <div><small>CATÁLOGO</small><strong>Nodos</strong></div>
+                <label class="mobile-sheet-close" for="mobile-state-flow" data-mobile-close aria-label="Cerrar"><i class="fas fa-times"></i></label>
+            </div>
             <div id="sidebar-search">
                 <input type="text" placeholder="Buscar transformador..." id="sidebar-filter-input">
             </div>
@@ -2665,6 +2772,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
                 <button class="tab-btn" data-ui-action="tab-logs" data-results-view="logs" aria-selected="false" onclick="event.stopPropagation(); JETLNativeResultTab('logs')"><i class="fas fa-terminal"></i>
                     Consola</button>
             </div>
+            <label class="mobile-sheet-close panel-sheet-close" for="mobile-state-flow" data-mobile-close aria-label="Cerrar resultados"><i class="fas fa-times"></i></label>
             <div class="panel-tabs-actions">
                 <button class="tab-btn panel-collapse-btn" id="btn-panel-collapse" data-ui-action="toggle-panel"
                     title="Ocultar visor" aria-label="Ocultar visor" aria-expanded="true"><i
@@ -2830,13 +2938,13 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:12px; rig
             </div>
         </div>
     </div>
-    <div id="run-history-modal" class="modal" role="dialog" aria-modal="true"
+    <div id="run-history-modal" class="modal" data-dock-sheet role="dialog" aria-modal="true"
         aria-labelledby="run-history-title" aria-hidden="true">
         <div class="modal-content run-history-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-clock-rotate-left"></i><div>
-                    <strong id="run-history-title">Historial de ejecuciones</strong>
-                    <small>Últimas 30 ejecuciones completas y parciales</small>
+                    <strong id="run-history-title">Historial</strong>
+                    <small>ÚLTIMAS 30 EJECUCIONES</small>
                 </div></div>
                 <button class="modal-close" type="button" data-run-history-close aria-label="Cerrar"
                     onclick="event.stopPropagation(); JETLCloseRunHistory()"><i class="fas fa-times"></i></button>

@@ -143,16 +143,58 @@ function replaceConnectionWithNode(connection, nodeId) {
 }
 window.JETLReplaceConnectionWithNode = replaceConnectionWithNode;
 
+// Dónde va un nodo que se encadena a otro, en coordenadas del lienzo. En pantallas
+// anchas, a la derecha del origen. En móvil, en zigzag a dos columnas para que el
+// flujo crezca hacia abajo: desde la columna izquierda se pasa a la derecha en la
+// misma fila; desde la derecha se baja a la izquierda de la fila siguiente. Si el
+// hueco está ocupado (otra rama del mismo origen) se baja hasta uno libre.
+const CHAIN_GAP = 75;
+
+function chainedNodeCanvasPosition(sourceId, graph = _getGraphDataSafe(), narrow = window.innerWidth <= 768) {
+    const source = graph[String(sourceId)];
+    if (!source) return null;
+    const sx = Number(source.pos_x || 0);
+    const sy = Number(source.pos_y || 0);
+    if (!narrow) return { x: sx + 300, y: sy };
+    const size = (id) => {
+        const el = document.getElementById('node-' + id);
+        return { w: el?.offsetWidth || 240, h: el?.offsetHeight || 120 };
+    };
+    const { w } = size(source.id);
+    const nodes = Object.values(graph);
+    const leftX = Math.min(...nodes.map((node) => Number(node.pos_x || 0)));
+    let x;
+    let y;
+    if (sx < leftX + (w + CHAIN_GAP) / 2) {
+        x = sx + w + CHAIN_GAP;
+        y = sy;
+    } else {
+        const rowBottom = Math.max(...nodes
+            .filter((node) => Math.abs(Number(node.pos_y || 0) - sy) < CHAIN_GAP)
+            .map((node) => Number(node.pos_y || 0) + size(node.id).h));
+        x = leftX;
+        y = rowBottom + CHAIN_GAP;
+    }
+    const overlaps = (px, py) => nodes.some((node) => {
+        const nx = Number(node.pos_x || 0);
+        const ny = Number(node.pos_y || 0);
+        const { w: nw, h: nh } = size(node.id);
+        return px < nx + nw && px + w > nx && py < ny + nh && py + 100 > ny;
+    });
+    for (let guard = 0; guard < 200 && overlaps(x, y); guard++) y += 25;
+    return { x, y };
+}
+
 function getConnectedNodePlacement(sourceId, fallbackRect) {
-    const source = _getGraphDataSafe()[String(sourceId)];
-    if (!source || !editor?.precanvas) {
+    const position = editor?.precanvas ? chainedNodeCanvasPosition(sourceId) : null;
+    if (!position) {
         return { x: fallbackRect.width / 2 + fallbackRect.left, y: fallbackRect.height / 2 + fallbackRect.top };
     }
     const canvasRect = editor.precanvas.getBoundingClientRect();
     const zoom = Number(editor.zoom || 1);
     return {
-        x: canvasRect.left + (Number(source.pos_x || 0) + 300) * zoom,
-        y: canvasRect.top + Number(source.pos_y || 0) * zoom
+        x: canvasRect.left + position.x * zoom,
+        y: canvasRect.top + position.y * zoom
     };
 }
 

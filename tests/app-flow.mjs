@@ -313,6 +313,40 @@ try {
     });
     check('during a run the centre button cancels it', cancelLabel === 'Cancelar', cancelLabel);
 
+    // Every dock destination is a bottom sheet: history keeps the dock and closes on navigation.
+    await page.click('#mobile-history');
+    const historySheet = await page.evaluate(() => ({
+        open: document.getElementById('run-history-modal').classList.contains('is-open'),
+        dock: getComputedStyle(document.getElementById('mobile-dock')).visibility,
+        active: document.getElementById('mobile-history').classList.contains('active')
+    }));
+    await page.click('[data-mobile-view="nodes"]');
+    const swapped = await page.evaluate(() => ({
+        historyClosed: !document.getElementById('run-history-modal').classList.contains('is-open'),
+        nodesOpen: document.body.classList.contains('mobile-nodes-open')
+    }));
+    await page.evaluate(() => JETLNativeNav('flow'));
+    check('history is a dock sheet that gives way to the next one', historySheet.open && historySheet.dock === 'visible' && historySheet.active && swapped.historyClosed && swapped.nodesOpen, JSON.stringify({ historySheet, swapped }));
+
+    // On a phone, chaining nodes grows the flow downwards in two columns (zigzag).
+    const chain = await page.evaluate(() => {
+        editor.clear();
+        JETLNativeNav('flow');
+        const first = addNode('reader_bbox_gen');
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        document.getElementById('node-' + first).classList.add('selected');
+        editor.node_selected = document.getElementById('node-' + first);
+        const ids = [first];
+        for (let k = 0; k < 4; k++) ids.push(addNodeClick('geo_centroid'));
+        const data = editor.drawflow.drawflow.Home.data;
+        return ids.map((id) => [Number(data[id].pos_x), Number(data[id].pos_y), (data[id].inputs.input_1?.connections || []).length]);
+    });
+    const xs = [...new Set(chain.map(([x]) => x))];
+    const rowsGoDown = chain[2][1] > chain[0][1] && chain[4][1] > chain[2][1];
+    const zigzag = xs.length === 2 && chain[0][0] === chain[2][0] && chain[2][0] === chain[4][0] && chain[1][0] === chain[3][0]
+        && chain[0][1] === chain[1][1] && chain[2][1] === chain[3][1];
+    check('chained nodes grow downwards in two columns on a phone', zigzag && rowsGoDown && chain.slice(1).every(([, , linked]) => linked === 1), JSON.stringify(chain));
+
     // «Validar flujo» lists problems before running; tapping one goes to its node.
     const valIds = await page.evaluate(() => {
         editor.clear();

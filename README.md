@@ -16,7 +16,9 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
 - Proyectos `.jetl` (guardar/cargar) y borrador local en el navegador, con aviso
   para recuperarlo o descartarlo al abrir la app.
 - Interfaz móvil: barra inferior (Nodos / Historial / Acciones / Resultados /
-  Proyecto) y gestos en el lienzo. «Acciones» abre un panel según el contexto:
+  Proyecto); cada destino es una hoja que sube desde abajo con la misma
+  apariencia (Resultados ocupa casi toda la pantalla). Al encadenar nodos el
+  flujo crece hacia abajo en dos columnas, en zigzag. «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
   problemas que lleva a cada nodo), encuadrar, plantillas y parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
   duplicarlo, centrarlo o eliminarlo. «Seleccionar varios» activa un modo en el que

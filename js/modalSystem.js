@@ -53,7 +53,8 @@
     }
 
     function observe(modal) {
-        if (modal.dataset.modalSystem === '1') return;
+        // Las hojas del dock (Historial) no son diálogos: no ocultan el dock.
+        if (modal.dataset.modalSystem === '1' || modal.hasAttribute('data-dock-sheet')) return;
         modal.dataset.modalSystem = '1';
         modal.setAttribute('aria-hidden', 'true');
         new MutationObserver(() => syncModal(modal)).observe(modal, {

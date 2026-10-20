@@ -226,7 +226,8 @@ function closeRunHistory() {
     modal.classList.remove('is-open');
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
-    if (!document.querySelector('.modal.is-open')) document.body.classList.remove('modal-open');
+    document.body.classList.remove('history-open');
+    document.getElementById('mobile-history')?.classList.remove('active');
 }
 
 function initRunHistory() {
@@ -290,9 +291,14 @@ function openRunHistory() {
     modal.style.display = 'flex';
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
+    // En móvil es una hoja del dock: el dock sigue visible y marca Historial.
+    document.body.classList.add('history-open');
+    document.getElementById('mobile-history')?.classList.add('active');
     return true;
 }
+
+// Cambiar de vista en el dock cierra el historial, que también es una hoja.
+JETLEvents.on('nav:view', () => closeRunHistory());
 
 window.JETLRunHistory = { load: loadRunHistory, record: publishRunReport, render: renderRunHistory };
 window.JETLOpenRunHistory = openRunHistory;

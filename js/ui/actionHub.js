@@ -60,11 +60,17 @@ function itemHtml(item) {
 
 const plural = (n) => `${n} ${n === 1 ? 'nodo' : 'nodos'}`;
 
+// Cabecera de hoja, la misma que Proyecto, Nodos o Historial.
+function sheetHead(kicker, title) {
+    return `<div class="mobile-sheet-header action-hub-head"><div><small>${kicker}</small><strong>${title}</strong></div>
+        <button type="button" class="mobile-sheet-close" data-hub-close aria-label="Cerrar"><i class="fas fa-times"></i></button></div>`;
+}
+
 function render(panel) {
     if (isSelecting()) {
         const count = pickedIds().length;
         panel.dataset.nodeId = '';
-        panel.innerHTML = `<div class="action-hub-head">Selección · ${plural(count)}</div>
+        panel.innerHTML = `${sheetHead('SELECCIÓN', plural(count))}
             <button type="button" class="action-hub-primary" data-hub-action="duplicate-group" ${count ? '' : 'disabled'}><i class="fas fa-clone" aria-hidden="true"></i><span>Duplicar ${plural(count)}</span><small>con sus conexiones</small></button>
             <div class="action-hub-grid">${SELECTION_ITEMS.map(itemHtml).join('')}</div>`;
         return;
@@ -74,17 +80,17 @@ function render(panel) {
     let head, primary, items;
     if (node) {
         const planned = collectRequiredNodeIds(nodeId, _getGraphDataSafe()).length;
-        head = `Nodo seleccionado · <b>${JETLEscapeHtml(nodeLabel(nodeId))}</b>`;
+        head = sheetHead('NODO SELECCIONADO', JETLEscapeHtml(nodeLabel(nodeId)));
         primary = { icon: 'fa-forward-step', label: 'Ejecutar hasta aquí', hub: 'run-to', note: `${planned} ${planned === 1 ? 'nodo' : 'nodos'}` };
         items = NODE_ITEMS;
     } else {
         const count = Object.keys(_getGraphDataSafe()).length;
-        head = `Flujo · ${count} ${count === 1 ? 'nodo' : 'nodos'}`;
+        head = sheetHead('ACCIONES', `Flujo · ${plural(count)}`);
         primary = { icon: 'fa-play', label: 'Ejecutar todo', hub: 'run-all', note: lastFullRun() };
         items = FLOW_ITEMS;
     }
     panel.dataset.nodeId = node ? String(nodeId) : '';
-    panel.innerHTML = `<div class="action-hub-head">${head}</div>
+    panel.innerHTML = `${head}
         <button type="button" class="action-hub-primary" data-hub-action="${primary.hub}"><i class="fas ${primary.icon}" aria-hidden="true"></i><span>${primary.label}</span><small>${JETLEscapeHtml(primary.note)}</small></button>
         <div class="action-hub-grid">${items.map(itemHtml).join('')}</div>`;
 }
@@ -101,6 +107,8 @@ function closeActionHub() {
 function openActionHub() {
     const panel = document.getElementById('action-hub');
     if (!panel) return;
+    // Una sola hoja a la vez: Acciones sustituye a la que estuviera abierta.
+    window.JETLNativeNav?.('flow');
     render(panel);
     document.body.classList.add('action-hub-open');
     document.getElementById('mobile-run')?.setAttribute('aria-expanded', 'true');
@@ -205,6 +213,10 @@ function initActionHub() {
     });
     // Los data-ui-action siguen su camino hasta shell.js; aquí sólo se cierra el panel.
     panel.addEventListener('click', (event) => {
+        if (event.target.closest('[data-hub-close]')) {
+            closeActionHub();
+            return;
+        }
         const item = event.target.closest('[data-hub-action], [data-ui-action]');
         if (!item) return;
         const nodeId = panel.dataset.nodeId || null;
