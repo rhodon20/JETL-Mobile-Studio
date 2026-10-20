@@ -468,6 +468,93 @@ try {
     await page.click('#multi-select-banner button');
     check('Listo leaves select mode', await page.evaluate(() => !document.body.classList.contains('multi-select-mode') && !document.querySelector('.drawflow-node.is-picked')));
 
+    // Notes: a free sticky note on the canvas and an annotation inside a node.
+    const noteNodes = await page.evaluate(() => {
+        editor.clear();
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_buffer');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        editor.node_selected = null;
+        JETLNativeNav('flow');
+        JETLEvents.emit('canvas:fit');
+        addToHistory();
+        return { a, b };
+    });
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="note"]');
+    await page.fill('#annotation-text', 'Revisar la zona norte');
+    await page.click('[data-annotation-color="#3498db"]');
+    await page.click('[data-annotation-save]');
+    const freeNote = await page.evaluate(() => ({
+        dom: document.querySelector('#annotation-layer .canvas-note')?.textContent.trim(),
+        saved: editor.export().annotations
+    }));
+    check('a free note is created from Acciones', freeNote.dom === 'Revisar la zona norte' && freeNote.saved.length === 1 && freeNote.saved[0].color === '#3498db' && freeNote.saved[0].nodeId === null, JSON.stringify(freeNote));
+
+    const noteBox = await page.locator('.canvas-note').boundingBox();
+    await page.mouse.move(noteBox.x + 30, noteBox.y + 20);
+    await page.mouse.down();
+    for (let k = 1; k <= 4; k++) await page.mouse.move(noteBox.x + 30 + k * 11, noteBox.y + 20 + k * 9);
+    await page.mouse.up();
+    const movedNote = await page.evaluate(() => ({ ...editor.export().annotations[0], dialog: !!document.getElementById('annotation-modal')?.classList.contains('is-open') }));
+    check('dragging a note moves it onto the grid', movedNote.x !== freeNote.saved[0].x && movedNote.x % 25 === 0 && movedNote.y % 25 === 0 && !movedNote.dialog, JSON.stringify(movedNote));
+
+    await page.click('.canvas-note');
+    await page.fill('#annotation-text', 'Revisar la zona sur');
+    await page.click('[data-annotation-save]');
+    const edited = await page.evaluate(() => editor.export().annotations[0].text);
+    await page.evaluate(() => undo());
+    const noteUndone = await page.evaluate(() => ({ text: editor.export().annotations[0]?.text, dom: document.querySelector('.canvas-note')?.textContent.trim() }));
+    check('tapping a note edits it and undo restores it', edited === 'Revisar la zona sur' && noteUndone.text === 'Revisar la zona norte' && noteUndone.dom === 'Revisar la zona norte', JSON.stringify({ edited, noteUndone }));
+
+    await page.evaluate((b) => { const el = document.getElementById('node-' + b); el.classList.add('selected'); editor.node_selected = el; }, noteNodes.b);
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="annotate"]');
+    await page.fill('#annotation-text', 'Radio provisional');
+    await page.click('[data-annotation-save]');
+    await page.click('#mobile-run');
+    const nodeNote = await page.evaluate((b) => ({
+        strip: document.querySelector(`#node-${b} > .node-note`)?.textContent.trim(),
+        label: [...document.querySelectorAll('#action-hub .action-hub-item span')].map((el) => el.textContent).includes('Editar nota')
+    }), noteNodes.b);
+    await page.click('[data-hub-close]');
+    check('a node annotation shows inside the node', nodeNote.strip === 'Radio provisional' && nodeNote.label, JSON.stringify(nodeNote));
+
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(() => window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready', null, { timeout: 30000 });
+    await page.click('[data-draft-recovery="restore"]');
+    await page.waitForTimeout(200);
+    const restoredNotes = await page.evaluate((b) => ({
+        free: document.querySelector('.canvas-note')?.textContent.trim(),
+        strip: document.querySelector(`#node-${b} > .node-note`)?.textContent.trim()
+    }), noteNodes.b);
+    check('notes come back with the recovered draft', restoredNotes.free === 'Revisar la zona norte' && restoredNotes.strip === 'Radio provisional', JSON.stringify(restoredNotes));
+    const afterRemove = await page.evaluate((b) => { editor.removeNodeId('node-' + b); return editor.export().annotations.map((n) => n.nodeId); }, noteNodes.b);
+    check('removing a node drops its annotation', afterRemove.length === 1 && afterRemove[0] === null, JSON.stringify(afterRemove));
+    // A project saved with the notes only at its root (Desktop format) still shows them.
+    const desktopNotes = await page.evaluate(async () => {
+        const id = addNode('geo_buffer');
+        const flow = editor.export();
+        delete flow.annotations;
+        const project = { version: 'x', flow, annotations: [
+            { id: 'annotation_1', type: 'custom', text: 'Desde Desktop', node_id: null, x: 50, y: 50, color: '#2ecc71' },
+            { id: 'annotation_2', type: 'custom', text: 'Del nodo', node_id: String(id), x: 0, y: 0, color: '#f1c40f' }
+        ] };
+        const input = document.getElementById('upload-jetl');
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([JSON.stringify(project)], 'p.jetl', { type: 'application/json' }));
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 400));
+        return {
+            free: document.querySelector('.canvas-note')?.textContent.trim(),
+            strip: document.querySelector(`#node-${id} > .node-note`)?.textContent.trim()
+        };
+    });
+    check('notes saved at the project root (Desktop) are loaded', desktopNotes.free === 'Desde Desktop' && desktopNotes.strip === 'Del nodo', JSON.stringify(desktopNotes));
+    await page.evaluate(() => { editor.clear(); JETLNativeNav('flow'); });
+
     // Draft recovery: after a reload the app asks before touching the saved flow.
     const reloadAndReadPrompt = async () => {
         await page.reload({ waitUntil: 'load' });

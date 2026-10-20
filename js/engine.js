@@ -526,6 +526,8 @@ function saveProject() {
     const project = window.JETLProjectPersistence?.createProject
         ? window.JETLProjectPersistence.createProject(exportData, document)
         : { version: "2026.03.05", timestamp: Date.now(), flow: exportData };
+    // Las anotaciones viajan dentro de flow; se repiten en la raíz, donde las guarda Desktop.
+    project.annotations = exportData.annotations || [];
     const workingCopyCount = Object.keys(project.reader_working_copies || {}).length;
     const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -550,6 +552,12 @@ function loadProject(input) {
                 ? window.JETLProjectPersistence.parseProject(json)
                 : { flow: json.flow ? json.flow : json, readerWorkingCopies: {} };
             const flowData = parsedProject.flow;
+            // Un proyecto con las anotaciones sólo en la raíz (formato Desktop).
+            if (!Array.isArray(flowData.annotations) && Array.isArray(json?.annotations)) {
+                flowData.annotations = json.annotations
+                    .filter((note) => note && note.text)
+                    .map((note) => ({ ...note, nodeId: note.nodeId ?? note.node_id ?? null }));
+            }
 
             // No se requiere auto-reparación de HTML porque los nodos ahora usan delegación
             // y no incrustan su propio ID en el template.

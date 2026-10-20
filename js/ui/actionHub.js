@@ -14,6 +14,7 @@ import { focusFlowNode } from './catalog.js';
 import { isSelecting, pickedIds, startSelection, stopSelection, setPicked, pickAll } from './multiSelect.js';
 import { duplicateNodes, removeNodes } from '../engine.js';
 import { openValidation } from './validationPanel.js';
+import { annotate, noteForNode } from './annotations.js';
 
 let running = false;
 
@@ -21,6 +22,7 @@ const FLOW_ITEMS = [
     { icon: 'fa-magnifying-glass-location', label: 'Buscar en el lienzo', ui: 'open-flow-navigator' },
     { icon: 'fa-list-check', label: 'Validar flujo', hub: 'validate' },
     { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
+    { icon: 'fa-note-sticky', label: 'Nota', hub: 'note' },
     { icon: 'fa-expand', label: 'Encuadrar', hub: 'fit' },
     { icon: 'fa-layer-group', label: 'Plantillas', ui: 'open-templates' },
     { icon: 'fa-sliders', label: 'Parámetros', ui: 'open-params' }
@@ -28,6 +30,7 @@ const FLOW_ITEMS = [
 
 const NODE_ITEMS = [
     { icon: 'fa-map-location-dot', label: 'Ver resultado', hub: 'view' },
+    { icon: 'fa-note-sticky', label: 'Anotar', hub: 'annotate' },
     { icon: 'fa-clone', label: 'Duplicar', hub: 'duplicate' },
     { icon: 'fa-crosshairs', label: 'Centrar', hub: 'center' },
     { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
@@ -82,7 +85,7 @@ function render(panel) {
         const planned = collectRequiredNodeIds(nodeId, _getGraphDataSafe()).length;
         head = sheetHead('NODO SELECCIONADO', JETLEscapeHtml(nodeLabel(nodeId)));
         primary = { icon: 'fa-forward-step', label: 'Ejecutar hasta aquí', hub: 'run-to', note: `${planned} ${planned === 1 ? 'nodo' : 'nodos'}` };
-        items = NODE_ITEMS;
+        items = NODE_ITEMS.map((item) => (item.hub === 'annotate' && noteForNode(nodeId) ? { ...item, label: 'Editar nota' } : item));
     } else {
         const count = Object.keys(_getGraphDataSafe()).length;
         head = sheetHead('ACCIONES', `Flujo · ${plural(count)}`);
@@ -139,6 +142,11 @@ async function runHubAction(action, nodeId) {
         }
         return;
     }
+    if (action === 'note') {
+        showFlow();
+        annotate();
+        return;
+    }
     if (action === 'validate') {
         openValidation();
         return;
@@ -163,6 +171,9 @@ async function runHubAction(action, nodeId) {
         window.JETLNativeNav?.('results');
         await window.showOnMap?.(nodeId, null, true);
         window.switchTab?.('map');
+    } else if (action === 'annotate') {
+        showFlow();
+        annotate(nodeId);
     } else if (action === 'duplicate') {
         showFlow();
         if (duplicateNode(nodeId)) showToast('Nodo duplicado', 'success');

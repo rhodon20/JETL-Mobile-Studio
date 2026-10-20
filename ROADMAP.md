@@ -17,8 +17,8 @@
    difieren; `scripts/audit-node-params.mjs`). Orden acordado: reproyectar al
    pintar (hecho), aviso de recuperación del borrador (hecho), límites de
    memoria al pintar (hecho), tabla → mapa y columnas visibles (hecho),
-   panel «Acciones», multiselección táctil, ajuste a cuadrícula y validar el
-   flujo (hecho). Sigue: notas/anotaciones como acción del panel.
+   panel «Acciones», multiselección táctil, ajuste a cuadrícula, validar el
+   flujo y anotaciones (hecho). Quedan para más adelante los grupos plegables.
 2. **Modo sin conexión.** Reintroducir el service worker (retirado por un
    bloqueo de arranque en Safari) aprovechando las URLs versionadas por
    contenido; validar en iPhone antes de publicar.

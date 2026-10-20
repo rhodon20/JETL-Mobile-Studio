@@ -33,7 +33,7 @@ const LAYERS = {
     engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js', 'js/engine/validate.js'],
     state: ['js/state/history.js', 'js/state/draft.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/packages.js'],
     app: ['js/engine.js', 'js/templates.js'],
-    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js', 'js/ui/draftPrompt.js', 'js/ui/actionHub.js', 'js/ui/multiSelect.js', 'js/ui/validationPanel.js'],
+    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js', 'js/ui/draftPrompt.js', 'js/ui/actionHub.js', 'js/ui/multiSelect.js', 'js/ui/validationPanel.js', 'js/ui/annotations.js'],
     shell: ['js/shell.js'],
     dev: ['js/smoke.js']
 };

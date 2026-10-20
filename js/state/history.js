@@ -101,9 +101,13 @@ function _computeDiff(prevState, nextState) {
 
     const hasNodeDelta = Object.keys(addedNodes).length || Object.keys(removedNodes).length || Object.keys(movedNodes).length;
     const hasEdgeDelta = addedEdges.length || removedEdges.length;
-    if (!hasNodeDelta && !hasEdgeDelta) return null;
+    // Las anotaciones (editor.drawflow.annotations) se guardan enteras: son pocas.
+    const prevNotes = JSON.stringify((prevState || {}).annotations || []);
+    const nextNotes = JSON.stringify((nextState || {}).annotations || []);
+    const annotations = prevNotes === nextNotes ? null : { from: JSON.parse(prevNotes), to: JSON.parse(nextNotes) };
+    if (!hasNodeDelta && !hasEdgeDelta && !annotations) return null;
 
-    return { addedNodes, removedNodes, movedNodes, addedEdges, removedEdges };
+    return { addedNodes, removedNodes, movedNodes, addedEdges, removedEdges, annotations };
 }
 
 function _invertDiff(diff) {
@@ -117,7 +121,8 @@ function _invertDiff(diff) {
         removedNodes: _cloneState(diff.addedNodes || {}),
         movedNodes: invMoved,
         addedEdges: _cloneState(diff.removedEdges || []),
-        removedEdges: _cloneState(diff.addedEdges || [])
+        removedEdges: _cloneState(diff.addedEdges || []),
+        annotations: diff.annotations ? { from: diff.annotations.to, to: diff.annotations.from } : null
     };
 }
 
@@ -193,6 +198,7 @@ function _applyDiffToState(baseState, diff) {
 
     (diff.removedEdges || []).forEach((e) => _removeEdge(data, e));
     (diff.addedEdges || []).forEach((e) => _addEdge(data, e));
+    if (diff.annotations) state.annotations = _cloneState(diff.annotations.to);
 
     return state;
 }

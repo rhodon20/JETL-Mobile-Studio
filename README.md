@@ -20,8 +20,9 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   apariencia (Resultados ocupa casi toda la pantalla). Al encadenar nodos el
   flujo crece hacia abajo en dos columnas, en zigzag. «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
-  problemas que lleva a cada nodo), encuadrar, plantillas y parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
-  duplicarlo, centrarlo o eliminarlo. «Seleccionar varios» activa un modo en el que
+  problemas que lleva a cada nodo), nota en el lienzo, encuadrar, plantillas y
+  parámetros; con un nodo seleccionado, ejecutar hasta él, ver su resultado,
+  anotarlo (la nota va dentro del nodo), duplicarlo, centrarlo o eliminarlo. «Seleccionar varios» activa un modo en el que
   tocar un nodo lo marca y arrastrar uno marcado mueve el grupo; el panel ofrece
   entonces duplicar (con sus conexiones), eliminar, todos y ninguno. Durante una
   ejecución, el botón la cancela.
