@@ -56,7 +56,9 @@ paso *Verify the live site* de la CI comprueba que se publica.
 ## Ficha de Play: capturas e iconos
 
 `scripts/store-screenshots.mjs` recorre la app real con un flujo de ejemplo y
-genera las capturas de teléfono (1080×1920) y el gráfico destacado (1024×500).
+genera las capturas de teléfono (1080×1920), compuestas con un titular en un
+marco de móvil (las capturas sin componer quedan en `raw/`), y el gráfico
+destacado (1024×500). Los titulares están en `HEADLINES`.
 El workflow manual **Store assets** las genera con el mapa base de fondo y las
 deja, junto al icono de 512 px (`android/store_icon.png`), en el artefacto
 `store-assets`.
