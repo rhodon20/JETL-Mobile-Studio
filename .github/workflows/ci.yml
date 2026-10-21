@@ -106,6 +106,7 @@ jobs:
           check /sw.js         '^cache-control: no-cache'
           check /manifest.json '^cache-control: no-cache'
           check /version.json  '^cache-control: no-store'
+          check /.well-known/assetlinks.json '^content-type: application/json'
           sw=$(curl -fsS "$url/sw.js")
           grep -q "const BUILD = '$want-" <<<"$sw" || { echo "::error::sw.js sin sello de build"; exit 1; }
           echo "Publicado y verificado: $url ($want)"

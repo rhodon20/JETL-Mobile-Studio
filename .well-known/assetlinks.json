@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "es.jetljlm.studio",
+      "sha256_cert_fingerprints": [
+        "22:EF:EB:93:82:AB:B8:9D:AF:FA:47:D2:A8:D7:AE:A3:C7:41:D3:20:6C:09:DC:7D:E3:37:1D:19:B9:0A:8D:3E"
+      ]
+    }
+  }
+]

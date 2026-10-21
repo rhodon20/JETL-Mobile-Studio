@@ -134,4 +134,5 @@ mismas pruebas contra `dist/` (también sin red). Si todo pasa, publica `dist/` 
 - `ROADMAP.md`: estado y próximos pasos (y el registro histórico).
 - `HANDOFF.md`: cómo retomar el trabajo.
 - `TESTING.md`, `RELEASE_CHECKLIST.md`, `COMPATIBILITY_MATRIX.md`.
-- `docs/`: paridad con JETL Desktop (nodos e interfaz).
+- `docs/`: paridad con JETL Desktop (nodos e interfaz) y la app de Android para Google Play (`docs/ANDROID.md`).
+- `android/`: envoltorio TWA de la app de Android (ver `docs/ANDROID.md`).

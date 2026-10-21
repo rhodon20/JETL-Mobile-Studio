@@ -87,4 +87,6 @@ test('el despliegue en Cloudflare sirve cada archivo sin redirigir y no cachea l
     assert.match(fs.readFileSync(path.join(OUT, '_redirects'), 'utf8'), /^\/ \/index\.html 200$/m);
     const headers = fs.readFileSync(path.join(OUT, '_headers'), 'utf8');
     for (const file of ['/index.html', '/sw.js', '/version.json']) assert.match(headers, new RegExp(`^${file.replace('.', '\\.')}\\n  Cache-Control: no-`, 'm'), file);
+    // La app Android sólo abre a pantalla completa si el dominio publica su huella.
+    assert.ok(fs.existsSync(path.join(OUT, '.well-known', 'assetlinks.json')), 'falta .well-known/assetlinks.json en el build');
 });

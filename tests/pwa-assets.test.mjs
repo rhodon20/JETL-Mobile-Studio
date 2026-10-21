@@ -51,3 +51,18 @@ test('la política de privacidad existe y se publica', () => {
     }
     assert.match(readFileSync(new URL('scripts/build.mjs', root), 'utf8'), /'privacy\.html'/);
 });
+
+test('la app Android (TWA) y la verificación de dominio coinciden con la web publicada', () => {
+    const twa = JSON.parse(readFileSync(new URL('android/twa-manifest.json', root), 'utf8'));
+    const [links] = JSON.parse(readFileSync(new URL('.well-known/assetlinks.json', root), 'utf8'));
+    assert.equal(twa.packageId, 'es.jetljlm.studio', 'el paquete de Play no se puede cambiar una vez publicado');
+    assert.equal(links.target.package_name, twa.packageId);
+    assert.ok(links.target.sha256_cert_fingerprints.length > 0);
+    for (const fingerprint of links.target.sha256_cert_fingerprints) assert.match(fingerprint, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
+    assert.equal(new URL(twa.webManifestUrl).host, twa.host);
+    assert.equal(twa.startUrl, `/${manifest.start_url.replace(/^\.\//, '')}`);
+    assert.deepEqual(twa.shortcuts.map((s) => new URL(s.url).search), manifest.shortcuts.map((s) => new URL(s.url, 'https://x/').search));
+    const gradle = readFileSync(new URL('android/app/build.gradle', root), 'utf8');
+    assert.ok(gradle.includes(`hostName: '${twa.host}'`) && gradle.includes(`applicationId "${twa.packageId}"`), 'build.gradle desactualizado: regenerar con bubblewrap update');
+    assert.ok(!/127\.0\.0\.1|localhost/.test(gradle), 'build.gradle apunta a un servidor local');
+});

@@ -1,0 +1,75 @@
+{
+  "packageId": "es.jetljlm.studio",
+  "host": "jetl-studio.javierlorenzom93.workers.dev",
+  "name": "JETL Studio",
+  "launcherName": "JETL Studio",
+  "display": "standalone",
+  "themeColor": "#202020",
+  "themeColorDark": "#202020",
+  "navigationColor": "#121212",
+  "navigationColorDark": "#121212",
+  "navigationDividerColor": "#121212",
+  "navigationDividerColorDark": "#121212",
+  "backgroundColor": "#121212",
+  "enableNotifications": false,
+  "startUrl": "/index.html",
+  "iconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-512.png",
+  "maskableIconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./upload-key.jks",
+    "alias": "upload"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Nuevo flujo",
+      "shortName": "Nuevo",
+      "url": "https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=new",
+      "chosenIconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-192.png"
+    },
+    {
+      "name": "Recuperar el último borrador",
+      "shortName": "Borrador",
+      "url": "https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=draft",
+      "chosenIconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-192.png"
+    },
+    {
+      "name": "Abrir un proyecto",
+      "shortName": "Abrir",
+      "url": "https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=open",
+      "chosenIconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-192.png"
+    },
+    {
+      "name": "Historial de ejecuciones",
+      "shortName": "Historial",
+      "url": "https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=history",
+      "chosenIconUrl": "https://jetl-studio.javierlorenzom93.workers.dev/icons/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-core 1.27.0",
+  "webManifestUrl": "https://jetl-studio.javierlorenzom93.workers.dev/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://jetl-studio.javierlorenzom93.workers.dev/",
+  "minSdkVersion": 21,
+  "orientation": "any",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "appVersion": "1.0.0"
+}

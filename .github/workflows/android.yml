@@ -1,0 +1,68 @@
+name: Android (TWA)
+
+# La app de Android es una Trusted Web Activity: abre la web publicada en
+# Cloudflare a pantalla completa. Sólo hace falta recompilarla cuando cambia
+# el envoltorio (android/), no cuando cambia la web.
+on:
+  push:
+    branches: ['**']
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Build bundle (Play) and APK (instalación directa)
+        working-directory: android
+        run: ./gradlew --no-daemon bundleRelease assembleRelease
+      # Firma con la clave de subida; Google Play vuelve a firmar con la clave
+      # de la app (Play App Signing). Sin los secretos se publican sin firmar,
+      # para comprobar al menos que el proyecto compila.
+      - name: Sign
+        id: sign
+        working-directory: android
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          aab=app/build/outputs/bundle/release/app-release.aab
+          apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::warning::Faltan los secretos ANDROID_UPLOAD_KEYSTORE_B64 / ANDROID_UPLOAD_KEYSTORE_PASSWORD: se publican sin firmar"
+            cp "$aab" out/jetl-studio-unsigned.aab
+            cp "$apk" out/jetl-studio-unsigned.apk
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/upload-key.jks"
+          base64 -d <<<"$KEYSTORE_B64" > "$keystore"
+          build_tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          cp "$aab" out/jetl-studio.aab
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore "$keystore" \
+            -storepass:env KEYSTORE_PASSWORD out/jetl-studio.aab upload
+          "$build_tools/zipalign" -p -f 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$build_tools/apksigner" sign --ks "$keystore" --ks-key-alias upload \
+            --ks-pass env:KEYSTORE_PASSWORD --out out/jetl-studio.apk "$RUNNER_TEMP/aligned.apk"
+          "$build_tools/apksigner" verify out/jetl-studio.apk
+          jarsigner -verify out/jetl-studio.aab > /dev/null
+          rm -f "$keystore"
+          # La huella es pública: es la que debe figurar en /.well-known/assetlinks.json.
+          echo "Huella SHA-256 de la clave de subida:"
+          "$build_tools/apksigner" verify --print-certs out/jetl-studio.apk | grep -i 'SHA-256'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jetl-studio-android
+          path: android/out/
+          if-no-files-found: error

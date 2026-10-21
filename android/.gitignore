@@ -1,0 +1,8 @@
+# Generado al compilar
+.gradle/
+build/
+app/build/
+local.properties
+# La clave de subida nunca va al repositorio: la CI la escribe desde un secreto
+*.jks
+*.keystore
