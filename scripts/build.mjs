@@ -20,6 +20,10 @@ fs.mkdirSync(DIST, { recursive: true });
 for (const entry of ENTRIES) fs.cpSync(path.join(ROOT, entry), path.join(DIST, entry), { recursive: true });
 // Serve files and folders starting with '_' or '.' as-is.
 fs.writeFileSync(path.join(DIST, '.nojekyll'), '');
+// Cloudflare: reglas de raíz y cabeceras (deploy/). Y, cuando exista, la
+// verificación de dominio de la app Android (.well-known/assetlinks.json).
+for (const file of ['_redirects', '_headers']) fs.copyFileSync(path.join(ROOT, 'deploy', file), path.join(DIST, file));
+if (fs.existsSync(path.join(ROOT, '.well-known'))) fs.cpSync(path.join(ROOT, '.well-known'), path.join(DIST, '.well-known'), { recursive: true });
 
 // Cache busting: GitHub Pages lets browsers reuse files for 10 minutes, so every
 // reference carries ?v=<hash of the file's content>. A file that did not change

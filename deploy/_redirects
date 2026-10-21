@@ -1,0 +1,3 @@
+# Cloudflare Workers (static assets, html_handling "none"): la raíz sirve la app
+# sin redirigir, para que el service worker nunca guarde una respuesta redirigida.
+/ /index.html 200

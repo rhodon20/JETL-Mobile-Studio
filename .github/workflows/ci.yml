@@ -49,3 +49,32 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Cloudflare Workers (archivos estáticos): alojamiento en la raíz de un dominio,
+  # necesario para la app de Google Play (/.well-known/assetlinks.json). Sólo en
+  # main, tras pasar las pruebas, y sólo si el repositorio tiene los secretos
+  # CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID (si faltan, se salta).
+  deploy-cloudflare:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Cloudflare secrets present?
+        id: secrets
+        run: echo "ready=${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build and deploy
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          npm ci
+          npm run build
+          npx --yes wrangler@4.151.3 deploy

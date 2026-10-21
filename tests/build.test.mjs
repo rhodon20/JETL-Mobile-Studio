@@ -77,3 +77,14 @@ test('el service worker publicado precachea, con su URL exacta, lo que la app pi
     // Fuera: el mapa base (necesita red igualmente) y las pantallas de arranque de iOS.
     assert.ok(!precache.some((url) => url.includes('maplibre') || url.startsWith('icons/startup/')));
 });
+
+test('el despliegue en Cloudflare sirve cada archivo sin redirigir y no cachea lo que decide la versión', () => {
+    // Con html_handling por defecto index.html y privacy.html redirigen (307) y el
+    // service worker no puede precachear respuestas redirigidas (comprobado con wrangler dev).
+    const config = fs.readFileSync(path.join(ROOT, 'wrangler.jsonc'), 'utf8');
+    assert.match(config, /"directory": "\.\/dist"/);
+    assert.match(config, /"html_handling": "none"/);
+    assert.match(fs.readFileSync(path.join(OUT, '_redirects'), 'utf8'), /^\/ \/index\.html 200$/m);
+    const headers = fs.readFileSync(path.join(OUT, '_headers'), 'utf8');
+    for (const file of ['/index.html', '/sw.js', '/version.json']) assert.match(headers, new RegExp(`^${file.replace('.', '\\.')}\\n  Cache-Control: no-`, 'm'), file);
+});

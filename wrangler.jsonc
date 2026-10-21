@@ -1,0 +1,15 @@
+// Despliegue en Cloudflare Workers (archivos estáticos) del sitio que genera
+// scripts/build.mjs en dist/. Lo ejecuta la CI en main (.github/workflows/ci.yml).
+{
+	"$schema": "https://unpkg.com/wrangler@4.151.3/config-schema.json",
+	"name": "jetl-studio",
+	"compatibility_date": "2026-10-21",
+	"assets": {
+		"directory": "./dist",
+		// Cada archivo tal cual: con el modo por defecto index.html y privacy.html
+		// redirigen, y el service worker no puede precachear respuestas redirigidas.
+		// La raíz la resuelve dist/_redirects.
+		"html_handling": "none",
+		"not_found_handling": "none"
+	}
+}

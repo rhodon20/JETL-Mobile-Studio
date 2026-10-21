@@ -108,9 +108,16 @@ que estás viendo y avisa (con botón Recargar) si hay uno más reciente; el sel
 lo pone `scripts/build.mjs` en `index.html` y `version.json`.
 
 ## Despliegue
-Cada push a `main` pasa el CI (`.github/workflows/ci.yml`): comprobaciones,
-pruebas unitarias, smoke, flujo de la app y mapa base, build de `dist/` y las
-mismas pruebas contra `dist/`. Si todo pasa, publica `dist/` en GitHub Pages.
+`.github/workflows/ci.yml` ejecuta las pruebas en cada push y, en `main`, las
+mismas pruebas contra `dist/` (también sin red). Si todo pasa, publica `dist/` en:
+- **GitHub Pages** (como hasta ahora).
+- **Cloudflare Workers** (archivos estáticos, `wrangler.jsonc`): alojamiento en la
+  raíz de un dominio, necesario para la app de Google Play
+  (`/.well-known/assetlinks.json`). Requiere los secretos del repositorio
+  `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`; sin ellos el paso se salta.
+  `deploy/_redirects` y `deploy/_headers` se copian a `dist/`: cada archivo se
+  sirve tal cual (sin las redirecciones de `.html`, que rompen el precacheo del
+  service worker) y `index.html`, `sw.js` y `version.json` no se cachean.
 
 ## Limitaciones conocidas
 - **Sin conexión, sin mapa base ni lectores de red.** La app instalada abre y
