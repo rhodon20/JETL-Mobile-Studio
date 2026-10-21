@@ -46,9 +46,13 @@ test('cada acceso directo del manifiesto abre una acción que la app atiende, co
 test('la política de privacidad existe y se publica', () => {
     const privacy = readFileSync(new URL('privacy.html', root), 'utf8');
     assert.match(privacy, /<title>Privacidad · JETL Studio<\/title>/);
-    for (const host of ['openfreemap.org', 'nominatim.openstreetmap.org', 'overpass-api.de', 'unpkg.com', 'jsdelivr.com']) {
+    for (const host of ['openfreemap.org', 'nominatim.openstreetmap.org', 'overpass-api.de']) {
         assert.ok(privacy.includes(host), `la política debe mencionar ${host}`);
     }
+    // Las librerías de formatos van en js/vendor: ni la app las pide a una CDN ni la política lo dice.
+    const appCode = [index, readFileSync(new URL('js/formats.js', root), 'utf8'), readFileSync(new URL('js/nodes/readers.js', root), 'utf8'), readFileSync(new URL('js/nodes/writers.js', root), 'utf8')].join('\n');
+    assert.doesNotMatch(appCode, /https:\/\/(unpkg\.com|cdn\.jsdelivr\.net)/);
+    assert.doesNotMatch(privacy, /unpkg|jsdelivr/i);
     assert.match(readFileSync(new URL('scripts/build.mjs', root), 'utf8'), /'privacy\.html'/);
 });
 

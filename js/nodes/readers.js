@@ -229,7 +229,7 @@ async function readerLocalSourceCompat(source, format, options = {}) {
         return result;
     }
     if (format === 'xlsx') {
-        if (!window.XLSX) await window.JETLLoadScriptOnce('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'XLSX');
+        if (!window.XLSX) await window.JETLLoadScriptOnce('js/vendor/xlsx.full.min.js', 'XLSX');
         if (!window.XLSX) throw new Error('Motor Excel no disponible');
         const workbook = window.XLSX.read(await source.arrayBuffer(), { type: 'array', cellDates: true });
         const sheetName = options.sheet_name && workbook.Sheets[options.sheet_name] ? options.sheet_name : workbook.SheetNames[0];
@@ -419,6 +419,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_gdb: {
+        requiresBackend: true,
         cat: '1. READERS', label: 'GDB Reader', icon: 'fa-folder', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
         help: 'Lee File Geodatabase por capas mediante backend, sin cargar GDAL pesado en móvil.',
         tpl: () => readerFileTemplateCompat('.zip,.gdb', 'Requiere backend · 16 salidas', READER_NODE_DEFAULTS.reader_gdb),
@@ -438,6 +439,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_feature_reader: {
+        requiresBackend: true,
         cat: '1. READERS', label: 'FeatureReader', icon: 'fa-folder-open', color: '#e67e22', in: 1, out: 3, inputClonePolicy: 'none',
         help: 'Lee datasets dinámicamente desde atributos del feature iniciador mediante backend.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-folder-open"></i><div><strong data-geom-transform-summary>CSV · atributo</strong><small>1 entrada · 3 salidas</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-fr-config>${JSON.stringify(FEATURE_READER_DEFAULT_CONFIG)}</textarea></div>`,
@@ -546,14 +548,14 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     reader_gpkg: {
         cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee GeoPackage (experimental). Si falla, revisa la librería GeoPackage.',
+        help: 'Lee la primera tabla vectorial de un GeoPackage, con su sistema de referencia.',
         tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".gpkg"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div>`,
         run: async (id) => { const v = window._file_cache && window._file_cache['file_' + id]; if (!v) throw new Error("Sin archivo"); return v; }
     },
 
     reader_parquet: {
         cat: '1. READERS', label: 'Parquet Reader', icon: 'fa-table', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee Parquet (experimental). Requiere ParquetReader global.',
+        help: 'Lee GeoParquet (geometría WKB o WKT) y Parquet sin geometría como tabla.',
         tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".parquet"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div>`,
         run: async (id) => { const v = window._file_cache && window._file_cache['file_' + id]; if (!v) throw new Error("Sin archivo"); return v; }
     },

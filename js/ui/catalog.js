@@ -10,11 +10,18 @@ JETLEvents.on('tools:changed', () => {
     renderSidebar(f ? String(f.value || '') : '');
 });
 
+// Nodos que sólo funcionan con el backend de Desktop (GDB, FeatureReader): siguen
+// registrados para abrir sus proyectos, pero no se ofrecen si no hay backend.
+function offeredInCatalog(tool) {
+    return !tool.requiresBackend || !!(window.JETLBackend || window.JETLBackendIntegration);
+}
+
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');
     container.innerHTML = '';
     const cats = {};
     Object.entries(TOOL_REGISTRY).forEach(([k, tool]) => {
+        if (!offeredInCatalog(tool)) return;
         if (filter && !tool.label.toLowerCase().includes(filter.toLowerCase())) return;
         if (!cats[tool.cat]) cats[tool.cat] = [];
         cats[tool.cat].push({ k, ...tool });
@@ -315,7 +322,7 @@ function initQuickSearch() {
     function renderMatches(value) {
         const val = String(value || '').trim().toLocaleLowerCase('es');
         results.innerHTML = '';
-        const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => t.label.toLowerCase().includes(val) || t.cat.toLowerCase().includes(val));
+        const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => offeredInCatalog(t) && (t.label.toLowerCase().includes(val) || t.cat.toLowerCase().includes(val)));
 
         matches.slice(0, 10).forEach(([k, t], i) => {
             const item = document.createElement('div');

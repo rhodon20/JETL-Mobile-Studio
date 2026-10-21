@@ -27,8 +27,8 @@ jobs:
         run: npm run test:extended
       - name: Build
         run: npm run build
-      - name: Smoke and app flow against the built site
-        run: node tests/run-smoke.mjs --root dist && node tests/app-flow.mjs --root dist
+      - name: Smoke, app flow and formats against the built site
+        run: node tests/run-smoke.mjs --root dist && node tests/app-flow.mjs --root dist && node tests/formats-io.mjs --root dist
       - name: Offline (service worker) against the built site
         run: node tests/run-smoke.mjs --offline --root dist
       - uses: actions/upload-pages-artifact@v3

@@ -24,7 +24,12 @@
    iPhone y Android), manifiesto completo, política de privacidad, accesos
    directos que funcionen, alojamiento en la raíz de un dominio para
    `/.well-known/assetlinks.json` (Cloudflare Pages) y empaquetado TWA.
-3. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
+3. **Lectores y escritores de formatos** (21 de octubre): GeoPackage y Parquet no
+   funcionaban (lectura y escritura); arreglados, con librerías en `js/vendor/`
+   (sin CDN, disponibles sin conexión) y `tests/formats-io.mjs` con archivos
+   reales. Pendiente: abrir en QGIS un GeoParquet/GeoPackage exportado y medir
+   archivos grandes en el móvil.
+4. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
 
 ## Ideas para más adelante (sin fecha)
@@ -34,9 +39,6 @@
   53 nodos que difieren (`docs/NODE_CATALOG_PARITY.md`).
 - **Accesos directos de la app instalada**: hechos (Nuevo flujo, Recuperar borrador,
   Abrir proyecto, Historial; `js/ui/launchActions.js`). iOS no los admite.
-- **Librerías de formatos desde CDN.** GeoPackage, Parquet, Excel y la escritura
-  de Shapefile descargan sus librerías de unpkg/jsDelivr al usarse: no funcionan
-  sin conexión y esas CDN reciben la IP. Alojarlas en el propio sitio.
 
 ## Deuda conocida
 - Definiciones proj4 repetidas en cuatro sitios: `GEOMETRY_PROJ4_DEFS_COMPAT` y

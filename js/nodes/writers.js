@@ -84,7 +84,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     writer_gpkg: {
         cat: '5. WRITERS', label: 'GPKG DL', icon: 'fa-database', color: '#c0392b', in: 1, out: 0,
-        help: 'Exporta GeoPackage (experimental).',
+        help: 'Exporta un GeoPackage en EPSG:4326 (reproyecta antes si hace falta).',
         tpl: () => `<input class="node-control" df-fn value="export.gpkg" placeholder="Nombre archivo">`,
         run: async (id, i, d) => {
             if (!window.JETLFormats) throw new Error("Formatos no disponibles");
@@ -97,7 +97,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     writer_parquet: {
         cat: '5. WRITERS', label: 'Parquet DL', icon: 'fa-table', color: '#c0392b', in: 1, out: 0,
-        help: 'Exporta Parquet (experimental).',
+        help: 'Exporta GeoParquet (geometría WKB), legible por QGIS, GDAL o DuckDB.',
         tpl: () => `<input class="node-control" df-fn value="export.parquet" placeholder="Nombre archivo">`,
         run: async (id, i, d) => {
             if (!window.JETLFormats) throw new Error("Formatos no disponibles");
@@ -109,6 +109,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     writer_gdb: {
+        requiresBackend: true,
         cat: '5. WRITERS', label: 'GDB', icon: 'fa-folder-open', color: '#c0392b', in: 1, out: 0,
         dynamicInputs: true, inputClonePolicy: 'none', help: 'Exporta File Geodatabase mediante un backend compatible.',
         tpl: () => `<input class="node-control" df-fn value="export.gdb.zip" placeholder="Nombre archivo"><input class="node-control" df-layer-name value="layer" placeholder="Prefijo capa"><div style="font-size:.66em;color:#aaa;margin-top:5px">Requiere backend · varias entradas admitidas</div>`,
@@ -124,7 +125,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         tpl: () => `<input class="node-control" df-fn value="export.shp.zip" placeholder="Nombre archivo"><input class="node-control" df-layer-name value="layer" placeholder="Nombre de capa">`,
         run: async (id, inputs, dom) => {
             const source = writerFeatureCollection(inputs?.[0]); if (!source.features.length) throw new Error('SHP Writer necesita entidades de entrada');
-            const shpwrite = await writerEnsureScript('https://unpkg.com/@mapbox/shp-write@0.4.3/shpwrite.js', 'shpwrite');
+            const shpwrite = await writerEnsureScript('js/vendor/shpwrite.js', 'shpwrite');
             const filename = writerFilename(dom, 'export.shp.zip'); const layer = resolveParamTextWriter(dom?.querySelector('[df-layer-name]')?.value || 'layer') || 'layer';
             const archive = await shpwrite.zip(source, { folder: layer, types: { point: layer, polygon: layer, polyline: layer } });
             writerDownload(archive, filename, 'application/zip'); return inputs?.[0];
@@ -135,7 +136,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         cat: '5. WRITERS', label: 'XLSX', icon: 'fa-table', color: '#c0392b', in: 1, out: 0, inputClonePolicy: 'none', help: 'Exporta atributos a un libro Excel local.',
         tpl: () => `<input class="node-control" df-fn value="export.xlsx" placeholder="Nombre archivo"><input class="node-control" df-sheet value="Data" placeholder="Nombre de hoja">`,
         run: async (id, inputs, dom) => {
-            const XLSX = await writerEnsureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'XLSX');
+            const XLSX = await writerEnsureScript('js/vendor/xlsx.full.min.js', 'XLSX');
             const rows = writerRows(inputs?.[0]); const sheetName = String(dom?.querySelector('[df-sheet]')?.value || 'Data').slice(0, 31) || 'Data';
             const workbook = XLSX.utils.book_new(); const worksheet = XLSX.utils.json_to_sheet(rows);
             XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);

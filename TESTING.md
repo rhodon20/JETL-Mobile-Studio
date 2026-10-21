@@ -15,6 +15,7 @@ Ejecuta, en este orden (para en el primer fallo):
 | `npm run test:unit` | `tests/*.test.mjs` | unitarias con `node:test`: nodos (paridad con Desktop), plan de ejecución, monitor, historial, navegación móvil, persistencia, build |
 | `npm run test:smoke` | `tests/run-smoke.mjs` | suite `JETLSmoke.runStable()` dentro de Chromium (Playwright), en tamaño móvil |
 | | `tests/app-flow.mjs` | flujos reales de la app: ejecución total, parcial y fallida, monitor, contadores, historial, proyecto nuevo, cuadrícula del lienzo, módulos bajo demanda, panel de versión y que ningún script se descargue dos veces |
+| | `tests/formats-io.mjs` | cada lector con su nodo y un archivo real de `tests/fixtures/formats/` (GeoJSON, KML, GPX, CSV, SHP, Excel, GeoPackage en 4326 y 25830, GeoParquet, Parquet con WKT y sin geometría), ida y vuelta GeoPackage/GeoParquet, WKB de PostGIS, nodos que exigen backend fuera del catálogo y ninguna librería pedida fuera del sitio. Los archivos se regeneran con `tests/fixtures/formats/make-fixtures.py` |
 | | `tests/basemap.mjs` | mapa base: OpenFreeMap si responde, OpenStreetMap si no, y que nunca se pida CARTO ni una API key |
 
 Extra (también en CI):
@@ -24,6 +25,7 @@ npm run test:extended          # JETLSmoke.runExtended(): añade las pruebas con
 npm run build                  # genera dist/
 node tests/run-smoke.mjs --root dist
 node tests/app-flow.mjs --root dist
+node tests/formats-io.mjs --root dist
 node tests/run-smoke.mjs --offline --root dist   # instala el service worker, corta la red,
                                                  # recarga, pasa la suite y prueba ?nosw=1
 ```

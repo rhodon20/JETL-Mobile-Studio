@@ -3941,217 +3941,320 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
     });
 
     // ----------------------------
-    // Experimental readers
+    // GeoPackage y Parquet
     // ----------------------------
+    // Las librerías van en js/vendor (sin CDN): se descargan la primera vez que se
+    // usan y el service worker las guarda, así que después funcionan sin conexión.
+    const GEOPACKAGE_SRC = 'js/vendor/geopackage.min.js';
+    const ARROW_SRC = 'js/vendor/arrow.es2015.min.js';
+    const PARQUET_WASM_SRC = 'js/vendor/parquet-wasm/parquet_wasm.js';
+
+    async function _geopackage() {
+        const GP = await window.JETLLoadScriptOnce(GEOPACKAGE_SRC, 'geopackage');
+        if (!GP || typeof GP.open !== 'function') throw new Error('Motor GeoPackage no disponible.');
+        return GP;
+    }
+
+    let _parquetReady = null;
+    // parquet-wasm convierte Parquet <-> Arrow IPC; apache-arrow lee y construye las tablas.
+    function _parquet() {
+        if (!_parquetReady) {
+            _parquetReady = (async () => {
+                const Arrow = await window.JETLLoadScriptOnce(ARROW_SRC, 'Arrow');
+                if (!Arrow || typeof Arrow.tableFromIPC !== 'function') throw new Error('Motor Arrow no disponible.');
+                const wasm = await import(new URL(PARQUET_WASM_SRC, document.baseURI).href);
+                await wasm.default();
+                return { Arrow, wasm };
+            })().catch((error) => { _parquetReady = null; throw error; });
+        }
+        return _parquetReady;
+    }
+
+    function _cancelled(what) {
+        if (window.isEngineCancelled) throw new Error(`${what} cancelada.`);
+    }
+
+    // Valores de una fila que no caben en JSON: enteros de 64 bits (BigInt), binarios
+    // y estructuras de Arrow.
+    function _plainValue(value) {
+        if (typeof value === 'bigint') {
+            const asNumber = Number(value);
+            return Number.isSafeInteger(asNumber) ? asNumber : value.toString();
+        }
+        if (value instanceof Uint8Array || value instanceof ArrayBuffer) return '[BINARY]';
+        if (value instanceof Date) return value.toISOString();
+        if (value && typeof value === 'object') {
+            const plain = typeof value.toJSON === 'function' ? value.toJSON() : value;
+            try { return JSON.stringify(plain, (k, v) => typeof v === 'bigint' ? v.toString() : v); } catch (e) { return String(plain); }
+        }
+        return value;
+    }
+
+    // --- WKB (ISO y EWKB de PostGIS) <-> geometría GeoJSON ---
+    const WKB_TYPES = ['', 'Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon', 'GeometryCollection'];
+
+    function wkbToGeometry(bytes) {
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        let offset = 0;
+        function read() {
+            const little = view.getUint8(offset) === 1; offset += 1;
+            let type = view.getUint32(offset, little); offset += 4;
+            // EWKB: banderas en los bits altos (Z, M, SRID); ISO: 1000/2000/3000 sobre el tipo.
+            let hasZ = (type & 0x80000000) !== 0, hasM = (type & 0x40000000) !== 0;
+            if (type & 0x20000000) offset += 4;
+            type &= 0x0fffffff;
+            if (type >= 1000) { const dims = Math.floor(type / 1000); hasZ = hasZ || dims === 1 || dims === 3; hasM = hasM || dims === 2 || dims === 3; type %= 1000; }
+            const size = 2 + (hasZ ? 1 : 0) + (hasM ? 1 : 0);
+            const point = () => {
+                const c = [];
+                for (let i = 0; i < size; i++) { c.push(view.getFloat64(offset, little)); offset += 8; }
+                // Se conserva Z; M no tiene sitio en GeoJSON.
+                return hasZ ? c.slice(0, 3) : c.slice(0, 2);
+            };
+            const count = () => { const n = view.getUint32(offset, little); offset += 4; return n; };
+            const points = () => Array.from({ length: count() }, point);
+            const name = WKB_TYPES[type];
+            if (name === 'Point') { const c = point(); return c.every(Number.isNaN) ? null : { type: name, coordinates: c }; }
+            if (name === 'LineString') return { type: name, coordinates: points() };
+            if (name === 'Polygon') return { type: name, coordinates: Array.from({ length: count() }, points) };
+            if (name === 'GeometryCollection') return { type: name, geometries: Array.from({ length: count() }, read).filter(Boolean) };
+            if (name && name.startsWith('Multi')) {
+                return { type: name, coordinates: Array.from({ length: count() }, read).filter(Boolean).map((g) => g.coordinates) };
+            }
+            throw new Error(`Tipo de geometría WKB no soportado (${type})`);
+        }
+        return read();
+    }
+
+    // Z si alguna coordenada la trae (ISO WKB: tipo + 1000; GeoParquet: «Point Z»).
+    function _hasZ(geometry) {
+        return /\[[^[\]]*,[^[\]]*,[^[\]]*\]/.test(JSON.stringify(geometry.coordinates || geometry.geometries || []));
+    }
+
+    function geometryToWkb(geometry) {
+        const chunks = [];
+        let length = 0;
+        const push = (bytes) => { chunks.push(bytes); length += bytes.byteLength; };
+        const header = (type, count) => {
+            const b = new DataView(new ArrayBuffer(count === undefined ? 5 : 9));
+            b.setUint8(0, 1); b.setUint32(1, type, true);
+            if (count !== undefined) b.setUint32(5, count, true);
+            push(new Uint8Array(b.buffer));
+        };
+        const coords = (list, dims) => {
+            const b = new DataView(new ArrayBuffer(list.length * dims * 8));
+            list.forEach((c, i) => { for (let d = 0; d < dims; d++) b.setFloat64((i * dims + d) * 8, d < c.length ? Number(c[d]) : 0, true); });
+            push(new Uint8Array(b.buffer));
+        };
+        function write(g, z) {
+            const dims = z ? 3 : 2;
+            const code = (name) => WKB_TYPES.indexOf(name) + (z ? 1000 : 0);
+            if (g.type === 'Point') { header(code('Point')); coords([g.coordinates.length ? g.coordinates : [NaN, NaN, NaN]], dims); }
+            else if (g.type === 'LineString') { header(code('LineString'), g.coordinates.length); coords(g.coordinates, dims); }
+            else if (g.type === 'Polygon') { header(code('Polygon'), g.coordinates.length); g.coordinates.forEach((ring) => { const n = new DataView(new ArrayBuffer(4)); n.setUint32(0, ring.length, true); push(new Uint8Array(n.buffer)); coords(ring, dims); }); }
+            else if (g.type === 'MultiPoint' || g.type === 'MultiLineString' || g.type === 'MultiPolygon') {
+                header(code(g.type), g.coordinates.length);
+                const part = g.type.slice(5);
+                g.coordinates.forEach((c) => write({ type: part, coordinates: c }, z));
+            } else if (g.type === 'GeometryCollection') { header(code('GeometryCollection'), g.geometries.length); g.geometries.forEach((p) => write(p, z)); }
+            else throw new Error(`Tipo de geometría no soportado: ${g.type}`);
+        }
+        write(geometry, _hasZ(geometry));
+        const out = new Uint8Array(length);
+        let at = 0;
+        chunks.forEach((c) => { out.set(c, at); at += c.byteLength; });
+        return out;
+    }
+
+    // CRS de GeoParquet: PROJJSON con id {authority, code}; sin clave «crs» es CRS84.
+    function _geoparquetCrs(column) {
+        const crs = column && column.crs;
+        if (crs && crs.id && crs.id.authority && crs.id.code) return `${String(crs.id.authority).toUpperCase()}:${crs.id.code}`;
+        if (typeof crs === 'string') return crs;
+        return null;
+    }
+
+    function _collectionCrs(fc) {
+        const tagged = (fc.features || []).find((f) => f && f.properties && f.properties._crs);
+        const raw = (fc.metadata && fc.metadata.crs) || (fc.crs && fc.crs.properties && fc.crs.properties.name) || (tagged && tagged.properties._crs) || '';
+        const code = String(raw).match(/EPSG:{1,2}(\d+)/i) || String(raw).match(/^(\d+)$/);
+        if (/CRS84$/i.test(String(raw))) return 'EPSG:4326';
+        return code ? `EPSG:${code[1]}` : (raw ? String(raw) : null);
+    }
+
+    function _asCollection(data) {
+        return data && data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
+    }
+
     registerReader({
         exts: ['gpkg'],
-        label: 'GeoPackage (Experimental)',
-        timeoutMs: 45000,
+        label: 'GeoPackage',
+        timeoutMs: 90000,
         read: async (file) => {
-            if (window.log) window.log("⏳ Descargando motor GeoPackage desde CDN para Lectura...", "info");
-            await loadScript('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/geopackage.min.js', 'GeoPackage');
-            const GP = window.GeoPackage;
-            if (!GP || !GP.GeoPackageAPI) throw new Error("Motor GeoPackage no disponible.");
+            const GP = await _geopackage();
+            const gpkg = await GP.open(new Uint8Array(await file.arrayBuffer()));
+            try {
+                const tables = typeof gpkg.getFeatureTables === 'function' ? gpkg.getFeatureTables() : [];
+                if (!tables.length) throw new Error('El GeoPackage no tiene tablas vectoriales.');
+                const tableName = tables[0];
+                if (tables.length > 1 && window.log) window.log(`GeoPackage con ${tables.length} tablas (${tables.join(', ')}): se lee «${tableName}».`, 'warn');
 
-            if (window.log) window.log("⏳ Abriendo GeoPackage en memoria...", "info");
-            const buffer = await file.arrayBuffer();
-            const bytes = new Uint8Array(buffer);
-
-            const gpkg = await GP.GeoPackageAPI.open(bytes);
-            const tables = gpkg.getFeatureTables ? gpkg.getFeatureTables() : [];
-            if (!tables || tables.length === 0) {
-                if (gpkg.close) gpkg.close();
-                throw new Error("No se encontraron tablas vectoriales en el GPKG.");
-            }
-
-            const tableName = tables[0];
-            const dao = gpkg.getFeatureDao(tableName);
-            const rows = dao.queryForAll();
-            const features = [];
-
-            let iterCount = 0;
-            while (rows.moveToNext()) {
-                if (window.isEngineCancelled) throw new Error("Lectura de GeoPackage cancelada.");
-                if (iterCount++ % 200 === 0) await new Promise(r => setTimeout(r, 0));
-
-                const row = rows.getRow();
-                const geomData = row.getGeometry();
-                if (!geomData) continue;
-
-                let gj = null;
-                try {
-                    // Intento de parseo de geometria v3
-                    if (geomData.geometry) {
-                        gj = geomData.geometry.toGeoJSON();
-                    } else if (geomData.toGeoJSON) {
-                        gj = geomData.toGeoJSON();
-                    }
-                } catch (e) { }
-
-                if (!gj) continue;
-
-                // Extraer propiedades
-                const props = {};
-                const geomColumn = dao.getGeometryColumnName();
-                if (row.values) {
-                    for (const key in row.values) {
-                        if (key !== geomColumn) {
-                            props[key] = row.values[key];
-                        }
-                    }
+                const dao = gpkg.getFeatureDao(tableName);
+                const geometryColumn = dao.getGeometryColumnName();
+                const features = [];
+                let count = 0;
+                for (const raw of dao.queryForEach()) {
+                    if (count++ % 500 === 0) { _cancelled('Lectura de GeoPackage'); await new Promise((r) => setTimeout(r, 0)); }
+                    const row = dao.getRow(raw);
+                    const data = row.getGeometry();
+                    const geometry = data && data.geometry ? data.geometry.toGeoJSON() : null;
+                    const properties = {};
+                    for (const key in row.values) if (key !== geometryColumn) properties[key] = _plainValue(row.values[key]);
+                    features.push({ type: 'Feature', geometry, properties });
                 }
-
-                features.push(turf.feature(gj, props));
+                const fc = turf.featureCollection(features);
+                const srs = typeof dao.getSrs === 'function' ? dao.getSrs() : null;
+                // Las coordenadas llegan en el CRS de la tabla: se etiqueta para que el mapa lo reproyecte.
+                if (srs && srs.organization && srs.organization_coordsys_id > 0) fc.metadata = { crs: `${String(srs.organization).toUpperCase()}:${srs.organization_coordsys_id}` };
+                return fc;
+            } finally {
+                if (typeof gpkg.close === 'function') { try { gpkg.close(); } catch (e) { /* ya cerrado */ } }
             }
-
-            if (gpkg.close) gpkg.close();
-            return turf.featureCollection(features);
         }
     });
 
     registerReader({
         exts: ['parquet'],
-        label: 'Parquet (GeoParquet-lite)',
+        label: 'Parquet / GeoParquet',
+        timeoutMs: 90000,
         read: async (file) => {
-            if (window.log) window.log("⏳ Iniciando motor Parquet WASM para Lectura...", "info");
-            try {
-                // Importación dinámica nativa de ESM
-                const parquetWasm = await import('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm.js');
-                await parquetWasm.default('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm_bg.wasm');
-                const arrow = await import('https://cdn.jsdelivr.net/npm/apache-arrow@13.0.0/+esm');
-
-                const buffer = await file.arrayBuffer();
-                const ipc = parquetWasm.readParquet(new Uint8Array(buffer));
-
-                const table = arrow.tableFromIPC(ipc);
-                const rows = table.toArray().map(r => r.toJSON());
-
-                const features = [];
-                for (const r of rows) {
-                    let geom = null;
-                    if (r.geometry && typeof r.geometry === 'string') {
-                        try {
-                            geom = wellknown.parse(r.geometry);
-                            delete r.geometry;
-                        } catch (e) { }
-                    }
-                    features.push(turf.feature(geom, r));
-                }
-
-                if (window.log) window.log("✅ Parquet importado con éxito.", "success");
-                return turf.featureCollection(features);
-            } catch (e) {
-                if (window.log) window.log("⚠️ " + e.message, "err");
-                throw new Error("Lectura Parquet Error: " + e.message);
+            const { Arrow, wasm } = await _parquet();
+            // readParquet devuelve una tabla de WASM: hay que pasarla a IPC para que Arrow la lea.
+            const table = Arrow.tableFromIPC(wasm.readParquet(new Uint8Array(await file.arrayBuffer())).intoIPCStream());
+            let geo = null;
+            try { geo = JSON.parse(table.schema.metadata.get('geo') || 'null'); } catch (e) { geo = null; }
+            const fields = table.schema.fields;
+            // GeoParquet declara su columna de geometría; si no, se busca por nombre (WKB o WKT).
+            let geometryName = geo && geo.primary_column;
+            if (!geometryName) {
+                const guess = fields.find((f) => /^(geometry|geom|wkb_geometry|wkt|the_geom)$/i.test(f.name));
+                geometryName = guess ? guess.name : null;
             }
+            const encoding = geo && geo.columns && geo.columns[geometryName] ? String(geo.columns[geometryName].encoding || '').toUpperCase() : '';
+            if (encoding && encoding !== 'WKB' && encoding !== 'WKT') throw new Error(`Codificación de geometría GeoParquet no soportada: ${encoding} (se admiten WKB y WKT).`);
+
+            const features = [];
+            for (let i = 0; i < table.numRows; i++) {
+                if (i % 2000 === 0) { _cancelled('Lectura de Parquet'); await new Promise((r) => setTimeout(r, 0)); }
+                const row = table.get(i).toJSON();
+                let geometry = null;
+                const raw = geometryName ? row[geometryName] : null;
+                if (raw instanceof Uint8Array && raw.length) geometry = wkbToGeometry(raw);
+                else if (typeof raw === 'string' && raw.trim()) geometry = wellknown.parse(raw);
+                if (geometryName) delete row[geometryName];
+                const properties = {};
+                for (const key in row) properties[key] = _plainValue(row[key]);
+                features.push({ type: 'Feature', geometry, properties });
+            }
+            const fc = turf.featureCollection(features);
+            const crs = geo && geo.columns ? _geoparquetCrs(geo.columns[geometryName]) : null;
+            if (crs && crs !== 'OGC:CRS84') fc.metadata = { crs };
+            if (!geometryName && window.log) window.log('Parquet sin columna de geometría: se lee como tabla de atributos.', 'warn');
+            return fc;
         }
     });
-
-    // ----------------------------
-    // Funciones Helper para cargar librerías dinámicamente sin bloquear el arranque inicial
-    function loadScript(src, globalVar) {
-        return new Promise((resolve, reject) => {
-            if (window[globalVar]) return resolve(window[globalVar]);
-            const s = document.createElement('script');
-            s.src = src;
-            s.onload = () => resolve(window[globalVar]);
-            s.onerror = () => reject(new Error("Error cargando " + src));
-            document.head.appendChild(s);
-        });
-    }
 
     // ----------------------------
     // Formatos de Exportación Avanzados (Escritura)
     // ----------------------------
     registerWriter({
         exts: ['gpkg'],
-        label: 'GeoPackage (Experimental)',
+        label: 'GeoPackage',
         write: async (data) => {
-            if (window.log) window.log("⏳ Descargando motor GeoPackage desde CDN...", "info");
-            await loadScript('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/geopackage.min.js', 'GeoPackage');
-            const GP = window.GeoPackage;
-            if (!GP || !GP.GeoPackageAPI) throw new Error("Error en motor GeoPackage");
-
-            if (GP.setSqljsWasmLoc) {
-                GP.setSqljsWasmLoc('https://unpkg.com/@ngageoint/geopackage@3.0.0/dist/sql-wasm.wasm');
-            }
-
-            if (window.log) window.log("⏳ Creando GeoPackage en memoria...", "info");
-            const gpkg = await GP.GeoPackageAPI.create();
-            const tableName = "jetl_export";
-            const fc = data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
-
-            // Crear tabla e insertar Features
-            await GP.GeoPackageAPI.createFeatureTable(gpkg, tableName, fc.features[0] ? fc.features[0].geometry : null);
+            const fc = _asCollection(data);
+            const crs = _collectionCrs(fc);
+            // La librería inserta las entidades como EPSG:4326.
+            if (crs && crs !== 'EPSG:4326') throw new Error(`El GeoPackage se escribe en EPSG:4326 y los datos están en ${crs}: reproyéctalos antes con el nodo Reproject.`);
+            const GP = await _geopackage();
+            const gpkg = await GP.create();
+            const tableName = 'jetl_export';
+            const types = new Map();
+            fc.features.forEach((f) => Object.entries(f.properties || {}).forEach(([key, value]) => {
+                if (key === 'id' || key === 'geometry' || value === null || value === undefined) return;
+                const type = typeof value === 'number' ? 'REAL' : typeof value === 'boolean' ? 'BOOLEAN' : 'TEXT';
+                types.set(key, types.has(key) && types.get(key) !== type ? 'TEXT' : type);
+            }));
+            await GP.createFeatureTableWithProperties(gpkg, tableName, [...types].map(([name, dataType]) => ({ name, dataType })));
             for (let i = 0; i < fc.features.length; i++) {
-                if (window.isEngineCancelled) throw new Error("Exportación a GeoPackage cancelada.");
-                if (i % 250 === 0) await new Promise(r => setTimeout(r, 0));
-
-                await GP.GeoPackageAPI.addGeoJSONFeatureToGeoPackage(gpkg, fc.features[i], tableName);
+                if (i % 250 === 0) { _cancelled('Exportación a GeoPackage'); await new Promise((r) => setTimeout(r, 0)); }
+                const f = fc.features[i];
+                const properties = {};
+                for (const [key, type] of types) {
+                    const value = f.properties ? f.properties[key] : undefined;
+                    if (value === undefined || value === null) continue;
+                    properties[key] = type === 'TEXT' && typeof value === 'object' ? JSON.stringify(value) : type === 'TEXT' ? String(value) : value;
+                }
+                await GP.addGeoJSONFeatureToGeoPackage(gpkg, { type: 'Feature', geometry: f.geometry, properties }, tableName);
             }
-
-            if (window.log) window.log("⏳ Exportando binario GPKG...", "info");
-            const byteArray = await gpkg.export();
-            const blob = new Blob([byteArray], { type: "application/geopackage+sqlite3" });
-            return { blob, filename: "export.gpkg" };
+            const bytes = await new Promise((resolve, reject) => gpkg.export((error, result) => error ? reject(error) : resolve(result)));
+            return { blob: new Blob([bytes], { type: 'application/geopackage+sqlite3' }), filename: 'export.gpkg' };
         }
     });
 
+    // GeoParquet 1.1: geometría WKB y metadatos «geo», legible por QGIS, GDAL o DuckDB.
     registerWriter({
         exts: ['parquet'],
-        label: 'Parquet (GeoParquet-lite)',
+        label: 'GeoParquet',
         write: async (data) => {
-            if (window.log) window.log("⏳ Iniciando motor Parquet WASM...", "info");
-            try {
-                // Importamos directamente las dependencias como modulos ES (ESM) para no romper bindings WASM
-                const parquetWasm = await import('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm.js');
-                await parquetWasm.default('https://unpkg.com/parquet-wasm@0.6.1/esm/parquet_wasm_bg.wasm');
-                const arrow = await import('https://cdn.jsdelivr.net/npm/apache-arrow@13.0.0/+esm');
-
-                const fc = data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
-                if (window.log) window.log("⏳ Serializando a formato tabular Arrow...", "info");
-
-                const rows = [];
-                for (let i = 0; i < fc.features.length; i++) {
-                    if (window.isEngineCancelled) throw new Error("Exportación a Parquet cancelada.");
-                    if (i % 500 === 0) await new Promise(r => setTimeout(r, 0));
-
-                    const f = fc.features[i];
-                    if (!f.geometry) continue;
-                    try {
-                        let wkt = wellknown.stringify(f.geometry);
-                        const flatProps = {};
-                        if (f.properties) {
-                            Object.keys(f.properties).forEach(k => {
-                                let val = f.properties[k];
-                                if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
-                                flatProps[k] = val;
-                            });
-                        }
-                        rows.push({
-                            jetl_id: i,
-                            geometry: wkt,
-                            ...flatProps
-                        });
-                    } catch (e) { }
-                }
-
-                if (rows.length === 0) throw new Error("No hay data válida");
-                // Usamos tableFromJSON de apache-arrow
-                const table = arrow.tableFromJSON(rows);
-                const ipc = arrow.tableToIPC(table, "file");
-
-                // Escribimos a Parquet usando parquet-wasm
-                const buffer = parquetWasm.writeParquet(ipc);
-
-                if (window.log) window.log("✅ Parquet generado éxito.", "success");
-
-                const blob = new Blob([buffer], { type: "application/octet-stream" });
-                return { blob, filename: "export.parquet" };
-            } catch (e) {
-                if (window.log) window.log("⚠️ " + e.message, "err");
-                throw new Error("Parquet Export Error: " + e.message);
+            const fc = _asCollection(data);
+            const { Arrow, wasm } = await _parquet();
+            const keys = [];
+            const kinds = new Map();
+            fc.features.forEach((f) => Object.entries(f.properties || {}).forEach(([key, value]) => {
+                if (key === 'geometry') return;
+                if (!kinds.has(key)) { keys.push(key); kinds.set(key, null); }
+                if (value === null || value === undefined) return;
+                const kind = typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string';
+                const prev = kinds.get(key);
+                kinds.set(key, prev && prev !== kind ? 'string' : kind);
+            }));
+            const columns = {};
+            const geometryTypes = new Set();
+            const wkb = [];
+            for (let i = 0; i < fc.features.length; i++) {
+                if (i % 1000 === 0) { _cancelled('Exportación a Parquet'); await new Promise((r) => setTimeout(r, 0)); }
+                const g = fc.features[i].geometry;
+                if (g) geometryTypes.add(_hasZ(g) ? `${g.type} Z` : g.type);
+                wkb.push(g ? geometryToWkb(g) : null);
             }
+            for (const key of keys) {
+                const kind = kinds.get(key) || 'string';
+                const values = fc.features.map((f) => {
+                    const v = f.properties ? f.properties[key] : null;
+                    if (v === null || v === undefined) return null;
+                    if (kind === 'string') return typeof v === 'object' ? JSON.stringify(v) : String(v);
+                    return v;
+                });
+                const type = kind === 'number' ? new Arrow.Float64() : kind === 'boolean' ? new Arrow.Bool() : new Arrow.Utf8();
+                columns[key] = Arrow.vectorFromArray(values, type);
+            }
+            columns.geometry = Arrow.vectorFromArray(wkb, new Arrow.Binary());
+            const crs = _collectionCrs(fc);
+            const column = { encoding: 'WKB', geometry_types: [...geometryTypes].sort() };
+            // Sin «crs» GeoParquet entiende OGC:CRS84 (lon/lat). Otro CRS se identifica por su código.
+            if (crs && crs !== 'EPSG:4326') {
+                const [authority, code] = crs.split(':');
+                column.crs = { type: 'ProjectedCRS', name: crs, id: { authority, code: Number(code) || code } };
+            }
+            const geo = { version: '1.1.0', primary_column: 'geometry', columns: { geometry: column } };
+            // Un solo lote con el esquema final: todos los campos admiten nulos (atributos que
+            // faltan en alguna entidad, geometría vacía) y llevan los metadatos «geo».
+            const fields = Object.entries(columns).map(([name, vector]) => new Arrow.Field(name, vector.type, true));
+            const schema = new Arrow.Schema(fields, new Map([['geo', JSON.stringify(geo)]]));
+            const rows = Arrow.makeData({ type: new Arrow.Struct(fields), length: fc.features.length, nullCount: 0, children: Object.values(columns).map((vector) => vector.data[0]) });
+            const withGeo = new Arrow.Table([new Arrow.RecordBatch(schema, rows)]);
+            const bytes = wasm.writeParquet(wasm.Table.fromIPCStream(Arrow.tableToIPC(withGeo, 'stream')));
+            return { blob: new Blob([bytes], { type: 'application/vnd.apache.parquet' }), filename: 'export.parquet' };
         }
     });
 
@@ -4161,6 +4264,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         readFile,
         writeFile,
         toKML,
+        wkb: { toGeometry: wkbToGeometry, fromGeometry: geometryToWkb },
         _registry: registry
     };
 

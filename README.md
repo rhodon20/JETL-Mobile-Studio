@@ -30,9 +30,14 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   ejecución, el botón la cancela.
 
 ### Formatos
-- Lectura: GeoJSON/JSON, KML, Shapefile (ZIP), OSM (Overpass), WKT, GeoTIFF,
-  GPKG y Parquet (experimentales).
-- Escritura: GeoJSON, CSV, KML, GPKG y Parquet (experimentales).
+- Lectura: GeoJSON/JSON, KML, GPX, CSV, Excel, Shapefile (ZIP), GeoPackage,
+  Parquet/GeoParquet, OSM (Overpass), WKT y GeoTIFF.
+- Escritura: GeoJSON, CSV, KML, Excel, Shapefile (ZIP), GeoPackage (EPSG:4326) y
+  GeoParquet.
+- Las librerías de GeoPackage, Parquet/Arrow, Excel y escritura de Shapefile van
+  en `js/vendor/` (sin CDN): se cargan al usarse y quedan disponibles sin conexión.
+- GDB y FeatureReader necesitan el backend de Desktop: se conservan para abrir sus
+  proyectos, pero no aparecen en el catálogo de Studio.
 - Estado por navegador: `COMPATIBILITY_MATRIX.md`.
 
 ## Desarrollo
@@ -124,8 +129,7 @@ mismas pruebas contra `dist/` (también sin red). Si todo pasa, publica `dist/` 
   ejecuta flujos sin red (`sw.js` precachea ~3 MB en el primer uso desplegado),
   pero el mapa base, OSM/Overpass y los lectores HTTP necesitan conexión.
   `?nosw=1` desregistra el service worker y borra sus cachés.
-- GPKG y Parquet son experimentales; los nodos raster de Desktop están fuera de
-  alcance (`docs/NODE_CATALOG_PARITY.md`).
+- Los nodos raster de Desktop están fuera de alcance (`docs/NODE_CATALOG_PARITY.md`).
 - Datos grandes: falta perfilar ejecuciones lentas reales.
 - En Safari anterior a 16.4 (sin *import maps*) la app funciona, pero los
   módulos importados se descargan sin versión de caché.
