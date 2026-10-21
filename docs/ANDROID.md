@@ -52,3 +52,11 @@ Si falta la huella correcta, la app funciona, pero con una barra de navegador
 arriba. `tests/pwa-assets.test.mjs` comprueba que paquete, dominio y accesos
 directos coinciden entre la web, `twa-manifest.json` y `assetlinks.json`, y el
 paso *Verify the live site* de la CI comprueba que se publica.
+
+## Ficha de Play: capturas e iconos
+
+`scripts/store-screenshots.mjs` recorre la app real con un flujo de ejemplo y
+genera las capturas de teléfono (1080×1920) y el gráfico destacado (1024×500).
+El workflow manual **Store assets** las genera con el mapa base de fondo y las
+deja, junto al icono de 512 px (`android/store_icon.png`), en el artefacto
+`store-assets`.

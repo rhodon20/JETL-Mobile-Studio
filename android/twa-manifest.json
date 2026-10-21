@@ -59,7 +59,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://jetl-studio.javierlorenzom93.workers.dev/",
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "orientation": "any",
   "fingerprints": [],
   "additionalTrustedOrigins": [],

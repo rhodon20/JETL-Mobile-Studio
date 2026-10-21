@@ -1,0 +1,27 @@
+name: Store assets
+
+# Capturas y gráfico destacado para la ficha de Google Play, generados desde la
+# app real con el mapa base (aquí sí hay red). Se lanza a mano cuando cambia la
+# interfaz; el resultado queda como artefacto «store-assets».
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: node scripts/store-screenshots.mjs --root dist --out store-assets
+      - run: cp android/store_icon.png store-assets/icono-512.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-assets
+          path: store-assets/
+          if-no-files-found: error

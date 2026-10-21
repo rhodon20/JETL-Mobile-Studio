@@ -65,4 +65,6 @@ test('la app Android (TWA) y la verificación de dominio coinciden con la web pu
     const gradle = readFileSync(new URL('android/app/build.gradle', root), 'utf8');
     assert.ok(gradle.includes(`hostName: '${twa.host}'`) && gradle.includes(`applicationId "${twa.packageId}"`), 'build.gradle desactualizado: regenerar con bubblewrap update');
     assert.ok(!/127\.0\.0\.1|localhost/.test(gradle), 'build.gradle apunta a un servidor local');
+    // androidbrowserhelper exige Android 7.0 (API 24); con menos no compila.
+    assert.ok(twa.minSdkVersion >= 24 && gradle.includes(`minSdkVersion ${twa.minSdkVersion}`), 'minSdkVersion distinto en twa-manifest.json y build.gradle');
 });
