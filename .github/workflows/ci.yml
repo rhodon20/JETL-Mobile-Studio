@@ -77,4 +77,35 @@ jobs:
         run: |
           npm ci
           npm run build
-          npx --yes wrangler@4.151.3 deploy
+          npx --yes wrangler@4.151.3 deploy | tee "$RUNNER_TEMP/wrangler.log"
+      # Comprueba el sitio publicado, no sólo que wrangler terminó: la raíz y las
+      # páginas se sirven sin redirecciones (el precache del service worker las
+      # pide tal cual), lo que decide la versión no se cachea y version.json es
+      # el de este commit. El sello tarda unos segundos en propagarse.
+      - name: Verify the live site
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/wrangler.log" | head -1)
+          test -n "$url" || { echo "::error::wrangler no informó de la URL publicada"; exit 1; }
+          want=${GITHUB_SHA::7}
+          for i in $(seq 1 24); do
+            got=$(curl -fsS "$url/version.json" | jq -r .sha || true)
+            [ "$got" = "$want" ] && break
+            sleep 5
+          done
+          [ "$got" = "$want" ] || { echo "::error::$url/version.json sirve '$got', se esperaba '$want'"; exit 1; }
+          check() { # ruta, cabecera esperada (regex, sin distinguir mayúsculas)
+            headers=$(curl -sS -o /dev/null -D - "$url$1")
+            echo "$headers" | head -1 | grep -q ' 200' || { echo "::error::$1 no devuelve 200"; echo "$headers"; exit 1; }
+            echo "$headers" | grep -qiE "$2" || { echo "::error::$1 sin '$2'"; echo "$headers"; exit 1; }
+          }
+          check /              '^content-type: text/html'
+          check /index.html    '^cache-control: no-cache'
+          check /privacy.html  '^content-type: text/html'
+          check /sw.js         '^cache-control: no-cache'
+          check /manifest.json '^cache-control: no-cache'
+          check /version.json  '^cache-control: no-store'
+          sw=$(curl -fsS "$url/sw.js")
+          grep -q "const BUILD = '$want-" <<<"$sw" || { echo "::error::sw.js sin sello de build"; exit 1; }
+          echo "Publicado y verificado: $url ($want)"
