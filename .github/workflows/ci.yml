@@ -107,6 +107,9 @@ jobs:
           check /manifest.json '^cache-control: no-cache'
           check /version.json  '^cache-control: no-store'
           check /.well-known/assetlinks.json '^content-type: application/json'
+          # La app Android sólo abre a pantalla completa con estas huellas publicadas.
+          curl -fsS "$url/.well-known/assetlinks.json" | jq -S . > "$RUNNER_TEMP/assetlinks.live.json"
+          jq -S . .well-known/assetlinks.json | diff - "$RUNNER_TEMP/assetlinks.live.json" || { echo "::error::assetlinks.json publicado distinto del repositorio"; exit 1; }
           sw=$(curl -fsS "$url/sw.js")
           grep -q "const BUILD = '$want-" <<<"$sw" || { echo "::error::sw.js sin sello de build"; exit 1; }
           echo "Publicado y verificado: $url ($want)"
