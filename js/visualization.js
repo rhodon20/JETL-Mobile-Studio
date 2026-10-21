@@ -212,6 +212,36 @@ async function openFeatureCacheEntry(nodeId, preferredPort) {
 }
 window.openFeatureCacheEntry = openFeatureCacheEntry;
 
+// «Ver resultado» de un nodo (su ojo, el menú contextual o Acciones): el mapa
+// encuadra la capa y la tabla y el selector de caché pasan a ese mismo nodo.
+async function showNodeResult(nodeId, askPort = true) {
+    const id = String(nodeId || '');
+    if (!id || !executionData[id]) { showToast('Nodo sin datos procesados', 'error'); return false; }
+    if (String(currentNodeId || '') !== id) selectedFeatureIndex = null;
+    currentNodeId = id;
+    await showOnMap(id, null, askPort);
+    const info = resolveNodeDisplayData(id, nodeViewPortById[id] || null);
+    if (info && info.data) buildTable(info.data);
+    featureCacheBrowserState.nodeId = id;
+    featureCacheBrowserState.port = (info && info.port) || '';
+    saveFeatureCacheBrowserState();
+    updateFeatureCacheBrowserUI();
+    switchTab('map');
+    // Con una entidad elegida en la tabla, el mapa ya se centró en ella.
+    if (selectedFeatureIndex === null) fitNodeLayer(id);
+    return true;
+}
+window.showNodeResult = showNodeResult;
+
+function fitNodeLayer(id) {
+    const layer = mapLayers[id];
+    const bounds = layer && layer.getBounds ? layer.getBounds() : null;
+    if (!map || !bounds || !bounds.isValid()) return;
+    // El visor puede acabar de abrirse: Leaflet necesita su tamaño real para encuadrar.
+    map.invalidateSize();
+    map.fitBounds(bounds, { maxZoom: 18, padding: [30, 30] });
+}
+
 function ensureFeatureCacheBrowserUI() {
     if (featureCacheBrowserReady) return;
     const contextBar = document.getElementById('results-context-bar');
@@ -443,6 +473,24 @@ function ensureJETLMap() {
         ? window.JETLAddBasemap(map)
         : Promise.resolve(null);
     layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
+    // Encuadrar las capas desde el propio mapa: en el móvil la barra del visor no
+    // tiene sitio para ese botón (css/mobile.css lo muestra sólo allí).
+    const FitControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd() {
+            const bar = L.DomUtil.create('div', 'leaflet-bar jetl-fit-control');
+            const button = L.DomUtil.create('a', '', bar);
+            button.href = '#';
+            button.setAttribute('role', 'button');
+            button.title = 'Encuadrar capas';
+            button.setAttribute('aria-label', 'Encuadrar capas');
+            button.innerHTML = '<i class="fas fa-expand" aria-hidden="true"></i>';
+            L.DomEvent.disableClickPropagation(bar);
+            L.DomEvent.on(button, 'click', (event) => { L.DomEvent.preventDefault(event); zoomToAllLayers(); });
+            return bar;
+        }
+    });
+    new FitControl().addTo(map);
     return map;
 }
 window.ensureJETLMap = ensureJETLMap;
@@ -477,7 +525,7 @@ function zoomToAllLayers() {
         if (layer) group.addLayer(layer);
     });
     if (group.getLayers().length > 0) {
-        map.fitBounds(group.getBounds(), { padding: [50, 50] });
+        map.fitBounds(group.getBounds(), { maxZoom: 18, padding: [50, 50] });
     } else {
         showToast("No hay capas visibles", "warn");
     }

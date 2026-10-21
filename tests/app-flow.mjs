@@ -468,6 +468,48 @@ try {
     await page.click('#multi-select-banner button');
     check('Listo leaves select mode', await page.evaluate(() => !document.body.classList.contains('multi-select-mode') && !document.querySelector('.drawflow-node.is-picked')));
 
+    // «Ver resultado» frames the layer (here far from the map's start), and the
+    // table and the cache selector follow that node.
+    const viewIds = await page.evaluate(async () => {
+        editor.clear();
+        JETLNativeNav('flow');
+        const a = addNode('reader_bbox_gen');
+        const b = addNode('geo_centroid');
+        editor.addConnection(a, b, 'output_1', 'input_1');
+        document.querySelector(`#node-${a} [df-b]`).value = '-6.0,37.38,-5.98,37.40';
+        await runEngine();
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        const el = document.getElementById('node-' + a);
+        el.classList.add('selected');
+        editor.node_selected = el;
+        return { a, b };
+    });
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="view"]');
+    await page.waitForTimeout(400);
+    const viewed = await page.evaluate((a) => {
+        const c = map.getCenter();
+        const fit = document.querySelector('.jetl-fit-control');
+        return {
+            near: Math.abs(c.lng + 5.99) < 0.02 && Math.abs(c.lat - 37.39) < 0.02,
+            zoom: map.getZoom(),
+            current: String(currentNodeId),
+            rows: document.querySelectorAll('#table-container tbody tr').length,
+            cache: document.getElementById('feature-cache-node')?.value,
+            fitShown: !!fit && getComputedStyle(fit).display !== 'none'
+        };
+    }, viewIds.a);
+    check('«Ver resultado» frames the layer on the map', viewed.near && viewed.zoom >= 12, JSON.stringify(viewed));
+    check('«Ver resultado» shows that node in the table and the cache selector', viewed.current === String(viewIds.a) && viewed.rows === 1 && viewed.cache === String(viewIds.a), JSON.stringify(viewed));
+    // On a phone the frame-layers button lives on the map itself.
+    await page.evaluate(() => { map.setView([40.4, -3.7], 5); });
+    await page.click('.jetl-fit-control a');
+    await page.waitForTimeout(400);
+    // It frames every layer on the map (earlier checks left some around Madrid).
+    const refit = await page.evaluate(() => ({ zoom: map.getZoom(), contains: map.getBounds().contains([[37.38, -6.0], [37.40, -5.98]]) }));
+    check('the map frame button is shown on a phone and frames the layers', viewed.fitShown && refit.contains && refit.zoom > 5, JSON.stringify(refit));
+    await page.evaluate(() => JETLNativeNav('flow'));
+
     // Notes: a free sticky note on the canvas and an annotation inside a node.
     const noteNodes = await page.evaluate(() => {
         editor.clear();

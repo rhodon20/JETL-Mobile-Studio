@@ -416,7 +416,7 @@ function initEngineDelegation() {
             const action = actionEl.getAttribute('data-node-action');
 
             if (action === 'run') runEnginePartial(nodeId);
-            else if (action === 'view') showOnMap(nodeId, null, true);
+            else if (action === 'view') showNodeResult(nodeId);
             else if (action === 'delete') editor.removeNodeId(nodeEl.id);
         });
 
@@ -466,7 +466,7 @@ function ctxAction(action) {
     } else if (action === 'run') {
         runEnginePartial(ctxNodeId);
     } else if (action === 'view') {
-        showOnMap(ctxNodeId, null, true);
+        showNodeResult(ctxNodeId);
     }
     document.getElementById('ctx-menu').style.display = 'none';
 }

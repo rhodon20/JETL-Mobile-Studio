@@ -35,6 +35,11 @@
     pointer-events: none;
 }
 
+/* Encuadrar capas desde el mapa: sólo en el móvil (en escritorio está en la barra del visor). */
+.leaflet-control.jetl-fit-control {
+    display: none;
+}
+
 @media (max-width: 768px) {
     html,
     body {
@@ -283,6 +288,11 @@
     #panel-tabs .btn[data-ui-action="zoom-all"],
     #btn-map-expand {
         display: none;
+    }
+
+    /* Sustituye al botón de encuadrar de la barra del visor (oculto arriba). */
+    .leaflet-control.jetl-fit-control {
+        display: block;
     }
 
     #panel-tabs .tab-btn {

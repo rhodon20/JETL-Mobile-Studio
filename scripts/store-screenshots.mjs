@@ -82,12 +82,6 @@ try {
     await page.tap(`#node-${ids.size}`, { position: { x: 70, y: 12 } });
     await page.click('#mobile-run');
     await page.click('#action-hub [data-hub-action="view"]');
-    // El selector de caché del visor no sigue al nodo que se muestra: se elige a mano.
-    await page.selectOption('#feature-cache-node', String(ids.size));
-    await page.click('#feature-cache-open');
-    await page.evaluate(() => switchTab('map'));
-    // El mapa no encuadra la capa por sí solo: lo que haría el usuario con los dedos.
-    await page.evaluate(() => zoomToAllLayers());
     await settleMap();
     await shot('03-mapa');
 

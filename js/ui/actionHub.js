@@ -169,8 +169,7 @@ async function runHubAction(action, nodeId) {
         }
         await window.JETLEnsureRuntime?.();
         window.JETLNativeNav?.('results');
-        await window.showOnMap?.(nodeId, null, true);
-        window.switchTab?.('map');
+        await window.showNodeResult?.(nodeId);
     } else if (action === 'annotate') {
         showFlow();
         annotate(nodeId);
