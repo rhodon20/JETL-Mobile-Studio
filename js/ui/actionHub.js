@@ -15,6 +15,7 @@ import { isSelecting, pickedIds, startSelection, stopSelection, setPicked, pickA
 import { duplicateNodes, removeNodes } from '../engine.js';
 import { openValidation } from './validationPanel.js';
 import { annotate, noteForNode } from './annotations.js';
+import { NODE_COLORS, getNodeColor, setNodeColor } from './nodeColor.js';
 
 let running = false;
 
@@ -31,6 +32,7 @@ const FLOW_ITEMS = [
 const NODE_ITEMS = [
     { icon: 'fa-map-location-dot', label: 'Ver resultado', hub: 'view' },
     { icon: 'fa-note-sticky', label: 'Anotar', hub: 'annotate' },
+    { icon: 'fa-palette', label: 'Color', hub: 'color' },
     { icon: 'fa-clone', label: 'Duplicar', hub: 'duplicate' },
     { icon: 'fa-crosshairs', label: 'Centrar', hub: 'center' },
     { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
@@ -96,6 +98,19 @@ function render(panel) {
     panel.innerHTML = `${head}
         <button type="button" class="action-hub-primary" data-hub-action="${primary.hub}"><i class="fas ${primary.icon}" aria-hidden="true"></i><span>${primary.label}</span><small>${JETLEscapeHtml(primary.note)}</small></button>
         <div class="action-hub-grid">${items.map(itemHtml).join('')}</div>`;
+}
+
+// Colores del nodo dentro del mismo panel: tocar uno lo aplica y cierra.
+function renderColorPicker(panel, nodeId) {
+    const current = getNodeColor(nodeId);
+    const swatches = NODE_COLORS.map((color) => `<button type="button" class="node-color-swatch" data-hub-action="set-color" data-color="${color}" style="--swatch:${color}" role="radio" aria-checked="${color === current}" aria-label="Color ${color}"></button>`).join('');
+    panel.innerHTML = `${sheetHead('COLOR DEL NODO', JETLEscapeHtml(nodeLabel(nodeId)))}
+        <p class="node-color-hint">Marca el nodo en el lienzo y su capa en el mapa.</p>
+        <div class="node-color-grid" role="radiogroup" aria-label="Color del nodo">${swatches}</div>
+        <div class="action-hub-grid">
+            <button type="button" class="action-hub-item" data-hub-action="set-color" data-color="" ${current ? '' : 'disabled'}><i class="fas fa-eraser" aria-hidden="true"></i><span>Quitar color</span></button>
+            <button type="button" class="action-hub-item" data-hub-action="color-back"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Volver</span></button>
+        </div>`;
 }
 
 function isOpen() {
@@ -230,8 +245,20 @@ function initActionHub() {
         const item = event.target.closest('[data-hub-action], [data-ui-action]');
         if (!item) return;
         const nodeId = panel.dataset.nodeId || null;
-        closeActionHub();
         const action = item.getAttribute('data-hub-action');
+        if (action === 'color' && nodeId) {
+            renderColorPicker(panel, nodeId);
+            return;
+        }
+        if (action === 'color-back') {
+            render(panel);
+            return;
+        }
+        closeActionHub();
+        if (action === 'set-color' && nodeId) {
+            setNodeColor(nodeId, item.dataset.color || null);
+            return;
+        }
         if (action) runHubAction(action, nodeId);
         else if (item.getAttribute('data-ui-action') === 'open-flow-navigator') showFlow();
     });

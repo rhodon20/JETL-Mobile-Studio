@@ -534,6 +534,27 @@ try {
     const refit = await page.evaluate(() => { const b = map.getBounds(); return { zoom: map.getZoom(), contains: b.contains([-6.0, 37.38]) && b.contains([-5.98, 37.40]) }; });
     check('the map frame button is shown on a phone and frames the layers', viewed.fitShown && refit.contains && refit.zoom > 4, JSON.stringify(refit));
     await page.evaluate(() => JETLNativeNav('flow'));
+    // Acciones > Color: el nodo se tiñe, su capa en el mapa toma ese color y el
+    // color viaja con el proyecto.
+    await page.evaluate((a) => {
+        document.querySelectorAll('.drawflow-node.selected').forEach((el) => el.classList.remove('selected'));
+        const el = document.getElementById('node-' + a);
+        el.classList.add('selected');
+        editor.node_selected = el;
+    }, viewIds.a);
+    await page.click('#mobile-run');
+    await page.click('#action-hub [data-hub-action="color"]');
+    await page.click('#action-hub [data-color="#9b59b6"]');
+    const colored = await page.evaluate(async (a) => {
+        const tinted = document.getElementById('node-' + a).classList.contains('has-node-color');
+        await showNodeResult(a, false);
+        JETLNativeNav('flow');
+        const layerColor = mapLayers[a]?.color;
+        editor.import(editor.export());
+        JETLEvents.emit('workspace:replaced');
+        return { tinted, layerColor, saved: editor.getNodeFromId(a).data.jetl_color, reimported: document.getElementById('node-' + a).classList.contains('has-node-color') };
+    }, viewIds.a);
+    check('a node colour tints the node and its map layer and is saved with the flow', colored.tinted && colored.layerColor === '#9b59b6' && colored.saved === '#9b59b6' && colored.reimported, JSON.stringify(colored));
 
     // Notes: a free sticky note on the canvas and an annotation inside a node.
     const noteNodes = await page.evaluate(() => {

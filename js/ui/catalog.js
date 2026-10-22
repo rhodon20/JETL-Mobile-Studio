@@ -16,6 +16,23 @@ function offeredInCatalog(tool) {
     return !tool.requiresBackend || !!(window.JETLBackend || window.JETLBackendIntegration);
 }
 
+// Categorías del registro ("2.1 VECTOR - GEOMETRY") con nombre legible e icono.
+const CATEGORY_ICONS = [
+    [/READERS/, 'fa-file-import'], [/GEOMETRY/, 'fa-draw-polygon'], [/OVERLAY/, 'fa-layer-group'],
+    [/SPATIAL/, 'fa-location-crosshairs'], [/ATTRIBUTE/, 'fa-table-list'], [/UTILS/, 'fa-screwdriver-wrench'],
+    [/RASTER/, 'fa-image'], [/WRITERS/, 'fa-file-export']
+];
+
+function categoryName(cat) {
+    const name = String(cat).replace(/^[\d.]+\s*/, '').toLocaleLowerCase('es').replace(/\s*-\s*/g, ' · ');
+    return name.charAt(0).toLocaleUpperCase('es') + name.slice(1);
+}
+
+function categoryIcon(cat) {
+    const hit = CATEGORY_ICONS.find(([pattern]) => pattern.test(String(cat).toUpperCase()));
+    return hit ? hit[1] : 'fa-cube';
+}
+
 function renderSidebar(filter) {
     const container = document.getElementById('sidebar-content');
     container.innerHTML = '';
@@ -28,6 +45,10 @@ function renderSidebar(filter) {
     });
 
     const sortedCats = Object.keys(cats).sort();
+    if (!sortedCats.length) {
+        container.innerHTML = `<div class="catalog-empty">Ningún transformador coincide con «${JETLEscapeHtml(filter)}».</div>`;
+        return;
+    }
 
     sortedCats.forEach(c => {
         const group = document.createElement('div');
@@ -36,7 +57,7 @@ function renderSidebar(filter) {
         const title = document.createElement('div');
         title.className = 'cat-title';
         title.setAttribute('data-cat-toggle', '1');
-        title.innerHTML = `<span>${JETLEscapeHtml(c)}</span> <i class="fas fa-chevron-down"></i>`;
+        title.innerHTML = `<i class="fas ${categoryIcon(c)} cat-icon" aria-hidden="true"></i><span class="cat-name">${JETLEscapeHtml(categoryName(c))}</span><span class="cat-count">${cats[c].length}</span><i class="fas fa-chevron-down cat-chevron" aria-hidden="true"></i>`;
 
         const itemsDiv = document.createElement('div');
         itemsDiv.className = 'cat-items';
@@ -49,7 +70,7 @@ function renderSidebar(filter) {
         const supportsDrag = !window.matchMedia('(pointer: coarse)').matches;
         cats[c].forEach(t => {
             itemsDiv.innerHTML += `<div class="node-item" draggable="${supportsDrag}" data-k="${JETLEscapeHtml(t.k)}">
-                <i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> ${JETLEscapeHtml(t.label)}
+                <i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> <span class="node-item-label">${JETLEscapeHtml(t.label)}</span>
             </div>`;
         });
 

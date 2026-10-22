@@ -722,6 +722,16 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 .action-hub-item.danger i { color:#ff8a80; }
 #mobile-run.is-cancel { background:linear-gradient(145deg,#c0392b,#962d22); box-shadow:0 8px 20px rgba(192,57,43,.42); }
 .action-hub-primary:disabled { opacity:.45; box-shadow:none; cursor:default; }
+.action-hub-item:disabled { opacity:.4; cursor:default; }
+
+/* Color del nodo (js/ui/nodeColor.js): cabecera teñida. El borde del nodo queda para
+   su estado (seleccionado, error, ejecutado). */
+.drawflow .drawflow-node.has-node-color .node-head { border-bottom: 4px solid var(--node-color) !important; background: color-mix(in srgb, var(--node-color) 48%, #1e1e1e); }
+.node-color-hint { margin: 0 4px 12px; color: #9aa0a6; font-size: 13px; }
+.node-color-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin: 0 4px 14px; }
+.node-color-swatch { aspect-ratio:1; min-height:48px; border-radius:14px; border:2px solid rgba(255,255,255,.12); background:var(--swatch); cursor:pointer; }
+.node-color-swatch[aria-checked="true"] { border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.25); }
+.node-color-swatch:active { transform:scale(.95); }
 
 /* Multiselección (js/ui/multiSelect.js): en el modo, un toque marca el nodo; sus
    controles y puertos no reaccionan. Cada nodo muestra un círculo en la esquina. */
@@ -868,3 +878,49 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
     color: #9aa0a6;
     text-align: center;
 }
+
+/* Elegir salida (lectores con una salida por tabla): lista que cabe en el móvil. */
+#toast.port-picker {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: min(420px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    padding: 12px;
+    border-radius: 16px;
+    text-align: left;
+}
+#toast.port-picker > i { display: none; }
+#toast.port-picker #toast-msg { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.port-picker-title { font-weight: 600; }
+.port-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 45vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.port-picker-btn {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #444;
+    border-radius: 10px;
+    background: #2a2a2a;
+    color: #ddd;
+    font-size: 14px;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.port-picker-btn.active { background: #2ecc71; border-color: #2ecc71; color: #111; }
+
+/* Catálogo de nodos (js/ui/catalog.js): categoría con icono, nombre y cuántos tiene. */
+#sidebar-content .cat-title { justify-content: flex-start; gap: 10px; }
+#sidebar-content .cat-title .cat-name { flex: 1; min-width: 0; }
+#sidebar-content .cat-title .cat-icon { width: 18px; text-align: center; font-size: 1em; }
+#sidebar-content .cat-title.active .cat-icon { transform: none; }
+#sidebar-content .cat-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.08); color: #aab; font-size: .9em; text-align: center; letter-spacing: 0; }
+.catalog-empty { padding: 24px 16px; color: #9aa0a6; text-align: center; }

@@ -20,6 +20,7 @@ import { runLaunchAction } from './ui/launchActions.js';
 import { initActionHub } from './ui/actionHub.js';
 import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 import { initAnnotations } from './ui/annotations.js';
+import { initNodeColors } from './ui/nodeColor.js';
 import { initOfflineMode } from './core/offline.js';
 
 let jetlAppInitialized = false;
@@ -185,6 +186,7 @@ function initializeJETLApp() {
             ['panel de acciones', initActionHub],
             ['multiselección', initMultiSelect],
             ['anotaciones', initAnnotations],
+            ['colores de nodo', initNodeColors],
             ['navegador de flujo', initFlowNavigator],
             ['búsqueda rápida', initQuickSearch]
         ];
@@ -423,7 +425,7 @@ function initEngineDelegation() {
         drawflowEl.addEventListener('change', (e) => {
             const fileInput = e.target.closest('input[type="file"][data-load-file]');
             if (fileInput) {
-                loadFile(fileInput);
+                loadFileWhenReady(fileInput);
                 return;
             }
 
@@ -434,6 +436,17 @@ function initEngineDelegation() {
             if (bandsInput) bandsInput.style.display = modeSelect.value === 'select' ? 'block' : 'none';
         });
     }
+}
+
+// loadFile vive en visualization.js, que se carga con el motor (en diferido): al
+// elegir un archivo antes de la primera ejecución el motor aún no está.
+async function loadFileWhenReady(input) {
+    const runtime = typeof window.JETLEnsureRuntime === 'function' ? window.JETLEnsureRuntime() : window.JETLRuntimeReady;
+    if (runtime && !(await runtime)) {
+        showToast('No se pudo preparar el motor', 'error');
+        return;
+    }
+    window.loadFile(input);
 }
 
 // History logic (undo/redo) moved to js/state/history.js

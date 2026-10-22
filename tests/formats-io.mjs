@@ -46,6 +46,17 @@ const READERS = [
 try {
     await page.goto(`${server.origin}/index.html`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__JETL_BOOT && window.__JETL_BOOT.stage === 'ready', null, { timeout: 30000 });
+    // Elegir el archivo antes de la primera ejecución: el motor (y loadFile) aún no
+    // se ha cargado y el lector tenía que esperar a una ejecución fallida.
+    {
+        const id = await page.evaluate(() => addNode('reader_parquet'));
+        await page.setInputFiles(`#node-${id} input[type=file]`, path.join(FIXTURES, 'ciudades.geoparquet.parquet'));
+        const label = await page.waitForFunction((id) => {
+            const text = document.querySelector(`#node-${id} .file-lbl`)?.textContent || '';
+            return /fts|Error/.test(text) && text;
+        }, id, { timeout: 60000 }).then((handle) => handle.jsonValue()).catch(() => 'sin leer');
+        check('a reader reads the file chosen before the first run', /\(3 fts\)/.test(label), label);
+    }
     await page.evaluate(async () => { await window.JETLEnsureRuntime(); await window.JETLEnsureExtras(); });
 
     for (const [type, file, port, expected] of READERS) {
@@ -104,6 +115,18 @@ try {
         check('a GeoPackage with several tables gives one output per table', multi.outputs === 3 && multi.first[0] === 3 && multi.first[1] === 'ciudades' && n2 === 1 && multi.fourth === 0, JSON.stringify(multi));
         // Una tabla sin su geometría registrada (la librería rechazaba el archivo entero) se lee igual, con Z.
         check('a table whose geometry column is not registered is still read', multi.third[0] === 1 && multi.third[1] === 'LineString' && multi.third[2] === 650, JSON.stringify(multi.third));
+        // Al ver el resultado se elige entre las salidas del nodo (no las 16 internas),
+        // cada una con su tabla.
+        const picker = await page.evaluate(async (id) => {
+            const shown = showNodeResult(id);
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const labels = [...document.querySelectorAll('#toast.port-picker .port-picker-btn')].map((b) => b.textContent);
+            document.querySelector('#toast.port-picker .port-picker-btn:nth-child(2)')?.click();
+            await shown;
+            JETLNativeNav('flow');
+            return { labels, layer: mapLayers[id]?.count };
+        }, id);
+        check('the output picker offers only the node outputs, named after their tables', picker.labels.join(' | ') === '1 · ciudades (3) | 2 · madrid_utm (1) | 3 · marcas (1)' && picker.layer === 1, JSON.stringify(picker));
         check('the GPKG node lists which table goes out of each output', multi.layers.join(' | ') === 'Salida 1 · ciudades (3) | Salida 2 · madrid_utm (1) | Salida 3 · marcas (1)', multi.layers.join(' | '));
         // Otro GPKG con una sola tabla: sobran salidas, pero la que tiene un cable se queda.
         const kept = await page.evaluate((id) => { const b = addNode('geo_centroid'); editor.addConnection(id, b, 'output_3', 'input_1'); return b; }, id);

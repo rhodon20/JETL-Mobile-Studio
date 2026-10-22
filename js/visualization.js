@@ -9,6 +9,7 @@ import { showPortPickerToast } from './ui/notify.js';
 import { detectCrs, toDisplayCrs } from './core/crs.js';
 import { clearDraft } from './state/draft.js';
 import { setNodeOutputCount } from './engine.js';
+import { getNodeColor } from './ui/nodeColor.js';
 import { createMap, setNodeLayer, getNodeLayer, clearNodeLayers, setFocus, showPopup, fitBounds, visibleBounds } from './ui/mapEngine.js';
 
 // Variables de estado
@@ -150,7 +151,7 @@ function updatePortInspectorUI(nodeId) {
     }
     wrap.style.display = 'inline-flex';
     sel.setAttribute('data-node-id', String(nodeId));
-    sel.innerHTML = ports.map((p) => `<option value="${p}">${p}</option>`).join('');
+    sel.replaceChildren(...ports.map((p) => new Option(_portLabel(nodeId, p), p)));
     const current = nodeViewPortById[nodeId] && ports.includes(nodeViewPortById[nodeId]) ? nodeViewPortById[nodeId] : ports[0];
     sel.value = current;
 }
@@ -166,13 +167,13 @@ function _getCachedNodeEntries() {
         if (!meta || !meta.data) return false;
         const d = meta.data;
         if (d && d.type === 'FeatureCollection') return true;
-        return _listOutputPorts(d).length > 0;
+        return _listOutputPorts(d, id).length > 0;
     });
 
     ids.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
     return ids.map((id) => {
         const d = executionData[id].data;
-        const ports = _listOutputPorts(d);
+        const ports = _listOutputPorts(d, id);
         const portCounts = {};
         let total = 0;
         if (d && d.type === 'FeatureCollection') {
@@ -358,7 +359,7 @@ function updateFeatureCacheBrowserUI() {
         featureCacheBrowserState.port = fallbackPort;
     } else {
         portSel.disabled = false;
-        portSel.innerHTML = hit.ports.map((p) => `<option value="${p}">${p} (${hit.portCounts[p] || 0})</option>`).join('');
+        portSel.replaceChildren(...hit.ports.map((p) => new Option(_portLabel(hit.id, p), p)));
         const chosenPort = featureCacheBrowserState.port && hit.ports.includes(featureCacheBrowserState.port)
             ? featureCacheBrowserState.port
             : hit.ports[0];
@@ -548,11 +549,27 @@ function setMapPerfIndicator(info) {
     el.style.display = 'block';
 }
 
-function _listOutputPorts(data) {
+// Salidas con datos que el nodo tiene de verdad: los lectores multisalida rellenan
+// hasta 16 (readerMultiOutputCompat), aunque el GPKG tenga 4 tablas y el nodo 4 salidas.
+function _listOutputPorts(data, nodeId) {
     if (!data || typeof data !== 'object' || data.type) return [];
+    const node = editor && editor.drawflow ? editor.drawflow.drawflow.Home.data[nodeId] : null;
+    const existing = node && node.outputs ? Object.keys(node.outputs) : [];
     return Object.keys(data)
         .filter(k => /^output_\d+$/.test(k) && data[k] && data[k].type === 'FeatureCollection')
+        .filter(k => !existing.length || existing.includes(k))
         .sort((a, b) => parseInt(a.split('_')[1], 10) - parseInt(b.split('_')[1], 10));
+}
+
+// Texto de cada salida: su número de entidades y, en los lectores por capas, la tabla.
+function _portLabel(nodeId, port) {
+    const meta = executionData[nodeId];
+    const fc = meta && meta.data ? meta.data[port] : null;
+    const index = parseInt(String(port).split('_')[1], 10) - 1;
+    const file = window._file_cache && window._file_cache['file_' + nodeId];
+    const layers = file && file.metadata && Array.isArray(file.metadata.layers) ? file.metadata.layers : null;
+    const name = layers && layers[index] && layers[index].name ? layers[index].name : port;
+    return `${name} (${_countFromFC(fc).toLocaleString()})`;
 }
 
 function _resolveNodePortData(nodeId, preferredPort) {
@@ -560,7 +577,7 @@ function _resolveNodePortData(nodeId, preferredPort) {
     if (!meta || !meta.data) return { data: null, port: null, ports: [] };
     const raw = meta.data;
     if (raw && raw.type === 'FeatureCollection') return { data: raw, port: null, ports: [] };
-    const ports = _listOutputPorts(raw);
+    const ports = _listOutputPorts(raw, nodeId);
     if (ports.length === 0) return { data: null, port: null, ports: [] };
     const chosen = (preferredPort && ports.includes(preferredPort))
         ? preferredPort
@@ -571,7 +588,7 @@ function _resolveNodePortData(nodeId, preferredPort) {
 function _choosePortInteractive(nodeId, ports) {
     if (!ports || ports.length <= 1) return Promise.resolve(ports && ports[0] ? ports[0] : null);
     const current = nodeViewPortById[nodeId] || ports[0];
-    return showPortPickerToast(nodeId, ports, current);
+    return showPortPickerToast(nodeId, ports, current, ports.map((p) => _portLabel(nodeId, p)));
 }
 
 function resolveNodeDisplayData(nodeId, preferredPort = null) {
@@ -631,7 +648,7 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     const nodeName = editor.getNodeFromId(id).name;
     const tool = TOOL_REGISTRY[nodeName];
     const customStyle = data._custom_style || null;
-    const baseColor = (customStyle && customStyle.color) ? customStyle.color : (tool.color || '#3388ff');
+    const baseColor = (customStyle && customStyle.color) ? customStyle.color : (getNodeColor(id) || tool.color || '#3388ff');
     const portLabel = activePort ? ` [${activePort}]` : '';
     currentSymbologyNode = id;
     setupSymbologyPanel(id, data);

@@ -52,7 +52,9 @@ function renderToast(m, type) {
 JETLEvents.on('log', (e) => renderLogEntry(e.message, e.level));
 JETLEvents.on('toast', (e) => renderToast(e.message, e.type));
 
-function showPortPickerToast(nodeId, ports, currentPort) {
+// Lista de salidas para elegir cuál ver; `labels` (opcional) es el texto de cada una
+// (nombre de la tabla y entidades). Es texto de archivo: nunca HTML.
+function showPortPickerToast(nodeId, ports, currentPort, labels = ports) {
     return new Promise((resolve) => {
         const t = document.getElementById('toast');
         const msgEl = document.getElementById('toast-msg');
@@ -64,17 +66,23 @@ function showPortPickerToast(nodeId, ports, currentPort) {
             toastAutoHideTimer = null;
         }
         const fallback = currentPort || ports[0];
-        const buttons = ports.map((p) => {
-            const active = p === fallback;
-            const bg = active ? '#2ecc71' : '#2a2a2a';
-            const color = active ? '#111' : '#ddd';
-            return `<button type="button" data-toast-port="${p}" style="border:1px solid #555;background:${bg};color:${color};padding:4px 8px;border-radius:12px;cursor:pointer;font-size:12px">${p}</button>`;
-        }).join('');
-
-        msgEl.innerHTML = `<span style="margin-right:6px">Nodo #${nodeId}: elige puerto</span>${buttons}`;
+        const title = document.createElement('div');
+        title.className = 'port-picker-title';
+        title.textContent = `Nodo #${nodeId}: elige salida`;
+        const list = document.createElement('div');
+        list.className = 'port-picker-list';
+        ports.forEach((p, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'port-picker-btn' + (p === fallback ? ' active' : '');
+            button.dataset.toastPort = p;
+            button.textContent = `${index + 1} · ${labels[index] || p}`;
+            list.appendChild(button);
+        });
+        msgEl.replaceChildren(title, list);
         t.style.borderLeft = '4px solid #3498db';
         t.style.pointerEvents = 'auto';
-        t.className = 'visible';
+        t.className = 'visible port-picker';
         anime.remove(t);
         anime({ targets: t, translateY: [50, 0], opacity: [0, 1], scale: [0.9, 1], easing: 'spring(1, 80, 10, 0)', duration: 500 });
 
@@ -95,7 +103,8 @@ function showPortPickerToast(nodeId, ports, currentPort) {
 
         t.addEventListener('click', onClick);
         document.addEventListener('keydown', onEsc);
-        const ttl = setTimeout(() => finish(fallback), 7000);
+        // Con muchas tablas hace falta tiempo para leer la lista.
+        const ttl = setTimeout(() => finish(fallback), 7000 + ports.length * 1000);
 
         toastInteractiveCleanup = () => {
             t.removeEventListener('click', onClick);

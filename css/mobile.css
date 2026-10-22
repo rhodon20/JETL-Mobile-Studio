@@ -593,6 +593,63 @@
         min-height: 66px;
     }
 
+    /* Catálogo táctil: tarjetas de categoría y filas grandes, como el resto de hojas. */
+    #sidebar-content { padding: 0 14px 16px; }
+    #sidebar-content .cat-group { border: 0; margin-bottom: 8px; }
+    #sidebar-content .cat-title {
+        min-height: 56px;
+        padding: 8px 14px 8px 8px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, .04);
+        color: #e7e7e9;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    #sidebar-content .cat-title .cat-icon {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: #2a2c30;
+        color: #e67e22;
+        font-size: 16px;
+    }
+    #sidebar-content .cat-title.active { background: rgba(52, 152, 219, .12); }
+    #sidebar-content .cat-title .cat-chevron { color: #8d8d93; font-size: 13px; }
+    #sidebar-content .cat-items { padding: 6px 0 4px 12px; }
+    #sidebar-content .node-item {
+        min-height: 50px;
+        margin: 0 0 6px;
+        padding: 6px 12px 6px 6px;
+        border-radius: 12px;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, .06);
+        color: #e7e7e9;
+        font-size: 15px;
+    }
+    #sidebar-content .node-item:hover { transform: none; }
+    #sidebar-content .node-item:active { background: rgba(52, 152, 219, .14); border-color: rgba(52, 152, 219, .45); }
+    #sidebar-content .node-item i {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        border-radius: 10px;
+        background: #2a2c30;
+        font-size: 15px;
+    }
+    #sidebar-content .node-item::after {
+        content: '+';
+        margin-left: auto;
+        color: #8d8d93;
+        font-size: 20px;
+        line-height: 1;
+    }
+
     #toast {
         bottom: calc(var(--mobile-dock-height) + var(--mobile-safe-bottom) + 14px);
         max-width: calc(100vw - 24px);
