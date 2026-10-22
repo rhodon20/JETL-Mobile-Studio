@@ -64,6 +64,18 @@ geopackage('madrid_25830.gpkg', [('ciudades', 25830, 'ETRS89 / UTM zone 30N', UT
 # Dos tablas en sistemas distintos: una salida por tabla y todo pasado a EPSG:4326.
 geopackage('varias_tablas.gpkg', [('ciudades', 4326, 'WGS 84', WGS84_WKT, CITIES),
                                   ('madrid_utm', 25830, 'ETRS89 / UTM zone 30N', UTM30_WKT, MADRID_UTM)])
+# Tabla que la librería de GeoPackage rechaza («No GEOMETRY column was found»): está en
+# gpkg_contents pero no en gpkg_geometry_columns, y guarda una línea 3D con envolvente.
+db = sqlite3.connect(path('varias_tablas.gpkg'))
+db.execute('CREATE TABLE marcas (fid INTEGER PRIMARY KEY AUTOINCREMENT, geom LINESTRINGZ, tipo TEXT)')
+db.execute("INSERT INTO gpkg_contents (table_name,data_type,identifier,srs_id) VALUES ('marcas','features','marcas',4326)")
+line = [(-3.71, 40.41, 650.0), (-3.69, 40.43, 655.5)]
+envelope = struct.pack('<6d', -3.71, -3.69, 40.41, 40.43, 650.0, 655.5)  # minx, maxx, miny, maxy, minz, maxz
+header = b'GP' + bytes([0, 0b00000101]) + struct.pack('<i', 4326)  # little endian, envolvente XYZ (indicador 2)
+wkb = struct.pack('<bII', 1, 1002, len(line)) + b''.join(struct.pack('<3d', *c) for c in line)  # ISO LineString Z
+db.execute('INSERT INTO marcas (geom, tipo) VALUES (?, ?)', (header + envelope + wkb, 'continua'))
+db.commit()
+db.close()
 
 # GeoParquet 1.1 estándar (geometría WKB y metadatos «geo»), Parquet con WKT y Parquet sin geometría.
 names = [c[0] for c in CITIES]

@@ -96,12 +96,15 @@ try {
                 layers: [...document.querySelectorAll(`#node-${id} [data-reader-layers] .reader-layer-row`)].map((r) => r.textContent),
                 first: [d.output_1.features.length, d.output_1.features[0]?.properties?._table],
                 second: [d.output_2.features.length, d.output_2.features[0]?.geometry?.coordinates, d.output_2.metadata?.crs],
-                third: d.output_3.features.length
+                third: [d.output_3.features.length, d.output_3.features[0]?.geometry?.type, d.output_3.features[0]?.geometry?.coordinates?.[0]?.[2]],
+                fourth: d.output_4.features.length
             };
         }, id);
         const [n2, c2, crs2] = multi.second;
-        check('a GeoPackage with several tables gives one output per table', multi.outputs === 16 && multi.first[0] === 3 && multi.first[1] === 'ciudades' && n2 === 1 && multi.third === 0, JSON.stringify(multi));
-        check('the GPKG node lists which table goes out of each output', multi.layers.join(' | ') === 'Salida 1 · ciudades (3) | Salida 2 · madrid_utm (1)', multi.layers.join(' | '));
+        check('a GeoPackage with several tables gives one output per table', multi.outputs === 16 && multi.first[0] === 3 && multi.first[1] === 'ciudades' && n2 === 1 && multi.fourth === 0, JSON.stringify(multi));
+        // Una tabla sin su geometría registrada (la librería rechazaba el archivo entero) se lee igual, con Z.
+        check('a table whose geometry column is not registered is still read', multi.third[0] === 1 && multi.third[1] === 'LineString' && multi.third[2] === 650, JSON.stringify(multi.third));
+        check('the GPKG node lists which table goes out of each output', multi.layers.join(' | ') === 'Salida 1 · ciudades (3) | Salida 2 · madrid_utm (1) | Salida 3 · marcas (1)', multi.layers.join(' | '));
         check('tables with different CRS are all brought to EPSG:4326', crs2 === 'EPSG:4326' && Math.abs(c2[0] + 3.7) < 0.01 && Math.abs(c2[1] - 40.42) < 0.01, JSON.stringify(multi.second));
     }
 

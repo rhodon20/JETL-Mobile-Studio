@@ -4118,42 +4118,70 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         return geometry;
     }
 
-    function _srsCode(srs) {
-        return srs && srs.organization && srs.organization_coordsys_id > 0 ? `${String(srs.organization).toUpperCase()}:${srs.organization_coordsys_id}` : null;
+    // Geometría de GeoPackage: cabecera «GP» (con envolvente opcional) + WKB.
+    function _gpkgGeometry(blob) {
+        if (!(blob instanceof Uint8Array) || blob.length < 8 || blob[0] !== 0x47 || blob[1] !== 0x50) return null;
+        const flags = blob[3];
+        if ((flags >> 4) & 1) return null; // geometría vacía
+        const envelope = [0, 32, 48, 48, 64][(flags >> 1) & 7];
+        if (envelope === undefined) throw new Error('Cabecera de geometría GeoPackage no válida');
+        return wkbToGeometry(blob.subarray(8 + envelope));
     }
+
+    const GPKG_GEOMETRY_TYPE = /^(GEOMETRY|POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION|CIRCULARSTRING|COMPOUNDCURVE|CURVEPOLYGON|MULTICURVE|MULTISURFACE|CURVE|SURFACE)(Z|M|ZM)?$/i;
+    const _sqlName = (name) => `"${String(name).replace(/"/g, '""')}"`;
 
     // Todas las tablas vectoriales, como en Desktop: cada entidad lleva su tabla en
     // `_table` y metadata.layers da el orden (el nodo GPKG Reader saca una por salida).
+    // Se lee con SQL y un decodificador propio, no con el modelo de tablas de la
+    // librería: éste rechaza el archivo entero si una tabla no tiene su columna de
+    // geometría registrada como espera, y QGIS o GDAL sí lo abren.
     // Si las tablas no comparten CRS se pasan todas a EPSG:4326.
     registerReader({
         exts: ['gpkg'],
         label: 'GeoPackage',
-        timeoutMs: 90000,
+        timeoutMs: 120000,
         read: async (file) => {
             const GP = await _geopackage();
             const gpkg = await GP.open(new Uint8Array(await file.arrayBuffer()));
+            const db = gpkg.connection;
             try {
-                const tables = typeof gpkg.getFeatureTables === 'function' ? gpkg.getFeatureTables() : [];
+                const tables = db.all("SELECT table_name, srs_id FROM gpkg_contents WHERE data_type = 'features' ORDER BY rowid");
                 if (!tables.length) throw new Error('El GeoPackage no tiene tablas vectoriales.');
+                const registered = new Map(db.all('SELECT table_name, column_name, srs_id FROM gpkg_geometry_columns').map((r) => [String(r.table_name).toLowerCase(), r]));
+                const srsById = new Map(db.all('SELECT srs_id, organization, organization_coordsys_id, definition FROM gpkg_spatial_ref_sys').map((r) => [r.srs_id, r]));
+                const warnings = [];
                 const layers = [];
-                for (const name of tables) {
-                    const dao = gpkg.getFeatureDao(name);
-                    const geometryColumn = dao.getGeometryColumnName();
-                    const srs = typeof dao.getSrs === 'function' ? dao.getSrs() : null;
+                for (const table of tables) {
+                    const name = table.table_name;
+                    if (!db.tableExists(name)) { warnings.push(`«${name}» figura en el índice pero no existe`); continue; }
+                    let geometryColumn = registered.get(String(name).toLowerCase())?.column_name || null;
+                    if (!geometryColumn) {
+                        // Sin registro: la columna cuyo tipo declarado sea de geometría.
+                        const column = db.all(`PRAGMA table_info(${_sqlName(name)})`).find((c) => GPKG_GEOMETRY_TYPE.test(String(c.type || '').trim()));
+                        geometryColumn = column ? column.name : null;
+                        warnings.push(geometryColumn ? `«${name}» no registra su geometría: se usa la columna «${geometryColumn}»` : `«${name}» no tiene columna de geometría: se lee como tabla`);
+                    }
+                    const srs = srsById.get(registered.get(String(name).toLowerCase())?.srs_id ?? table.srs_id);
                     const features = [];
-                    let count = 0;
-                    for (const raw of dao.queryForEach()) {
+                    let count = 0, unreadable = 0;
+                    for (const row of db.each(`SELECT * FROM ${_sqlName(name)}`)) {
                         if (count++ % 500 === 0) { _cancelled('Lectura de GeoPackage'); await new Promise((r) => setTimeout(r, 0)); }
-                        const row = dao.getRow(raw);
-                        const data = row.getGeometry();
-                        const geometry = data && data.geometry ? data.geometry.toGeoJSON() : null;
+                        let geometry = null;
+                        if (geometryColumn) {
+                            try { geometry = _gpkgGeometry(row[geometryColumn]); } catch (e) { unreadable++; }
+                        }
                         const properties = {};
-                        for (const key in row.values) if (key !== geometryColumn) properties[key] = _plainValue(row.values[key]);
+                        for (const key in row) if (key !== geometryColumn) properties[key] = _plainValue(row[key]);
                         properties._table = name;
                         features.push({ type: 'Feature', geometry, properties });
                     }
-                    layers.push({ name, crs: _srsCode(srs), wkt: srs && srs.definition, features });
+                    if (unreadable) warnings.push(`«${name}»: ${unreadable} geometrías no se pudieron leer (p. ej. curvas) y quedan vacías`);
+                    const crs = srs && srs.organization && srs.organization_coordsys_id > 0 ? `${String(srs.organization).toUpperCase()}:${srs.organization_coordsys_id}` : null;
+                    layers.push({ name, crs, wkt: srs && srs.definition, features });
                 }
+                if (warnings.length && window.log) warnings.forEach((w) => window.log(`GeoPackage: ${w}.`, 'warn'));
+                if (!layers.length) throw new Error('No se pudo leer ninguna tabla del GeoPackage.');
                 const crsList = [...new Set(layers.map((l) => l.crs || 'EPSG:4326'))];
                 if (crsList.length > 1) {
                     for (const layer of layers) {
@@ -4165,10 +4193,9 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
                     if (window.log) window.log(`GeoPackage con varios sistemas de referencia (${crsList.join(', ')}): se pasan todas las tablas a EPSG:4326.`, 'warn');
                 }
                 const fc = turf.featureCollection(layers.flatMap((l) => l.features));
-                const crs = layers[0].crs;
                 fc.metadata = { layers: layers.map((l) => ({ name: l.name, count: l.features.length })) };
                 // Las coordenadas llegan en el CRS de la tabla: se etiqueta para que el mapa lo reproyecte.
-                if (crs) fc.metadata.crs = crs;
+                if (layers[0].crs) fc.metadata.crs = layers[0].crs;
                 return fc;
             } finally {
                 if (typeof gpkg.close === 'function') { try { gpkg.close(); } catch (e) { /* ya cerrado */ } }
