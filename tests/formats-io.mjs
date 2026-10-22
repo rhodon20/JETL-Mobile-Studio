@@ -40,6 +40,7 @@ const READERS = [
     ['reader_parquet', 'ciudades.geoparquet.parquet', 'output_1', 3],
     ['reader_parquet', 'ciudades_wkt.parquet', 'output_1', 3],
     ['reader_parquet', 'tabla.parquet', 'output_1', 3],
+    ['reader_parquet', 'madrid_25830.parquet', 'output_1', 1],
     ['reader_parquet', 'tipos_variados.parquet', 'output_1', 3]
 ];
 
@@ -74,7 +75,8 @@ try {
         const near = (c, x, y) => Array.isArray(c) && Math.abs(c[0] - x) < 1e-6 && Math.abs(c[1] - y) < 1e-6;
         let ok = got.status === 'ok' && got.n === expected && got.props !== null;
         if (file === 'tabla.parquet') ok = ok && got.coords === null && /"poblacion":3300000/.test(got.props);
-        else if (file === 'madrid_25830.gpkg') ok = ok && got.crs === 'EPSG:25830' && near(got.coords, 440300, 4474500);
+        // En otro CRS se lee ya en EPSG:4326: los nodos de geoprocesamiento trabajan en grados.
+        else if (/madrid_25830/.test(file)) ok = ok && got.crs === 'EPSG:4326' && Math.abs(got.coords[0] + 3.7) < 0.01 && Math.abs(got.coords[1] - 40.42) < 0.01;
         else ok = ok && near(got.coords, -3.7, 40.42);
         // Int64 de Parquet y GPKG llegan como número, no como BigInt.
         if (/parquet|gpkg/.test(file)) ok = ok && /"poblacion":3300000/.test(got.props);
@@ -86,10 +88,21 @@ try {
             const wrong = Object.entries(expectedTypes).filter(([k, v]) => p[k] !== v).map(([k]) => `${k}=${JSON.stringify(p[k])}`);
             check('Parquet types become plain values (dates, decimals, lists, large strings)', wrong.length === 0 && Math.abs(p.densidad - 5390.5) < 1e-6 && JSON.parse(p.centro).x === -3.7, wrong.join(', ') || got.props);
         }
-        if (file === 'madrid_25830.gpkg') {
-            // Se dibuja sobre Madrid: el mapa reproyecta según metadata.crs.
-            const center = await page.evaluate(async (id) => { await showNodeResult(id, false); const c = map.getCenter(); JETLNativeNav('flow'); return { lng: c.lng, lat: c.lat }; }, id);
-            check('a GeoPackage in EPSG:25830 is drawn over Madrid', Math.abs(center.lng + 3.7) < 0.05 && Math.abs(center.lat - 40.42) < 0.05, JSON.stringify(center));
+        if (/madrid_25830/.test(file)) {
+            // Un nodo posterior (CenterPoint) recibe grados y su resultado se dibuja sobre
+            // Madrid; antes calculaba con metros como si fueran grados y salía fuera del mapa.
+            const after = await page.evaluate(async (id) => {
+                const c = addNode('geo_centroid');
+                editor.addConnection(id, c, 'output_1', 'input_1');
+                await runEngine();
+                const point = executionData[c]?.data?.features?.[0]?.geometry?.coordinates;
+                try { await showNodeResult(c, false); } catch (e) { return { point, error: e.message }; }
+                const center = map.getCenter();
+                JETLNativeNav('flow');
+                return { point, center: [center.lng, center.lat] };
+            }, id);
+            const madrid = (c) => Array.isArray(c) && Math.abs(c[0] + 3.7) < 0.05 && Math.abs(c[1] - 40.42) < 0.05;
+            check(`a node after ${file} works in degrees and is drawn over Madrid`, madrid(after.point) && madrid(after.center), JSON.stringify(after));
         }
     }
 
@@ -163,7 +176,11 @@ try {
         const gpkgBack = await JETLFormats.readFile(new File([await gpkgUtm.blob.arrayBuffer()], 'u.gpkg'));
         out.gpkgUtm = { coords: gpkgBack.features[0].geometry.coordinates, crs: gpkgBack.metadata?.crs, table: gpkgBack.features[0].properties._table };
         const parquetUtm = await JETLFormats.writeFile('parquet', utm);
-        out.parquetUtmCrs = (await JETLFormats.readFile(new File([await parquetUtm.blob.arrayBuffer()], 'u.parquet'))).metadata?.crs;
+        out.parquetUtm = (await JETLFormats.readFile(new File([await parquetUtm.blob.arrayBuffer()], 'u.parquet'))).metadata;
+        // Un código que no está en js/core/crs.js: su definición sale de la librería de GeoPackage.
+        const wgsUtm = await JETLFormats.writeFile('parquet', { ...utm, metadata: { crs: 'EPSG:32630' } });
+        const wgsUtmBack = await JETLFormats.readFile(new File([await wgsUtm.blob.arrayBuffer()], 'w.parquet'));
+        out.parquetOther = { crs: wgsUtmBack.metadata?.crs, coords: wgsUtmBack.features[0].geometry.coordinates };
         return out;
     });
     for (const ext of ['gpkg', 'parquet']) {
@@ -172,7 +189,9 @@ try {
     }
     const gu = roundTrip.gpkgUtm;
     check('GeoPackage export brings other CRS to EPSG:4326 by itself', gu.crs === 'EPSG:4326' && Math.abs(gu.coords[0] + 3.7) < 0.01 && Math.abs(gu.coords[1] - 40.42) < 0.01, JSON.stringify(gu));
-    check('GeoParquet keeps the CRS of the data', roundTrip.parquetUtmCrs === 'EPSG:25830', String(roundTrip.parquetUtmCrs));
+    const po = roundTrip.parquetOther;
+    check('a Parquet in a less common CRS is read in EPSG:4326 too', po.crs === 'EPSG:4326' && Math.abs(po.coords[0] + 3.7) < 0.01 && Math.abs(po.coords[1] - 40.42) < 0.01, JSON.stringify(po));
+    check('GeoParquet is written in the CRS of the data', roundTrip.parquetUtm?.source_crs === 'EPSG:25830' && roundTrip.parquetUtm?.crs === 'EPSG:4326', JSON.stringify(roundTrip.parquetUtm));
 
     // WKB de otras herramientas: EWKB de PostGIS con SRID, ISO con Z y M, big endian.
     const wkb = await page.evaluate(() => {

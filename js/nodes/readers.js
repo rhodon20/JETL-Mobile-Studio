@@ -553,7 +553,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         run: async (id) => {
             const v = window._file_cache && window._file_cache['file_' + id];
             if (!v) throw new Error("Sin archivo");
-            // Una salida por tabla, en el orden del GeoPackage (metadata.layers); cada una conserva el CRS.
+            // Una salida por tabla, en el orden del GeoPackage (metadata.layers), ya en EPSG:4326.
             const layers = (v.metadata && v.metadata.layers) || [{ name: null }];
             if (layers.length > READER_MULTI_OUTPUTS && typeof window.log === 'function') window.log(`El GeoPackage tiene ${layers.length} tablas: sólo hay ${READER_MULTI_OUTPUTS} salidas.`, 'warn');
             const outputs = {};

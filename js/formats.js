@@ -437,11 +437,13 @@
         return data && data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
     }
 
-    // --- Reproyección a EPSG:4326 (GeoPackage con CRS mezclados y exportación) ---
+    // --- Reproyección a EPSG:4326 (lectura de GPKG/Parquet y exportación a GPKG) ---
     // proj4 ya viene con el runtime; las definiciones EPSG salen de la propia librería
-    // de GeoPackage (más de 4000), o del WKT que guarda el GeoPackage.
+    // de GeoPackage (más de 4000; se carga sólo si hace falta), o del WKT que guarda el
+    // GeoPackage. proj4 2.9 no entiende el PROJJSON de GeoParquet.
     async function _to4326(GP, crs, wkt) {
         const proj4 = window.proj4 || await window.JETLLoadScriptOnce('js/vendor/proj4.js', 'proj4');
+        if (!proj4.defs(crs) && !wkt && !GP) GP = await _geopackage();
         const definition = (proj4.defs(crs) && crs) || (GP && GP.proj4Defs && GP.proj4Defs[crs]) || wkt;
         if (!definition) throw new Error(`No se conoce el sistema de referencia ${crs} para pasarlo a EPSG:4326.`);
         const project = proj4(definition, 'EPSG:4326');
@@ -449,6 +451,17 @@
         const coords = (c) => (typeof c[0] === 'number' ? point(c) : c.map(coords));
         const geometry = (g) => !g ? g : g.type === 'GeometryCollection' ? { ...g, geometries: g.geometries.map(geometry) } : { ...g, coordinates: coords(g.coordinates) };
         return geometry;
+    }
+
+    // Los nodos de geoprocesamiento (turf) trabajan en grados: un lector entrega sus
+    // entidades en EPSG:4326 aunque el archivo esté en otro CRS (como hace shpjs con el
+    // .prj). El CRS original queda en metadata.source_crs.
+    async function _features4326(features, crs, wkt, GP, what) {
+        const project = await _to4326(GP, crs, wkt);
+        for (let i = 0; i < features.length; i++) {
+            if (i % 2000 === 0) { _cancelled(what); await new Promise((r) => setTimeout(r, 0)); }
+            features[i].geometry = project(features[i].geometry);
+        }
     }
 
     // Geometría de GeoPackage: cabecera «GP» (con envolvente opcional) + WKB.
@@ -515,20 +528,14 @@
                 }
                 if (warnings.length && window.log) warnings.forEach((w) => window.log(`GeoPackage: ${w}.`, 'warn'));
                 if (!layers.length) throw new Error('No se pudo leer ninguna tabla del GeoPackage.');
-                const crsList = [...new Set(layers.map((l) => l.crs || 'EPSG:4326'))];
-                if (crsList.length > 1) {
-                    for (const layer of layers) {
-                        if (!layer.crs || layer.crs === 'EPSG:4326') continue;
-                        const project = await _to4326(GP, layer.crs, layer.wkt);
-                        layer.features.forEach((f) => { f.geometry = project(f.geometry); });
-                        layer.crs = 'EPSG:4326';
-                    }
-                    if (window.log) window.log(`GeoPackage con varios sistemas de referencia (${crsList.join(', ')}): se pasan todas las tablas a EPSG:4326.`, 'warn');
+                // Sin CRS declarado (srs_id 0/-1) se asume EPSG:4326.
+                const sourceCrs = [...new Set(layers.map((l) => l.crs || 'EPSG:4326'))];
+                for (const layer of layers) {
+                    if (layer.crs && layer.crs !== 'EPSG:4326') await _features4326(layer.features, layer.crs, layer.wkt, GP, 'Lectura de GeoPackage');
                 }
+                if (window.log && sourceCrs.some((c) => c !== 'EPSG:4326')) window.log(`GeoPackage en ${sourceCrs.join(', ')}: se lee en EPSG:4326.`, 'info');
                 const fc = turf.featureCollection(layers.flatMap((l) => l.features));
-                fc.metadata = { layers: layers.map((l) => ({ name: l.name, count: l.features.length })) };
-                // Las coordenadas llegan en el CRS de la tabla: se etiqueta para que el mapa lo reproyecte.
-                if (layers[0].crs) fc.metadata.crs = layers[0].crs;
+                fc.metadata = { crs: 'EPSG:4326', source_crs: sourceCrs.join(', '), layers: layers.map((l) => ({ name: l.name, count: l.features.length, crs: l.crs || 'EPSG:4326' })) };
                 return fc;
             } finally {
                 if (typeof gpkg.close === 'function') { try { gpkg.close(); } catch (e) { /* ya cerrado */ } }
@@ -580,8 +587,12 @@
                 features.push({ type: 'Feature', geometry, properties });
             }
             const fc = turf.featureCollection(features);
-            const crs = geo && geo.columns ? _geoparquetCrs(geo.columns[geometryName]) : null;
-            if (crs && crs !== 'OGC:CRS84') fc.metadata = { crs };
+            const crs = geo && geo.columns ? _collectionCrs({ metadata: { crs: _geoparquetCrs(geo.columns[geometryName]) } }) : null;
+            if (crs && crs !== 'EPSG:4326') {
+                await _features4326(features, crs, null, null, 'Lectura de Parquet');
+                if (window.log) window.log(`Parquet en ${crs}: se lee en EPSG:4326.`, 'info');
+                fc.metadata = { crs: 'EPSG:4326', source_crs: crs };
+            }
             if (!geometryName && window.log) window.log('Parquet sin columna de geometría: se lee como tabla de atributos.', 'warn');
             return fc;
         }

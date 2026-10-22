@@ -11,6 +11,13 @@ const CRS_DEFS = {
     'EPSG:23030': '+proj=utm +zone=30 +ellps=intl +towgs84=-87,-98,-121,0,0,0,0 +units=m +no_defs +type=crs'
 };
 
+// Se registran al cargar (proj4 llega antes, con el runtime): así los lectores de
+// js/formats.js también las encuentran sin cargar la librería de GeoPackage (5 MB),
+// que sólo hace falta para otros códigos EPSG.
+if (typeof proj4 !== 'undefined') {
+    Object.entries(CRS_DEFS).forEach(([crs, definition]) => { if (!proj4.defs(crs)) proj4.defs(crs, definition); });
+}
+
 // 'EPSG:25830', '25830', 'urn:ogc:def:crs:EPSG::25830' -> 'EPSG:25830'; CRS84 -> 'EPSG:4326'.
 function normalizeCrs(value) {
     const text = String(value || '').trim();

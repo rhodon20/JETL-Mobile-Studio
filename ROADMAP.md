@@ -27,12 +27,16 @@
 3. **Lectores y escritores de formatos** (21 de octubre): GeoPackage y Parquet no
    funcionaban (lectura y escritura); arreglados, con librerías en `js/vendor/`
    (sin CDN, disponibles sin conexión) y `tests/formats-io.mjs` con archivos
-   reales. Pendiente: abrir en QGIS un GeoParquet/GeoPackage exportado y medir
-   archivos grandes en el móvil.
+   reales. El 22 de octubre: en otro CRS se leen en EPSG:4326 (los nodos de turf
+   calculaban con metros como si fueran grados y su resultado no se veía); con el
+   Parquet del usuario (EPSG:25830) cuesta ~1 s más en escritorio. Pendiente: abrir
+   en QGIS un GeoParquet/GeoPackage exportado y medir archivos grandes en el móvil.
 4. **Visor con MapLibre: hecho** (22 de octubre, antes de la prueba cerrada por
    decisión del usuario; `js/ui/mapEngine.js`). Con el Parquet del usuario (174.022
-   polígonos): todas pintadas, 0,8 s de hilo principal y ~8,5 s del worker de
-   MapLibre preparando teselas (con aviso «Preparando…»). Falta medir en un móvil
+   polígonos): todas cargadas, 0,8 s de hilo principal y ~8,5 s del worker de
+   MapLibre preparando teselas (con aviso «Preparando…»). Son cuadrados de 1 m:
+   al encuadre inicial (zoom 14,7) miden menos de un píxel y MapLibre no los
+   dibuja hasta acercar (a zoom 16 se ven ~30.000). Falta medir en un móvil
    real la fluidez y la memoria del worker. Medición previa, el 22 de octubre
    en Chromium sin GPU (WebGL por software, peor que un móvil real), 174.022
    polígonos pequeños como el Parquet del usuario:

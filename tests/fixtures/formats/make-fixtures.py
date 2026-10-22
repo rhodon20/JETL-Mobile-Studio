@@ -85,6 +85,11 @@ geo = {'version': '1.1.0', 'primary_column': 'geometry', 'columns': {'geometry':
 pq.write_table(geoparquet.replace_schema_metadata({b'geo': json.dumps(geo).encode()}), path('ciudades.geoparquet.parquet'))
 pq.write_table(pa.table({'nombre': names, 'poblacion': population, 'geometry': [f'POINT ({c[1]} {c[2]})' for c in CITIES]}), path('ciudades_wkt.parquet'))
 pq.write_table(pa.table({'nombre': names, 'poblacion': population}), path('tabla.parquet'))
+# GeoParquet en EPSG:25830 (como los de GeoPandas): el lector lo pasa a EPSG:4326.
+geo_utm = {'version': '1.0.0', 'primary_column': 'geometry', 'columns': {'geometry': {'encoding': 'WKB', 'geometry_types': ['Point'],
+           'crs': {'type': 'ProjectedCRS', 'name': 'ETRS89 / UTM zone 30N', 'id': {'authority': 'EPSG', 'code': 25830}}}}}
+madrid_utm = pa.table({'nombre': ['Madrid'], 'poblacion': pa.array([3300000], pa.int64()), 'geometry': [wkb_point(440300, 4474500)]})
+pq.write_table(madrid_utm.replace_schema_metadata({b'geo': json.dumps(geo_utm).encode()}), path('madrid_25830.parquet'))
 # Tipos que generan pandas, GeoPandas o DuckDB: texto y binario «large», diccionario, fechas, decimal, listas...
 geo_large = {'version': '1.1.0', 'primary_column': 'geometry', 'columns': {'geometry': {'encoding': 'WKB', 'geometry_types': ['Point']}}}
 varied = pa.table({
