@@ -294,6 +294,24 @@ function snapNodeToGrid(nodeId) {
     return { dx, dy };
 }
 
+// Ajusta el número de salidas de un nodo (lectores con una salida por capa, como
+// Desktop). Nunca quita una salida conectada: si sobran y tienen cables, se quedan.
+function setNodeOutputCount(nodeId, count) {
+    const node = editor.getNodeFromId(nodeId);
+    if (!node) return;
+    const target = Math.max(1, count);
+    let current = Object.keys(node.outputs || {}).length;
+    while (current > target && !(node.outputs[`output_${current}`]?.connections || []).length) {
+        editor.removeNodeOutput(nodeId, `output_${current}`);
+        current--;
+    }
+    while (current < target) {
+        editor.addNodeOutput(nodeId);
+        current++;
+    }
+    editor.updateConnectionNodes('node-' + nodeId);
+}
+
 // Mueve un nodo (datos y DOM) y redibuja sus conexiones.
 function moveNodeTo(nodeId, x, y) {
     const node = editor.drawflow.drawflow.Home.data[nodeId];
@@ -614,7 +632,7 @@ Object.assign(window, { addNode, addNodeClick, runEngine, runEnginePartial, canc
 export {
     selectedCanvasConnection, setSelectedCanvasConnection, updateLocalDraftUI,
     startNewProject, restoreLocalDraft, addNode, addNodeClick, runEngine, runEnginePartial,
-    cancelEngineRun, saveProject, loadProject, duplicateNode, duplicateNodes, removeNodes, moveNodeTo,
+    cancelEngineRun, saveProject, loadProject, duplicateNode, duplicateNodes, removeNodes, moveNodeTo, setNodeOutputCount,
     snapNodeToGrid, isGridSnapEnabled, setGridSnapEnabled,
     getSingleSelectedCanvasNodeId
 };

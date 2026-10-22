@@ -8,6 +8,7 @@
 import { showPortPickerToast } from './ui/notify.js';
 import { detectCrs, toDisplayCrs } from './core/crs.js';
 import { clearDraft } from './state/draft.js';
+import { setNodeOutputCount } from './engine.js';
 
 // Variables de estado
 let selectedFeatureIndex = null;
@@ -1350,7 +1351,10 @@ async function loadFile(input, _) {
         if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
 
         if (lbl) { lbl.innerText = `${file.name} (${geojson.features.length} fts)`; lbl.style.color = "#2ecc71"; }
-        renderReaderLayers(nodeEl, geojson.metadata && geojson.metadata.layers);
+        const layers = geojson.metadata && geojson.metadata.layers;
+        renderReaderLayers(nodeEl, layers);
+        // Una salida por capa, como Desktop: el nodo no muestra 16 puertos si hay 4 tablas.
+        if (nodeId && Array.isArray(layers) && nodeEl && nodeEl.querySelector('[data-reader-layers]')) setNodeOutputCount(nodeId, Math.min(layers.length, 16));
         if (loader) loader.style.display = 'none';
     } catch (e) {
         console.warn(e);

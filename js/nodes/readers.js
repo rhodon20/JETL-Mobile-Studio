@@ -547,8 +547,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_gpkg: {
-        cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
-        help: 'Lee todas las tablas vectoriales de un GeoPackage, cada una por una salida (como en Desktop).',
+        cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee todas las tablas vectoriales de un GeoPackage, cada una por una salida (como en Desktop): al elegir el archivo el nodo tiene tantas salidas como tablas.',
         tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".gpkg"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div><div class="reader-layer-list" data-reader-layers></div>`,
         run: async (id) => {
             const v = window._file_cache && window._file_cache['file_' + id];
