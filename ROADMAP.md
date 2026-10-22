@@ -29,7 +29,21 @@
    (sin CDN, disponibles sin conexión) y `tests/formats-io.mjs` con archivos
    reales. Pendiente: abrir en QGIS un GeoParquet/GeoPackage exportado y medir
    archivos grandes en el móvil.
-4. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
+4. **Visor con MapLibre** (después de la prueba cerrada). Medido el 22 de octubre
+   en Chromium sin GPU (WebGL por software, peor que un móvil real), 174.022
+   polígonos pequeños como el Parquet del usuario:
+   | | Primer pintado | Mover el mapa (mediana / p90 por paso) | Memoria (hilo principal) |
+   |---|---|---|---|
+   | Leaflet, todos | 1,4 s | 7,4 s / 9,4 s (inusable) | 419 MB |
+   | MapLibre, todos | 5,6 s | 33 ms / 917 ms | 64 MB (+ copia en su worker, sin medir) |
+   | Leaflet, 5.000 (hoy) | 0,08 s | 33 ms / 200 ms | 15 MB |
+   Con MapLibre se podrían mostrar todas las entidades con fluidez; ya se carga
+   para el mapa base. Falta medir en un móvil real y la memoria de su worker.
+   La lectura de ese Parquet (~7 s en escritorio, ~34 s con la CPU a 1/4) es sobre
+   todo descompresión y crear ~10 millones de valores; extraer columnas con
+   `toArray` no mejoró (medido). Bajarla exigiría leer en un worker o no
+   materializar todas las columnas.
+5. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
 
 ## Ideas para más adelante (sin fecha)
