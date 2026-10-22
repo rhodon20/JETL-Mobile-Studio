@@ -547,10 +547,24 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_gpkg: {
-        cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee la primera tabla vectorial de un GeoPackage, con su sistema de referencia.',
-        tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".gpkg"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div>`,
-        run: async (id) => { const v = window._file_cache && window._file_cache['file_' + id]; if (!v) throw new Error("Sin archivo"); return v; }
+        cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
+        help: 'Lee todas las tablas vectoriales de un GeoPackage, cada una por una salida (como en Desktop).',
+        tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".gpkg"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div><div class="reader-layer-list" data-reader-layers></div>`,
+        run: async (id) => {
+            const v = window._file_cache && window._file_cache['file_' + id];
+            if (!v) throw new Error("Sin archivo");
+            // Una salida por tabla, en el orden del GeoPackage (metadata.layers); cada una conserva el CRS.
+            const layers = (v.metadata && v.metadata.layers) || [{ name: null }];
+            if (layers.length > READER_MULTI_OUTPUTS && typeof window.log === 'function') window.log(`El GeoPackage tiene ${layers.length} tablas: sólo hay ${READER_MULTI_OUTPUTS} salidas.`, 'warn');
+            const outputs = {};
+            layers.slice(0, READER_MULTI_OUTPUTS).forEach((layer, index) => {
+                const features = layer.name === null ? v.features : v.features.filter((f) => f.properties && f.properties._table === layer.name);
+                const fc = turf.featureCollection(features);
+                if (v.metadata && v.metadata.crs) fc.metadata = { crs: v.metadata.crs };
+                outputs[`output_${index + 1}`] = fc;
+            });
+            return readerMultiOutputCompat(outputs);
+        }
     },
 
     reader_parquet: {

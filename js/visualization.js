@@ -1291,6 +1291,18 @@ function syncTableFocus() {
 }
 
 
+// Lectores con una salida por capa (GPKG): qué capa sale por cada salida.
+function renderReaderLayers(nodeEl, layers) {
+    const list = nodeEl && nodeEl.querySelector('[data-reader-layers]');
+    if (!list) return;
+    list.replaceChildren(...(Array.isArray(layers) ? layers : []).map((layer, index) => {
+        const row = document.createElement('div');
+        row.className = 'reader-layer-row';
+        row.textContent = `Salida ${index + 1} · ${layer.name} (${layer.count})`;
+        return row;
+    }));
+}
+
 async function loadFile(input, _) {
     const file = input.files[0];
     if (!file) return;
@@ -1338,6 +1350,7 @@ async function loadFile(input, _) {
         if (window.JETLSchemaUI && typeof JETLSchemaUI.refreshAll === 'function') JETLSchemaUI.refreshAll();
 
         if (lbl) { lbl.innerText = `${file.name} (${geojson.features.length} fts)`; lbl.style.color = "#2ecc71"; }
+        renderReaderLayers(nodeEl, geojson.metadata && geojson.metadata.layers);
         if (loader) loader.style.display = 'none';
     } catch (e) {
         console.warn(e);

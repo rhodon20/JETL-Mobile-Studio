@@ -544,6 +544,21 @@ body.modal-open {
     font-size: .65rem;
 }
 
+/* Lector con una salida por capa (GPKG): qué capa sale por cada salida. */
+.reader-layer-list:not(:empty) {
+    margin-top: 4px;
+    display: grid;
+    gap: 2px;
+}
+
+.reader-layer-row {
+    color: #9aa0a6;
+    font-size: .65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .node-editor-open {
     width: 100%;
     margin-top: 7px;

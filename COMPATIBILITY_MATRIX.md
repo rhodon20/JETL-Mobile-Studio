@@ -21,14 +21,14 @@ Alcance: la app en general y los formatos complejos `GeoTIFF`, `GPKG`, `Parquet`
 | Formato | Chrome (desktop) | Edge (desktop) | Firefox (desktop) | Safari (desktop) | Android Chrome | iOS Safari | Notas |
 |---|---|---|---|---|---|---|---|
 | GeoTIFF | OK | OK | OK | PARCIAL | OK | PARCIAL | Datasets muy grandes pueden degradar memoria/tiempo. |
-| GPKG | OK | PEND | PEND | PEND | PEND | PEND | Chrome: `tests/formats-io.mjs` (EPSG:4326 y 25830). Lee la primera tabla vectorial y etiqueta su CRS. |
-| Parquet | OK | PEND | PEND | PEND | PEND | PEND | Chrome: `tests/formats-io.mjs`. GeoParquet WKB o WKT, y Parquet sin geometría como tabla; falta medir límites de RAM. |
+| GPKG | OK | PEND | PEND | PEND | PEND | PEND | Chrome: `tests/formats-io.mjs` (EPSG:4326 y 25830). Todas las tablas vectoriales, una por salida; con CRS distintos pasan a EPSG:4326. |
+| Parquet | OK | PEND | PEND | PEND | PEND | PEND | Chrome: `tests/formats-io.mjs`. GeoParquet WKB o WKT, Parquet sin geometría como tabla y tipos de pandas/GeoPandas/DuckDB (texto y binario «large», fechas, decimales, listas); falta medir límites de RAM. |
 
 ## Escritura (Writer)
 | Formato | Chrome (desktop) | Edge (desktop) | Firefox (desktop) | Safari (desktop) | Android Chrome | iOS Safari | Notas |
 |---|---|---|---|---|---|---|---|
 | GeoTIFF | N/A | N/A | N/A | N/A | N/A | N/A | No writer GeoTIFF en JETL actual. |
-| GPKG | OK | PEND | PEND | PEND | PEND | PEND | Chrome: ida y vuelta en `tests/formats-io.mjs`; validado con SQLite (integridad, `application_id`). Sólo EPSG:4326. |
+| GPKG | OK | PEND | PEND | PEND | PEND | PEND | Chrome: ida y vuelta en `tests/formats-io.mjs`; validado con SQLite (integridad, `application_id`). Se escribe en EPSG:4326; otro CRS se reproyecta al exportar. |
 | Parquet | OK | PEND | PEND | PEND | PEND | PEND | GeoParquet 1.1 (WKB + metadatos `geo`); validado con pyarrow y shapely. Falta abrirlo en QGIS. |
 
 ## Casos de prueba estandar por formato

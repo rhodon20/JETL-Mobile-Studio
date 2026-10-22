@@ -1739,6 +1739,21 @@ body.modal-open {
     font-size: .65rem;
 }
 
+/* Lector con una salida por capa (GPKG): qué capa sale por cada salida. */
+.reader-layer-list:not(:empty) {
+    margin-top: 4px;
+    display: grid;
+    gap: 2px;
+}
+
+.reader-layer-row {
+    color: #9aa0a6;
+    font-size: .65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .node-editor-open {
     width: 100%;
     margin-top: 7px;
@@ -4082,10 +4097,34 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         return code ? `EPSG:${code[1]}` : (raw ? String(raw) : null);
     }
 
+    // Campos que añade Studio (selección, CRS, tabla de origen): no se exportan.
+    const INTERNAL_PROPS = new Set(['_idx', '_crs', '_table']);
+
     function _asCollection(data) {
         return data && data.type === 'FeatureCollection' ? data : turf.featureCollection(Array.isArray(data) ? data : [data]);
     }
 
+    // --- Reproyección a EPSG:4326 (GeoPackage con CRS mezclados y exportación) ---
+    // proj4 ya viene con el runtime; las definiciones EPSG salen de la propia librería
+    // de GeoPackage (más de 4000), o del WKT que guarda el GeoPackage.
+    async function _to4326(GP, crs, wkt) {
+        const proj4 = window.proj4 || await window.JETLLoadScriptOnce('js/vendor/proj4.js', 'proj4');
+        const definition = (proj4.defs(crs) && crs) || (GP && GP.proj4Defs && GP.proj4Defs[crs]) || wkt;
+        if (!definition) throw new Error(`No se conoce el sistema de referencia ${crs} para pasarlo a EPSG:4326.`);
+        const project = proj4(definition, 'EPSG:4326');
+        const point = (c) => { const p = project.forward([Number(c[0]), Number(c[1])]); return c.length > 2 ? [p[0], p[1], c[2]] : p; };
+        const coords = (c) => (typeof c[0] === 'number' ? point(c) : c.map(coords));
+        const geometry = (g) => !g ? g : g.type === 'GeometryCollection' ? { ...g, geometries: g.geometries.map(geometry) } : { ...g, coordinates: coords(g.coordinates) };
+        return geometry;
+    }
+
+    function _srsCode(srs) {
+        return srs && srs.organization && srs.organization_coordsys_id > 0 ? `${String(srs.organization).toUpperCase()}:${srs.organization_coordsys_id}` : null;
+    }
+
+    // Todas las tablas vectoriales, como en Desktop: cada entidad lleva su tabla en
+    // `_table` y metadata.layers da el orden (el nodo GPKG Reader saca una por salida).
+    // Si las tablas no comparten CRS se pasan todas a EPSG:4326.
     registerReader({
         exts: ['gpkg'],
         label: 'GeoPackage',
@@ -4096,26 +4135,40 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
             try {
                 const tables = typeof gpkg.getFeatureTables === 'function' ? gpkg.getFeatureTables() : [];
                 if (!tables.length) throw new Error('El GeoPackage no tiene tablas vectoriales.');
-                const tableName = tables[0];
-                if (tables.length > 1 && window.log) window.log(`GeoPackage con ${tables.length} tablas (${tables.join(', ')}): se lee «${tableName}».`, 'warn');
-
-                const dao = gpkg.getFeatureDao(tableName);
-                const geometryColumn = dao.getGeometryColumnName();
-                const features = [];
-                let count = 0;
-                for (const raw of dao.queryForEach()) {
-                    if (count++ % 500 === 0) { _cancelled('Lectura de GeoPackage'); await new Promise((r) => setTimeout(r, 0)); }
-                    const row = dao.getRow(raw);
-                    const data = row.getGeometry();
-                    const geometry = data && data.geometry ? data.geometry.toGeoJSON() : null;
-                    const properties = {};
-                    for (const key in row.values) if (key !== geometryColumn) properties[key] = _plainValue(row.values[key]);
-                    features.push({ type: 'Feature', geometry, properties });
+                const layers = [];
+                for (const name of tables) {
+                    const dao = gpkg.getFeatureDao(name);
+                    const geometryColumn = dao.getGeometryColumnName();
+                    const srs = typeof dao.getSrs === 'function' ? dao.getSrs() : null;
+                    const features = [];
+                    let count = 0;
+                    for (const raw of dao.queryForEach()) {
+                        if (count++ % 500 === 0) { _cancelled('Lectura de GeoPackage'); await new Promise((r) => setTimeout(r, 0)); }
+                        const row = dao.getRow(raw);
+                        const data = row.getGeometry();
+                        const geometry = data && data.geometry ? data.geometry.toGeoJSON() : null;
+                        const properties = {};
+                        for (const key in row.values) if (key !== geometryColumn) properties[key] = _plainValue(row.values[key]);
+                        properties._table = name;
+                        features.push({ type: 'Feature', geometry, properties });
+                    }
+                    layers.push({ name, crs: _srsCode(srs), wkt: srs && srs.definition, features });
                 }
-                const fc = turf.featureCollection(features);
-                const srs = typeof dao.getSrs === 'function' ? dao.getSrs() : null;
+                const crsList = [...new Set(layers.map((l) => l.crs || 'EPSG:4326'))];
+                if (crsList.length > 1) {
+                    for (const layer of layers) {
+                        if (!layer.crs || layer.crs === 'EPSG:4326') continue;
+                        const project = await _to4326(GP, layer.crs, layer.wkt);
+                        layer.features.forEach((f) => { f.geometry = project(f.geometry); });
+                        layer.crs = 'EPSG:4326';
+                    }
+                    if (window.log) window.log(`GeoPackage con varios sistemas de referencia (${crsList.join(', ')}): se pasan todas las tablas a EPSG:4326.`, 'warn');
+                }
+                const fc = turf.featureCollection(layers.flatMap((l) => l.features));
+                const crs = layers[0].crs;
+                fc.metadata = { layers: layers.map((l) => ({ name: l.name, count: l.features.length })) };
                 // Las coordenadas llegan en el CRS de la tabla: se etiqueta para que el mapa lo reproyecte.
-                if (srs && srs.organization && srs.organization_coordsys_id > 0) fc.metadata = { crs: `${String(srs.organization).toUpperCase()}:${srs.organization_coordsys_id}` };
+                if (crs) fc.metadata.crs = crs;
                 return fc;
             } finally {
                 if (typeof gpkg.close === 'function') { try { gpkg.close(); } catch (e) { /* ya cerrado */ } }
@@ -4143,17 +4196,27 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
             const encoding = geo && geo.columns && geo.columns[geometryName] ? String(geo.columns[geometryName].encoding || '').toUpperCase() : '';
             if (encoding && encoding !== 'WKB' && encoding !== 'WKT') throw new Error(`Codificación de geometría GeoParquet no soportada: ${encoding} (se admiten WKB y WKT).`);
 
+            // Se lee por columnas, convirtiendo según el tipo de Arrow lo que no es un valor JSON.
+            const T = Arrow.Type;
+            const columns = fields.filter((f) => f.name !== geometryName).map((f) => {
+                const vector = table.getChild(f.name);
+                const type = f.type;
+                let convert = _plainValue;
+                if (type.typeId === T.Date) convert = (v) => v === null ? null : (type.unit === 0 ? new Date(v).toISOString().slice(0, 10) : new Date(v).toISOString());
+                else if (type.typeId === T.Timestamp) convert = (v) => v === null ? null : new Date(Number(v)).toISOString();
+                else if (type.typeId === T.Decimal) convert = (v) => v === null ? null : Arrow.util.bigNumToNumber(v, type.scale);
+                return { name: f.name, vector, convert };
+            });
+            const geometryVector = geometryName ? table.getChild(geometryName) : null;
             const features = [];
             for (let i = 0; i < table.numRows; i++) {
                 if (i % 2000 === 0) { _cancelled('Lectura de Parquet'); await new Promise((r) => setTimeout(r, 0)); }
-                const row = table.get(i).toJSON();
                 let geometry = null;
-                const raw = geometryName ? row[geometryName] : null;
+                const raw = geometryVector ? geometryVector.get(i) : null;
                 if (raw instanceof Uint8Array && raw.length) geometry = wkbToGeometry(raw);
                 else if (typeof raw === 'string' && raw.trim()) geometry = wellknown.parse(raw);
-                if (geometryName) delete row[geometryName];
                 const properties = {};
-                for (const key in row) properties[key] = _plainValue(row[key]);
+                for (const c of columns) properties[c.name] = c.convert(c.vector.get(i));
                 features.push({ type: 'Feature', geometry, properties });
             }
             const fc = turf.featureCollection(features);
@@ -4171,16 +4234,20 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         exts: ['gpkg'],
         label: 'GeoPackage',
         write: async (data) => {
-            const fc = _asCollection(data);
+            let fc = _asCollection(data);
             const crs = _collectionCrs(fc);
-            // La librería inserta las entidades como EPSG:4326.
-            if (crs && crs !== 'EPSG:4326') throw new Error(`El GeoPackage se escribe en EPSG:4326 y los datos están en ${crs}: reproyéctalos antes con el nodo Reproject.`);
             const GP = await _geopackage();
+            // La librería inserta las entidades como EPSG:4326: lo que esté en otro CRS se reproyecta.
+            if (crs && crs !== 'EPSG:4326') {
+                const project = await _to4326(GP, crs);
+                fc = { ...fc, features: fc.features.map((f) => ({ ...f, geometry: project(f.geometry) })) };
+                if (window.log) window.log(`GeoPackage: datos en ${crs} reproyectados a EPSG:4326.`, 'info');
+            }
             const gpkg = await GP.create();
             const tableName = 'jetl_export';
             const types = new Map();
             fc.features.forEach((f) => Object.entries(f.properties || {}).forEach(([key, value]) => {
-                if (key === 'id' || key === 'geometry' || value === null || value === undefined) return;
+                if (key === 'id' || key === 'geometry' || INTERNAL_PROPS.has(key) || value === null || value === undefined) return;
                 const type = typeof value === 'number' ? 'REAL' : typeof value === 'boolean' ? 'BOOLEAN' : 'TEXT';
                 types.set(key, types.has(key) && types.get(key) !== type ? 'TEXT' : type);
             }));
@@ -4211,7 +4278,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
             const keys = [];
             const kinds = new Map();
             fc.features.forEach((f) => Object.entries(f.properties || {}).forEach(([key, value]) => {
-                if (key === 'geometry') return;
+                if (key === 'geometry' || INTERNAL_PROPS.has(key)) return;
                 if (!kinds.has(key)) { keys.push(key); kinds.set(key, null); }
                 if (value === null || value === undefined) return;
                 const kind = typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string';

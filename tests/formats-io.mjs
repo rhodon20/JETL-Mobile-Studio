@@ -39,7 +39,8 @@ const READERS = [
     ['reader_gpkg', 'madrid_25830.gpkg', 'output_1', 1],
     ['reader_parquet', 'ciudades.geoparquet.parquet', 'output_1', 3],
     ['reader_parquet', 'ciudades_wkt.parquet', 'output_1', 3],
-    ['reader_parquet', 'tabla.parquet', 'output_1', 3]
+    ['reader_parquet', 'tabla.parquet', 'output_1', 3],
+    ['reader_parquet', 'tipos_variados.parquet', 'output_1', 3]
 ];
 
 try {
@@ -67,6 +68,13 @@ try {
         // Int64 de Parquet y GPKG llegan como número, no como BigInt.
         if (/parquet|gpkg/.test(file)) ok = ok && /"poblacion":3300000/.test(got.props);
         check(`${type} reads ${file}`, ok, JSON.stringify(got));
+        if (file === 'tipos_variados.parquet') {
+            // Tipos de pandas/GeoPandas/DuckDB: texto y binario «large», fechas, decimales, listas y estructuras.
+            const p = JSON.parse(got.props);
+            const expectedTypes = { nombre: 'Madrid', provincia: 'Madrid', poblacion: 3300000, rango: 1, capital: true, fundacion: '0852-01-01', actualizado: '2026-10-21T12:00:00.000Z', superficie: 604.45, barrios: '[1,2]', vacia: null };
+            const wrong = Object.entries(expectedTypes).filter(([k, v]) => p[k] !== v).map(([k]) => `${k}=${JSON.stringify(p[k])}`);
+            check('Parquet types become plain values (dates, decimals, lists, large strings)', wrong.length === 0 && Math.abs(p.densidad - 5390.5) < 1e-6 && JSON.parse(p.centro).x === -3.7, wrong.join(', ') || got.props);
+        }
         if (file === 'madrid_25830.gpkg') {
             // Se dibuja sobre Madrid: el mapa reproyecta según metadata.crs.
             const center = await page.evaluate(async (id) => { await showNodeResult(id, false); const c = map.getCenter(); JETLNativeNav('flow'); return { lng: c.lng, lat: c.lat }; }, id);
@@ -74,10 +82,33 @@ try {
         }
     }
 
+    // Un GeoPackage con varias tablas saca una por salida, como en Desktop; con CRS
+    // distintos todas pasan a EPSG:4326.
+    {
+        const id = await page.evaluate(() => { editor.clear(); return addNode('reader_gpkg'); });
+        await page.setInputFiles(`#node-${id} input[type=file]`, path.join(FIXTURES, 'varias_tablas.gpkg'));
+        await page.waitForFunction((id) => !/Leyendo|Sin archivo/.test(document.querySelector(`#node-${id} .file-lbl`)?.textContent || ''), id, { timeout: 60000 });
+        const multi = await page.evaluate(async (id) => {
+            await runEngine();
+            const d = executionData[id].data;
+            return {
+                outputs: document.querySelectorAll(`#node-${id} .outputs .output`).length,
+                layers: [...document.querySelectorAll(`#node-${id} [data-reader-layers] .reader-layer-row`)].map((r) => r.textContent),
+                first: [d.output_1.features.length, d.output_1.features[0]?.properties?._table],
+                second: [d.output_2.features.length, d.output_2.features[0]?.geometry?.coordinates, d.output_2.metadata?.crs],
+                third: d.output_3.features.length
+            };
+        }, id);
+        const [n2, c2, crs2] = multi.second;
+        check('a GeoPackage with several tables gives one output per table', multi.outputs === 16 && multi.first[0] === 3 && multi.first[1] === 'ciudades' && n2 === 1 && multi.third === 0, JSON.stringify(multi));
+        check('the GPKG node lists which table goes out of each output', multi.layers.join(' | ') === 'Salida 1 · ciudades (3) | Salida 2 · madrid_utm (1)', multi.layers.join(' | '));
+        check('tables with different CRS are all brought to EPSG:4326', crs2 === 'EPSG:4326' && Math.abs(c2[0] + 3.7) < 0.01 && Math.abs(c2[1] - 40.42) < 0.01, JSON.stringify(multi.second));
+    }
+
     // Ida y vuelta: lo que se escribe en GPKG y GeoParquet se vuelve a leer igual.
     const roundTrip = await page.evaluate(async () => {
         const fc = turf.featureCollection([
-            turf.point([-3.7, 40.42], { nombre: 'Madrid', n: 1, ok: true, tags: { a: 1 } }),
+            turf.point([-3.7, 40.42], { nombre: 'Madrid', n: 1, ok: true, tags: { a: 1 }, _idx: 0, _crs: 'EPSG:4326' }),
             turf.lineString([[-4, 40], [-3, 41], [-2, 40.5]], { nombre: 'Línea', n: 2.5 }),
             turf.polygon([[[-4, 40], [-3, 40], [-3, 41], [-4, 40]], [[-3.8, 40.2], [-3.2, 40.2], [-3.2, 40.6], [-3.8, 40.2]]], { nombre: 'Zona con hueco' }),
             turf.multiPolygon([[[[0, 0], [1, 0], [1, 1], [0, 0]]], [[[2, 2], [3, 2], [3, 3], [2, 2]]]], { nombre: 'Multi' }),
@@ -87,23 +118,28 @@ try {
         for (const ext of ['gpkg', 'parquet']) {
             const written = await JETLFormats.writeFile(ext, fc);
             const back = await JETLFormats.readFile(new File([await written.blob.arrayBuffer()], `x.${ext}`));
+            const exported = new Set(back.features.flatMap((f) => Object.keys(f.properties)));
             out[ext] = {
+                internal: ['_idx', '_crs'].filter((k) => exported.has(k)),
                 n: back.features.length,
                 sameGeometry: back.features.every((f, i) => JSON.stringify(f.geometry) === JSON.stringify(fc.features[i].geometry)),
                 madrid: back.features[0].properties
             };
         }
         const utm = { ...turf.featureCollection([turf.point([440300, 4474500], { nombre: 'Madrid' })]), metadata: { crs: 'EPSG:25830' } };
-        try { await JETLFormats.writeFile('gpkg', utm); out.gpkgUtm = 'sin error'; } catch (e) { out.gpkgUtm = e.message; }
+        const gpkgUtm = await JETLFormats.writeFile('gpkg', utm);
+        const gpkgBack = await JETLFormats.readFile(new File([await gpkgUtm.blob.arrayBuffer()], 'u.gpkg'));
+        out.gpkgUtm = { coords: gpkgBack.features[0].geometry.coordinates, crs: gpkgBack.metadata?.crs, table: gpkgBack.features[0].properties._table };
         const parquetUtm = await JETLFormats.writeFile('parquet', utm);
         out.parquetUtmCrs = (await JETLFormats.readFile(new File([await parquetUtm.blob.arrayBuffer()], 'u.parquet'))).metadata?.crs;
         return out;
     });
     for (const ext of ['gpkg', 'parquet']) {
         const r = roundTrip[ext];
-        check(`${ext} write → read keeps geometries and attributes`, r.n === 5 && r.sameGeometry && r.madrid.nombre === 'Madrid' && r.madrid.n === 1 && r.madrid.tags === '{"a":1}', JSON.stringify(r));
+        check(`${ext} write → read keeps geometries and attributes`, r.internal.length === 0 && r.n === 5 && r.sameGeometry && r.madrid.nombre === 'Madrid' && r.madrid.n === 1 && r.madrid.tags === '{"a":1}', JSON.stringify(r));
     }
-    check('GeoPackage refuses data that is not in EPSG:4326 with a clear message', /EPSG:25830.*Reproject/.test(roundTrip.gpkgUtm), roundTrip.gpkgUtm);
+    const gu = roundTrip.gpkgUtm;
+    check('GeoPackage export brings other CRS to EPSG:4326 by itself', gu.crs === 'EPSG:4326' && Math.abs(gu.coords[0] + 3.7) < 0.01 && Math.abs(gu.coords[1] - 40.42) < 0.01, JSON.stringify(gu));
     check('GeoParquet keeps the CRS of the data', roundTrip.parquetUtmCrs === 'EPSG:25830', String(roundTrip.parquetUtmCrs));
 
     // WKB de otras herramientas: EWKB de PostGIS con SRID, ISO con Z y M, big endian.

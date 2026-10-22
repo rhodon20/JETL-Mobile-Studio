@@ -2,7 +2,7 @@
 
 Uso: python3 tests/fixtures/formats/make-fixtures.py  (necesita pyarrow, openpyxl y pyshp)
 """
-import json, os, sqlite3, struct, zipfile
+import datetime, decimal, json, os, sqlite3, struct, zipfile
 
 import openpyxl
 import pyarrow as pa
@@ -26,8 +26,8 @@ def wkb_point(x, y):
     return struct.pack('<bIdd', 1, 1, x, y)
 
 
-def geopackage(name, srs_id, srs_name, srs_wkt, points):
-    """GeoPackage mínimo conforme a la norma: una tabla de puntos con atributos."""
+def geopackage(name, tables):
+    """GeoPackage mínimo conforme a la norma. tables: [(tabla, srs_id, srs_name, srs_wkt, puntos)]."""
     if os.path.exists(path(name)):
         os.remove(path(name))
     db = sqlite3.connect(path(name))
@@ -41,22 +41,29 @@ def geopackage(name, srs_id, srs_name, srs_wkt, points):
       min_x DOUBLE, min_y DOUBLE, max_x DOUBLE, max_y DOUBLE, srs_id INTEGER);
     CREATE TABLE gpkg_geometry_columns (table_name TEXT NOT NULL, column_name TEXT NOT NULL, geometry_type_name TEXT NOT NULL,
       srs_id INTEGER NOT NULL, z TINYINT NOT NULL, m TINYINT NOT NULL, CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name));
-    CREATE TABLE ciudades (fid INTEGER PRIMARY KEY AUTOINCREMENT, geom POINT, nombre TEXT, poblacion INTEGER);
     """)
     db.executemany('INSERT INTO gpkg_spatial_ref_sys VALUES (?,?,?,?,?,NULL)', [
         ('Undefined cartesian', -1, 'NONE', -1, 'undefined'), ('Undefined geographic', 0, 'NONE', 0, 'undefined'),
-        ('WGS 84', 4326, 'EPSG', 4326, WGS84_WKT)] + ([(srs_name, srs_id, 'EPSG', srs_id, srs_wkt)] if srs_id != 4326 else []))
-    db.execute("INSERT INTO gpkg_contents (table_name,data_type,identifier,srs_id) VALUES ('ciudades','features','ciudades',?)", (srs_id,))
-    db.execute("INSERT INTO gpkg_geometry_columns VALUES ('ciudades','geom','POINT',?,0,0)", (srs_id,))
-    for nombre, x, y, poblacion in points:
-        header = b'GP' + bytes([0, 1]) + struct.pack('<i', srs_id)  # versión 0, little endian, sin envolvente
-        db.execute('INSERT INTO ciudades (geom,nombre,poblacion) VALUES (?,?,?)', (header + wkb_point(x, y), nombre, poblacion))
+        ('WGS 84', 4326, 'EPSG', 4326, WGS84_WKT)])
+    for table, srs_id, srs_name, srs_wkt, points in tables:
+        if srs_id != 4326:
+            db.execute('INSERT OR IGNORE INTO gpkg_spatial_ref_sys VALUES (?,?,?,?,?,NULL)', (srs_name, srs_id, 'EPSG', srs_id, srs_wkt))
+        db.execute(f'CREATE TABLE {table} (fid INTEGER PRIMARY KEY AUTOINCREMENT, geom POINT, nombre TEXT, poblacion INTEGER)')
+        db.execute("INSERT INTO gpkg_contents (table_name,data_type,identifier,srs_id) VALUES (?,'features',?,?)", (table, table, srs_id))
+        db.execute("INSERT INTO gpkg_geometry_columns VALUES (?,'geom','POINT',?,0,0)", (table, srs_id))
+        for nombre, x, y, poblacion in points:
+            header = b'GP' + bytes([0, 1]) + struct.pack('<i', srs_id)  # versión 0, little endian, sin envolvente
+            db.execute(f'INSERT INTO {table} (geom,nombre,poblacion) VALUES (?,?,?)', (header + wkb_point(x, y), nombre, poblacion))
     db.commit()
     db.close()
 
 
-geopackage('ciudades.gpkg', 4326, 'WGS 84', WGS84_WKT, CITIES)
-geopackage('madrid_25830.gpkg', 25830, 'ETRS89 / UTM zone 30N', UTM30_WKT, [('Madrid', 440300, 4474500, 3300000)])
+MADRID_UTM = [('Madrid', 440300, 4474500, 3300000)]
+geopackage('ciudades.gpkg', [('ciudades', 4326, 'WGS 84', WGS84_WKT, CITIES)])
+geopackage('madrid_25830.gpkg', [('ciudades', 25830, 'ETRS89 / UTM zone 30N', UTM30_WKT, MADRID_UTM)])
+# Dos tablas en sistemas distintos: una salida por tabla y todo pasado a EPSG:4326.
+geopackage('varias_tablas.gpkg', [('ciudades', 4326, 'WGS 84', WGS84_WKT, CITIES),
+                                  ('madrid_utm', 25830, 'ETRS89 / UTM zone 30N', UTM30_WKT, MADRID_UTM)])
 
 # GeoParquet 1.1 estándar (geometría WKB y metadatos «geo»), Parquet con WKT y Parquet sin geometría.
 names = [c[0] for c in CITIES]
@@ -66,6 +73,24 @@ geo = {'version': '1.1.0', 'primary_column': 'geometry', 'columns': {'geometry':
 pq.write_table(geoparquet.replace_schema_metadata({b'geo': json.dumps(geo).encode()}), path('ciudades.geoparquet.parquet'))
 pq.write_table(pa.table({'nombre': names, 'poblacion': population, 'geometry': [f'POINT ({c[1]} {c[2]})' for c in CITIES]}), path('ciudades_wkt.parquet'))
 pq.write_table(pa.table({'nombre': names, 'poblacion': population}), path('tabla.parquet'))
+# Tipos que generan pandas, GeoPandas o DuckDB: texto y binario «large», diccionario, fechas, decimal, listas...
+geo_large = {'version': '1.1.0', 'primary_column': 'geometry', 'columns': {'geometry': {'encoding': 'WKB', 'geometry_types': ['Point']}}}
+varied = pa.table({
+    'nombre': pa.array(names, pa.large_string()),
+    'provincia': pa.array(names).dictionary_encode(),
+    'poblacion': pa.array([c[3] for c in CITIES], pa.uint64()),
+    'rango': pa.array([1, 2, 3], pa.int8()),
+    'densidad': pa.array([5390.5, 4900.25, 1500.0], pa.float32()),
+    'capital': pa.array([True, False, False]),
+    'fundacion': pa.array([datetime.date(852, 1, 1), datetime.date(712, 1, 1), datetime.date(1072, 1, 1)], pa.date32()),
+    'actualizado': pa.array([datetime.datetime(2026, 10, 21, 12, 0, tzinfo=datetime.timezone.utc)] * 3, pa.timestamp('us', tz='UTC')),
+    'superficie': pa.array([decimal.Decimal('604.45'), decimal.Decimal('140.80'), decimal.Decimal('197.91')], pa.decimal128(10, 2)),
+    'barrios': pa.array([[1, 2], [3], []], pa.list_(pa.int32())),
+    'centro': pa.array([{'x': c[1], 'y': c[2]} for c in CITIES]),
+    'vacia': pa.array([None, None, None], pa.null()),
+    'geometry': pa.array([wkb_point(c[1], c[2]) for c in CITIES], pa.large_binary()),
+})
+pq.write_table(varied.replace_schema_metadata({b'geo': json.dumps(geo_large).encode()}), path('tipos_variados.parquet'))
 
 json.dump({'type': 'FeatureCollection', 'features': [{'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [x, y]},
            'properties': {'nombre': n, 'poblacion': p}} for n, x, y, p in CITIES]}, open(path('ciudades.geojson'), 'w'))

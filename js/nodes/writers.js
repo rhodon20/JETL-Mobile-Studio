@@ -84,7 +84,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     writer_gpkg: {
         cat: '5. WRITERS', label: 'GPKG DL', icon: 'fa-database', color: '#c0392b', in: 1, out: 0,
-        help: 'Exporta un GeoPackage en EPSG:4326 (reproyecta antes si hace falta).',
+        help: 'Exporta un GeoPackage en EPSG:4326 (los datos en otro sistema se reproyectan solos).',
         tpl: () => `<input class="node-control" df-fn value="export.gpkg" placeholder="Nombre archivo">`,
         run: async (id, i, d) => {
             if (!window.JETLFormats) throw new Error("Formatos no disponibles");

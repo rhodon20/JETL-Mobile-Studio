@@ -32,8 +32,9 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
 ### Formatos
 - Lectura: GeoJSON/JSON, KML, GPX, CSV, Excel, Shapefile (ZIP), GeoPackage,
   Parquet/GeoParquet, OSM (Overpass), WKT y GeoTIFF.
-- Escritura: GeoJSON, CSV, KML, Excel, Shapefile (ZIP), GeoPackage (EPSG:4326) y
-  GeoParquet.
+- Escritura: GeoJSON, CSV, KML, Excel, Shapefile (ZIP), GeoPackage (en EPSG:4326,
+  reproyectando si hace falta) y GeoParquet.
+- GPKG Reader saca cada tabla vectorial por una salida (hasta 16), como Desktop.
 - Las librerías de GeoPackage, Parquet/Arrow, Excel y escritura de Shapefile van
   en `js/vendor/` (sin CDN): se cargan al usarse y quedan disponibles sin conexión.
 - GDB y FeatureReader necesitan el backend de Desktop: se conservan para abrir sus
