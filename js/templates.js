@@ -137,15 +137,8 @@ import { saveDraft } from './state/draft.js';
         JETLClearObject(executionData);
         currentRunTimestamp = 0;
         clearHistory();
-        Object.values(mapLayers).forEach(l => {
-            try { map.removeLayer(l); } catch (e) {}
-            try { if (layerControl) layerControl.removeLayer(l); } catch (e) {}
-        });
-        JETLClearObject(mapLayers);
-        if (layerControl) {
-            try { map.removeControl(layerControl); } catch (e) {}
-            layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
-        }
+        // El visor vacía sus capas (y la selección) al recibirlo.
+        JETLEvents.emit('workspace:reset', { clearSelection: true });
         if (typeof addToHistory === 'function') addToHistory();
         saveDraft(editor.export());
         JETLEvents.emit('workspace:replaced');

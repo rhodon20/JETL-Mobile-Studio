@@ -129,8 +129,6 @@ listed('JETL_EXTRA_MODULES').forEach((file) => precache.add(`${file}?v=${groupVe
 groups.JETL_MOTION_VERSION.forEach((file) => precache.add(`${file}?v=${groupVersion('JETL_MOTION_VERSION')}`));
 [...listed('JETL_DEFERRED_STYLES'),
     'css/vendor/fontawesome/webfonts/fa-solid-900.woff2',
-    'css/vendor/images/layers.png', 'css/vendor/images/layers-2x.png',
-    'css/vendor/images/marker-icon.png', 'css/vendor/images/marker-icon-2x.png', 'css/vendor/images/marker-shadow.png',
     // Imported by the geo worker (importScripts) and by the Shapefile reader.
     'js/vendor/turf.min.js', 'js/vendor/jsts.min.js', 'js/vendor/rbush.min.js', 'js/vendor/proj4.js', 'js/vendor/shp.js',
     ...JSON.parse(fs.readFileSync(path.join(DIST, 'manifest.json'), 'utf8')).icons.map((icon) => icon.src)

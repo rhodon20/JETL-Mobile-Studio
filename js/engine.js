@@ -589,16 +589,7 @@ function loadProject(input) {
             JETLEvents.emit('workspace:reset', { clearSelection: true });
             currentRunTimestamp = 0;
 
-            Object.values(mapLayers).forEach(l => {
-                map.removeLayer(l);
-                if (layerControl) layerControl.removeLayer(l);
-            });
-            JETLClearObject(mapLayers);
-
-            if (layerControl) {
-                map.removeControl(layerControl);
-                layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
-            }
+            // El visor vacía sus capas al recibir workspace:reset (arriba).
 
             // Importamos los datos ya saneados
             editor.import(flowData);

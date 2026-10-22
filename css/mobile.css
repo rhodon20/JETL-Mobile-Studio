@@ -36,7 +36,7 @@
 }
 
 /* Encuadrar capas desde el mapa: sólo en el móvil (en escritorio está en la barra del visor). */
-.leaflet-control.jetl-fit-control {
+.maplibregl-ctrl.jetl-fit-control {
     display: none;
 }
 
@@ -291,7 +291,7 @@
     }
 
     /* Sustituye al botón de encuadrar de la barra del visor (oculto arriba). */
-    .leaflet-control.jetl-fit-control {
+    .maplibregl-ctrl.jetl-fit-control {
         display: block;
     }
 

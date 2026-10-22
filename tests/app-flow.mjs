@@ -134,12 +134,12 @@ try {
         document.querySelector(`#node-${b} [df-dst]`).value = 'EPSG:25830';
         await runEngine();
         await window.showOnMap(String(b));
-        const bounds = mapLayers[String(b)]?.getBounds();
+        const bounds = mapLayers[String(b)]?.bounds;
         const out = executionData[b]?.data;
         return {
             crs: out?.metadata?.crs,
             firstX: out?.features?.[0]?.geometry?.coordinates?.[0]?.[0]?.[0],
-            center: bounds ? [bounds.getCenter().lng, bounds.getCenter().lat] : null
+            center: bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : null
         };
     });
     check('reprojected output is tagged with its CRS', projected.crs === 'EPSG:25830' && projected.firstX > 400000, JSON.stringify(projected));
@@ -210,7 +210,7 @@ try {
         check('published scripts are fetched with their version', unversioned.length === 0, unversioned.join(', '));
     }
 
-    // Large polygon layers are sampled on the map only; the node keeps every feature.
+    // MapLibre draws large polygon layers whole (Leaflet had to sample them at 5.000).
     const shapes = await page.evaluate(async () => {
         const id = addNode('geo_buffer');
         const features = Array.from({ length: 6000 }, (_, i) => {
@@ -219,13 +219,14 @@ try {
         });
         executionData[id] = { data: turf.featureCollection(features) };
         await showOnMap(id);
-        const drawn = mapLayers[id].getLayers().length;
+        const drawn = mapLayers[id].count;
         const kept = executionData[id].data.features.length;
-        return { id, drawn, kept, indicator: document.getElementById('map-perf-indicator')?.textContent || '' };
+        const indicator = document.getElementById('map-perf-indicator');
+        return { id, drawn, kept, indicator: indicator && indicator.style.display !== 'none' ? indicator.textContent : '' };
     });
-    check('large polygon layers are sampled on the map only', shapes.drawn === 5000 && shapes.kept === 6000 && shapes.indicator.includes('mostrando'), JSON.stringify(shapes));
+    check('large polygon layers are drawn whole on the map', shapes.drawn === 6000 && shapes.kept === 6000 && shapes.indicator === '', JSON.stringify(shapes));
 
-    // Tapping a table row takes the map to that feature, even one left out of the sample.
+    // Tapping a table row takes the map to that feature and highlights it.
     const focusOn = async (idx) => {
         await page.evaluate(() => switchTab('table'));
         await page.click(`#tr-row-${idx} td:nth-child(3)`);
@@ -234,14 +235,38 @@ try {
             const c = map.getCenter();
             const f = executionData[currentNodeId].data.features[idx].geometry.coordinates[0][0];
             const mapActive = document.querySelector('#panel-tabs [data-results-view="map"]').classList.contains('active');
-            return { mapActive, zoom: map.getZoom(), near: Math.abs(c.lng - f[0]) < 0.001 && Math.abs(c.lat - f[1]) < 0.001 };
+            const focus = map.getSource('jetl-focus')?._data;
+            const highlighted = (focus?.features || focus?.geojson?.features || [])[0]?.geometry?.coordinates?.[0]?.[0];
+            return { mapActive, zoom: map.getZoom(), near: Math.abs(c.lng - f[0]) < 0.001 && Math.abs(c.lat - f[1]) < 0.001, highlighted: JSON.stringify(highlighted) === JSON.stringify(f) };
         }, idx);
     };
     await page.evaluate((id) => { JETLNativeNav('results'); currentNodeId = id; buildTable(executionData[id].data); }, shapes.id);
-    const drawnFocus = await focusOn(0);
-    const sampledOutFocus = await focusOn(5);
-    check('tapping a row centres the map on that feature', drawnFocus.mapActive && drawnFocus.near && drawnFocus.zoom >= 15, JSON.stringify(drawnFocus));
-    check('a feature left out of the map sample can still be focused', sampledOutFocus.mapActive && sampledOutFocus.near, JSON.stringify(sampledOutFocus));
+    const firstFocus = await focusOn(0);
+    const otherFocus = await focusOn(5);
+    // MapLibre zoom = Leaflet zoom - 1 for the same scale (512 px tiles).
+    check('tapping a row centres the map on that feature', firstFocus.mapActive && firstFocus.near && firstFocus.zoom >= 14, JSON.stringify(firstFocus));
+    check('the selected feature is highlighted on the map', firstFocus.highlighted && otherFocus.highlighted && otherFocus.near, JSON.stringify({ firstFocus, otherFocus }));
+    // Tapping a feature on the map selects it, highlights it and shows its attributes.
+    const tapAt = await page.evaluate(() => {
+        const target = executionData[currentNodeId].data.features[42].geometry.coordinates[0];
+        const centre = [(target[0][0] + target[1][0]) / 2, (target[0][1] + target[2][1]) / 2];
+        map.jumpTo({ center: centre, zoom: 17 });
+        const p = map.project(centre);
+        const r = map.getContainer().getBoundingClientRect();
+        return { x: r.left + p.x, y: r.top + p.y };
+    });
+    await page.waitForTimeout(800);
+    await page.mouse.click(tapAt.x, tapAt.y);
+    await page.waitForTimeout(300);
+    const tapped = await page.evaluate(() => {
+        const focus = map.getSource('jetl-focus')?._data;
+        const highlighted = (focus?.features || focus?.geojson?.features || [])[0]?.geometry?.coordinates?.[0]?.[0];
+        return {
+            highlighted: JSON.stringify(highlighted) === JSON.stringify(executionData[currentNodeId].data.features[42].geometry.coordinates[0][0]),
+            popup: document.querySelector('.jetl-popup')?.textContent.replace(/\s+/g, ' ').trim() || ''
+        };
+    });
+    check('tapping a feature on the map selects it and shows its attributes', tapped.highlighted && /i\s*42/.test(tapped.popup), JSON.stringify(tapped));
     // Columns can be hidden from the table toolbar and shown again.
     await page.evaluate(() => switchTab('table'));
     await page.click('[data-table-action="columns"]');
@@ -499,15 +524,15 @@ try {
             fitShown: !!fit && getComputedStyle(fit).display !== 'none'
         };
     }, viewIds.a);
-    check('«Ver resultado» frames the layer on the map', viewed.near && viewed.zoom >= 12, JSON.stringify(viewed));
+    check('«Ver resultado» frames the layer on the map', viewed.near && viewed.zoom >= 11, JSON.stringify(viewed));
     check('«Ver resultado» shows that node in the table and the cache selector', viewed.current === String(viewIds.a) && viewed.rows === 1 && viewed.cache === String(viewIds.a), JSON.stringify(viewed));
     // On a phone the frame-layers button lives on the map itself.
-    await page.evaluate(() => { map.setView([40.4, -3.7], 5); });
-    await page.click('.jetl-fit-control a');
+    await page.evaluate(() => { map.jumpTo({ center: [-3.7, 40.4], zoom: 4 }); });
+    await page.click('.jetl-fit-control button');
     await page.waitForTimeout(400);
     // It frames every layer on the map (earlier checks left some around Madrid).
-    const refit = await page.evaluate(() => ({ zoom: map.getZoom(), contains: map.getBounds().contains([[37.38, -6.0], [37.40, -5.98]]) }));
-    check('the map frame button is shown on a phone and frames the layers', viewed.fitShown && refit.contains && refit.zoom > 5, JSON.stringify(refit));
+    const refit = await page.evaluate(() => { const b = map.getBounds(); return { zoom: map.getZoom(), contains: b.contains([-6.0, 37.38]) && b.contains([-5.98, 37.40]) }; });
+    check('the map frame button is shown on a phone and frames the layers', viewed.fitShown && refit.contains && refit.zoom > 4, JSON.stringify(refit));
     await page.evaluate(() => JETLNativeNav('flow'));
 
     // Notes: a free sticky note on the canvas and an annotation inside a node.

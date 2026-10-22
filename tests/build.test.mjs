@@ -32,7 +32,7 @@ test('cada script y hoja de estilo publicados llevan el hash de su contenido', (
 });
 
 test('los grupos diferidos y el worker se versionan por contenido', () => {
-    assert.match(html, new RegExp(`const JETL_RUNTIME_VERSION = '${hashOf('js/vendor/leaflet.js', 'js/vendor/turf.min.js', 'js/vendor/osmtogeojson.js', 'js/vendor/proj4.js', 'js/vendor/wellknown.js', 'js/basemap.js', 'js/visualization.js')}'`));
+    assert.match(html, new RegExp(`const JETL_RUNTIME_VERSION = '${hashOf('js/vendor/maplibre/maplibre-gl.js', 'js/vendor/turf.min.js', 'js/vendor/osmtogeojson.js', 'js/vendor/proj4.js', 'js/vendor/wellknown.js', 'js/basemap.js', 'js/visualization.js')}'`));
     assert.match(html, new RegExp(`const JETL_EXTRAS_VERSION = '${hashOf('js/modalSystem.js', 'js/schemaUI.js', 'js/templates.js', 'js/packages.js')}'`));
     assert.match(html, new RegExp(`const JETL_MOTION_VERSION = '${hashOf('js/vendor/anime.min.js', 'js/motion.js')}'`));
     assert.doesNotMatch(html, /_VERSION = 'dev'/);
@@ -71,11 +71,12 @@ test('el service worker publicado precachea, con su URL exacta, lo que la app pi
     const tagged = [...html.matchAll(/\b(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map((m) => m[1]);
     const runtime = html.match(/const JETL_RUNTIME_VERSION = '([^']+)'/)[1];
     const pool = fs.readFileSync(path.join(OUT, 'js/core/workerPool.js'), 'utf8').match(/'(js\/geo\.worker\.js\?v=[^']+)'/)[1];
-    for (const url of [...tagged, `js/vendor/leaflet.js?v=${runtime}`, `js/visualization.js?v=${runtime}`, pool, 'js/vendor/jsts.min.js', 'index.html', 'privacy.html']) {
+    for (const url of [...tagged, `js/vendor/maplibre/maplibre-gl.js?v=${runtime}`, 'js/vendor/maplibre/maplibre-gl.css', `js/visualization.js?v=${runtime}`, pool, 'js/vendor/jsts.min.js', 'index.html', 'privacy.html']) {
         assert.ok(precache.includes(url), `falta en el precacheo: ${url}`);
     }
-    // Fuera: el mapa base (necesita red igualmente) y las pantallas de arranque de iOS.
-    assert.ok(!precache.some((url) => url.includes('maplibre') || url.startsWith('icons/startup/')));
+    // MapLibre sí va (el visor funciona sin conexión; el mapa base necesita red igualmente).
+    // Fuera: Leaflet, que ya no se usa, y las pantallas de arranque de iOS.
+    assert.ok(!precache.some((url) => url.includes('leaflet') || url.startsWith('icons/startup/')));
 });
 
 test('el despliegue en Cloudflare sirve cada archivo sin redirigir y no cachea lo que decide la versión', () => {

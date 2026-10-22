@@ -9,6 +9,7 @@ import { showPortPickerToast } from './ui/notify.js';
 import { detectCrs, toDisplayCrs } from './core/crs.js';
 import { clearDraft } from './state/draft.js';
 import { setNodeOutputCount } from './engine.js';
+import { createMap, setNodeLayer, getNodeLayer, clearNodeLayers, setFocus, showPopup, fitBounds, visibleBounds } from './ui/mapEngine.js';
 
 // Variables de estado
 let selectedFeatureIndex = null;
@@ -30,7 +31,6 @@ let featureCacheBrowserState = { nodeId: '', port: '' };
 // Campos ocultos en la tabla, por nodo (sólo durante la sesión).
 let tableHiddenFields = {};
 // Entidad elegida en la tabla que no está pintada (quedó fuera del muestreo).
-let tableFocusLayer = null;
 
 function loadFeatureCacheBrowserState() {
     try {
@@ -235,12 +235,8 @@ async function showNodeResult(nodeId, askPort = true) {
 window.showNodeResult = showNodeResult;
 
 function fitNodeLayer(id) {
-    const layer = mapLayers[id];
-    const bounds = layer && layer.getBounds ? layer.getBounds() : null;
-    if (!map || !bounds || !bounds.isValid()) return;
-    // El visor puede acabar de abrirse: Leaflet necesita su tamaño real para encuadrar.
-    map.invalidateSize();
-    map.fitBounds(bounds, { maxZoom: 18, padding: [30, 30] });
+    const layer = getNodeLayer(id);
+    fitBounds(map, layer && layer.bounds);
 }
 
 function ensureFeatureCacheBrowserUI() {
@@ -461,37 +457,25 @@ function bindTableInteractions() {
     });
 }
 
-// El mapa se crea la primera vez que hace falta (necesita Leaflet, que llega con este runtime).
+// El mapa se crea la primera vez que hace falta (MapLibre llega con este runtime).
+// Sin WebGL no hay mapa: se avisa en su lugar y la tabla sigue funcionando.
 function ensureJETLMap() {
     if (map) return map;
     const mapElement = document.getElementById('map');
     if (!mapElement) throw new Error('No se encontró el contenedor del mapa');
-    if (typeof L === 'undefined') throw new Error('Leaflet no está disponible');
-
-    map = L.map(mapElement, { renderer: L.canvas() }).setView([40.416, -3.703], 6);
-    // Asynchronous (MapLibre loads on demand); the map is usable meanwhile.
+    if (typeof maplibregl === 'undefined') throw new Error('MapLibre no está disponible');
+    try {
+        map = createMap(mapElement, { onFitAll: zoomToAllLayers, onTap: selectFeatureOnMap });
+    } catch (error) {
+        console.warn('[map] sin WebGL:', error);
+        mapElement.textContent = 'El mapa necesita WebGL, que este dispositivo no ofrece. Los datos siguen en la pestaña Datos.';
+        mapElement.classList.add('map-unavailable');
+        return null;
+    }
+    // Asíncrono: hasta que llega el estilo, el mapa ya se usa con fondo liso.
     window.JETLBasemapReady = typeof window.JETLAddBasemap === 'function'
         ? window.JETLAddBasemap(map)
         : Promise.resolve(null);
-    layerControl = L.control.layers(null, {}, { position: 'topright', collapsed: true }).addTo(map);
-    // Encuadrar las capas desde el propio mapa: en el móvil la barra del visor no
-    // tiene sitio para ese botón (css/mobile.css lo muestra sólo allí).
-    const FitControl = L.Control.extend({
-        options: { position: 'topleft' },
-        onAdd() {
-            const bar = L.DomUtil.create('div', 'leaflet-bar jetl-fit-control');
-            const button = L.DomUtil.create('a', '', bar);
-            button.href = '#';
-            button.setAttribute('role', 'button');
-            button.title = 'Encuadrar capas';
-            button.setAttribute('aria-label', 'Encuadrar capas');
-            button.innerHTML = '<i class="fas fa-expand" aria-hidden="true"></i>';
-            L.DomEvent.disableClickPropagation(bar);
-            L.DomEvent.on(button, 'click', (event) => { L.DomEvent.preventDefault(event); zoomToAllLayers(); });
-            return bar;
-        }
-    });
-    new FitControl().addTo(map);
     return map;
 }
 window.ensureJETLMap = ensureJETLMap;
@@ -521,15 +505,7 @@ JETLEvents.on('run:finish', (e) => {
 
 // Función principal de pintado en el mapa
 function zoomToAllLayers() {
-    const group = new L.FeatureGroup();
-    Object.values(mapLayers).forEach(layer => {
-        if (layer) group.addLayer(layer);
-    });
-    if (group.getLayers().length > 0) {
-        map.fitBounds(group.getBounds(), { maxZoom: 18, padding: [50, 50] });
-    } else {
-        showToast("No hay capas visibles", "warn");
-    }
+    if (!fitBounds(map, visibleBounds())) showToast("No hay capas visibles", "warn");
 }
 
 function setMapPerfIndicator(info) {
@@ -630,157 +606,90 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     if (!data || !data.features || data.features.length === 0) { showToast("Geometría vacía", "warn"); return; }
     ensureStableFeatureIndex(data);
 
-    // Limpieza
     clearTableFocusLayer();
-    if (mapLayers[id]) {
-        map.removeLayer(mapLayers[id]);
-        layerControl.removeLayer(mapLayers[id]);
-        delete mapLayers[id];
-    }
 
+    // MapLibre pinta cientos de miles de entidades con fluidez (ROADMAP > Visor con
+    // MapLibre); sólo por encima de este tope se muestrea, para no agotar la memoria
+    // del móvil. La tabla y las exportaciones siempre usan el dataset completo.
+    const MAP_MAX_FEATURES = 250000;
     const srcFeatures = Array.isArray(data.features) ? data.features : [];
-    const isPointGeom = (f) => {
-        const t = f && f.geometry && f.geometry.type;
-        return t === 'Point' || t === 'MultiPoint';
-    };
-    const allPoints = srcFeatures.length > 0 && srcFeatures.every(isPointGeom);
-    const PERF_POINT_THRESHOLD = 30000;
-    const PERF_POINT_MAX_DRAW = 20000;
-    // Líneas y polígonos pesan mucho más en Leaflet (~6 KB por polígono frente a
-    // ~1 KB por punto): 50.000 buffers ocupaban 293 MB y 1,5 s al pintarse; con
-    // este tope, 30 MB y 0,2 s. Medido en Chromium con pantalla de móvil.
-    const PERF_SHAPE_MAX_DRAW = 5000;
-    const PERF_GENERIC_THRESHOLD = 12000;
-    let drawData = data;
+    let drawFeatures = srcFeatures;
     let perfSampleInfo = null;
-    // Exactamente maxDraw entidades repartidas por todo el dataset (un paso entero
-    // ceil(total/maxDraw) se quedaba en 3.000 de 6.000 con un tope de 5.000).
-    const sampleForMap = (maxDraw) => {
-        const sampled = [];
-        for (let i = 0; i < maxDraw; i++) sampled.push(srcFeatures[Math.floor(i * srcFeatures.length / maxDraw)]);
-        drawData = turf.featureCollection(sampled);
-        perfSampleInfo = { shown: sampled.length, total: srcFeatures.length, reason: 'sampling' };
-    };
-
-    // Modo rendimiento para capas masivas: se aligera solo la vista del mapa sin
-    // tocar el dataset real del nodo (la tabla y las exportaciones lo usan entero).
-    if (allPoints && srcFeatures.length > PERF_POINT_THRESHOLD) {
-        sampleForMap(PERF_POINT_MAX_DRAW);
-    } else if (!allPoints && srcFeatures.length > PERF_SHAPE_MAX_DRAW) {
-        sampleForMap(PERF_SHAPE_MAX_DRAW);
-    } else if (srcFeatures.length > PERF_GENERIC_THRESHOLD) {
-        perfSampleInfo = { shown: srcFeatures.length, total: srcFeatures.length, reason: 'interaction' };
+    if (srcFeatures.length > MAP_MAX_FEATURES) {
+        // Exactamente el tope, repartido por todo el dataset.
+        drawFeatures = [];
+        for (let i = 0; i < MAP_MAX_FEATURES; i++) drawFeatures.push(srcFeatures[Math.floor(i * srcFeatures.length / MAP_MAX_FEATURES)]);
+        perfSampleInfo = { shown: drawFeatures.length, total: srcFeatures.length, reason: 'sampling' };
     }
 
     // El mapa trabaja en grados: un resultado en otro CRS se reproyecta sólo para pintarlo.
-    const display = toDisplayCrs(drawData, detectCrs(data));
+    const display = toDisplayCrs(turf.featureCollection(drawFeatures), detectCrs(data));
     if (display.unsupported) showToast(`Sin definición para ${display.crs}: se pinta sin reproyectar`, 'warn');
-    drawData = display.collection;
 
     const nodeName = editor.getNodeFromId(id).name;
     const tool = TOOL_REGISTRY[nodeName];
     const customStyle = data._custom_style || null;
     const baseColor = (customStyle && customStyle.color) ? customStyle.color : (tool.color || '#3388ff');
     const portLabel = activePort ? ` [${activePort}]` : '';
-    const layerName = `<span style="color:${JETLEscapeHtml(baseColor)}">■</span> ${JETLEscapeHtml(tool.label)} (#${id})${portLabel}`;
     currentSymbologyNode = id;
     setupSymbologyPanel(id, data);
     setMapPerfIndicator(perfSampleInfo);
 
+    // El mapa recibe una copia ligera (geometría, índice y color): los atributos se
+    // quedan aquí y la ventana de información los lee del dataset al tocar.
+    const colorOf = (feature) => {
+        const props = feature.properties || {};
+        if (customStyle && customStyle.color) return customStyle.color;
+        if (props._custom_style && props._custom_style.color) return props._custom_style.color;
+        if (props.marker_color) return props.marker_color;
+        const symStyle = getSymbologyStyle(id, feature, baseColor);
+        return (symStyle && symStyle.color) || baseColor;
+    };
+    const collection = {
+        type: 'FeatureCollection',
+        features: display.collection.features.filter((f) => f && f.geometry).map((f) => ({
+            type: 'Feature', geometry: f.geometry, properties: { _idx: f.properties._idx, __c: colorOf(f) }
+        }))
+    };
+
     try {
-        const perfMode = !!perfSampleInfo;
-        const layer = L.geoJSON(drawData, {
-            style: function (feature) {
-                if (feature.properties && feature.properties._idx === selectedFeatureIndex) {
-                    return { color: '#e74c3c', weight: 4, opacity: 1, fillColor: '#e74c3c', fillOpacity: 0.6 };
-                }
-                if (customStyle) return customStyle;
-                if (feature.properties && feature.properties._custom_style) return feature.properties._custom_style;
-                const symStyle = getSymbologyStyle(id, feature, baseColor);
-                if (symStyle) return symStyle;
-                return { color: baseColor, weight: 2, opacity: 0.8, fillColor: baseColor, fillOpacity: 0.2 };
-            },
-            pointToLayer: (feature, latlng) => {
-                let c = baseColor;
-                let r = perfMode ? 4 : 6;
-                let w = perfMode ? 0 : 1;
-                let border = perfMode ? baseColor : '#fff';
-
-                if (feature.properties && feature.properties._idx === selectedFeatureIndex) {
-                    c = '#e74c3c'; r = 9; w = 3; border = '#f1c40f';
-                } else if (feature.properties && feature.properties.marker_color) {
-                    c = feature.properties.marker_color;
-                } else {
-                    const symStyle = getSymbologyStyle(id, feature, baseColor);
-                    if (symStyle && symStyle.color) c = symStyle.color;
-                }
-                return L.circleMarker(latlng, {
-                    radius: r,
-                    color: border,
-                    weight: w,
-                    fillColor: c,
-                    fillOpacity: 0.9,
-                    interactive: !perfMode
-                });
-            },
-            onEachFeature: function (feature, layer) {
-                if (perfMode) return;
-                // Asignamos índice original inmutable
-                if (!feature.properties || typeof feature.properties !== 'object') feature.properties = {};
-                if (feature.properties._idx === undefined) {
-                    feature.properties._idx = data.features.indexOf(feature);
-                }
-
-                layer.on('click', function (e) {
-                    selectedFeatureIndex = feature.properties._idx;
-
-                    if (mapLayers[id]) mapLayers[id].resetStyle();
-                    if (layer.bringToFront) layer.bringToFront();
-
-                    // Actualizar tabla si está visible
-                    if (executionData[id]) {
-                        // Importante: No reconstruimos todo para no perder el orden actual
-                        // Pero debemos asegurar que la fila es visible (sync)
-                        const tableContainer = document.getElementById('table-container');
-                        if (tableContainer.style.display === 'block') {
-                            // Si la fila está fuera de la ventana actual por el ordenamiento, reconstruimos
-                            buildTable(executionData[id].data);
-                        }
-                    }
-                    showToast(`Reg #${selectedFeatureIndex + 1} seleccionado.`, 'success');
-                });
-
-                if (feature.properties) {
-                    let table = '<table style="font-size:10px; color: #333;">';
-                    for (let k in feature.properties) {
-                        if (k.startsWith('_')) continue;
-                        let val = feature.properties[k];
-                        if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(4);
-                        table += `<tr><td><b>${JETLEscapeHtml(k)}</b></td><td>${JETLEscapeHtml(val)}</td></tr>`;
-                    }
-                    table += '</table>';
-                    layer.bindPopup(table);
-                }
-            }
-        }).addTo(map);
-
-        layerControl.addOverlay(layer, layerName);
-        mapLayers[id] = layer;
-
+        if (!map) { showToast('El mapa no está disponible en este dispositivo', 'warn'); return; }
+        mapLayers[id] = setNodeLayer(map, id, { collection, label: `${tool.label} (#${id})${portLabel}`, color: baseColor });
         syncMapFocus(id);
         switchTab('map');
-        if (perfSampleInfo) {
-            if (perfSampleInfo.reason === 'sampling') {
-                showToast(`Modo rendimiento mapa: ${perfSampleInfo.shown}/${perfSampleInfo.total} puntos mostrados`, 'warn');
-            } else {
-                showToast(`Modo rendimiento mapa: interaccion limitada (${perfSampleInfo.total} entidades)`, 'warn');
-            }
-        }
-
+        if (perfSampleInfo) showToast(`Mapa: ${perfSampleInfo.shown.toLocaleString()} de ${perfSampleInfo.total.toLocaleString()} entidades (la tabla las tiene todas)`, 'warn');
     } catch (e) {
         console.error(e);
         showToast("Error renderizando mapa", "error");
     }
+}
+
+// Tocar una entidad en el mapa: se selecciona (resaltado y fila de la tabla) y se
+// muestran sus atributos.
+function selectFeatureOnMap(nodeId, idx, lngLat) {
+    const data = _resolveNodePortData(nodeId).data;
+    const feature = data && data.features ? (data.features[idx] && data.features[idx].properties && data.features[idx].properties._idx === idx ? data.features[idx] : data.features.find((f) => f && f.properties && f.properties._idx === idx)) : null;
+    if (!feature) return;
+    selectedFeatureIndex = idx;
+    currentNodeId = String(nodeId);
+    const display = toDisplayCrs(turf.featureCollection([feature]), detectCrs(data));
+    setFocus(map, display.collection.features[0]);
+    showPopup(map, lngLat, featurePopupHtml(feature));
+    // Si la tabla está a la vista, se reconstruye para mostrar la fila seleccionada.
+    const tableContainer = document.getElementById('table-container');
+    if (tableContainer && tableContainer.style.display === 'block') buildTable(data);
+    showToast(`Reg #${idx + 1} seleccionado.`, 'success');
+}
+
+function featurePopupHtml(feature) {
+    let table = '<table class="jetl-popup-table">';
+    for (const k in (feature.properties || {})) {
+        if (k.startsWith('_')) continue;
+        let val = feature.properties[k];
+        if (typeof val === 'number' && !Number.isInteger(val)) val = val.toFixed(4);
+        table += `<tr><td><b>${JETLEscapeHtml(k)}</b></td><td>${JETLEscapeHtml(val)}</td></tr>`;
+    }
+    return table + '</table>';
 }
 
 // Lógica de Ordenación
@@ -1002,7 +911,6 @@ function selectRow(idx, nodeId) {
         }
     });
 
-    if (mapLayers[nodeId]) mapLayers[nodeId].resetStyle();
     // En móvil tabla y mapa son pestañas: tocar una fila lleva al mapa, que se
     // centra en la entidad (switchTab llama a syncMapFocus). Al volver a la tabla
     // la fila sigue seleccionada y visible.
@@ -1166,9 +1074,7 @@ function togglePanelHeight() {
             ? '<i class="fas fa-chevron-up"></i><span class="panel-action-label">Mostrar</span>'
             : '<i class="fas fa-chevron-down"></i><span class="panel-action-label">Ocultar</span>';
     }
-    setTimeout(() => {
-        if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
-    }, 350);
+    setTimeout(() => { if (map) map.resize(); }, 350);
 }
 
 function updateMapExpandButton() {
@@ -1198,9 +1104,7 @@ function toggleMapPanelExpand(forceState) {
         panel.style.height = prevBottomPanelHeight || '40vh';
     }
     updateMapExpandButton();
-    setTimeout(() => {
-        try { map.invalidateSize(); } catch (e) {}
-    }, 220);
+    setTimeout(() => { if (map) map.resize(); }, 220);
 }
 window.toggleMapPanelExpand = toggleMapPanelExpand;
 
@@ -1226,7 +1130,7 @@ function switchTab(t) {
     if (t === 'map') {
         if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
         setTimeout(() => {
-            if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
+            if (map) map.resize();
             if (selectedFeatureIndex !== null && currentNodeId) syncMapFocus(currentNodeId);
         }, 300);
         const panel = document.getElementById('symbology-panel');
@@ -1247,39 +1151,21 @@ window.switchTab = switchTab;
 
 // Sincronización
 function clearTableFocusLayer() {
-    if (tableFocusLayer && map) map.removeLayer(tableFocusLayer);
-    tableFocusLayer = null;
+    if (map) setFocus(map, null);
 }
 
+// La entidad seleccionada (en la tabla o en el mapa) se resalta encima de todas
+// las capas y el mapa se centra en ella.
 function syncMapFocus(nodeId) {
     if (selectedFeatureIndex === null || !map) return;
-    clearTableFocusLayer();
-
-    const layerGroup = mapLayers[nodeId];
-    const layers = layerGroup && layerGroup.getLayers ? layerGroup.getLayers() : [];
-    const target = layers.find(l => l.feature && l.feature.properties._idx === selectedFeatureIndex);
-
-    if (target) {
-        if (target.getBounds) map.fitBounds(target.getBounds(), { maxZoom: 18, padding: [50, 50] });
-        else if (target.getLatLng) map.setView(target.getLatLng(), 18);
-        target.openPopup();
-        return;
-    }
-
-    // No está pintada (el mapa muestrea las capas grandes): se dibuja aparte,
-    // resaltada, a partir de la entidad original del nodo.
     const data = _resolveNodePortData(nodeId).data;
     const feature = data && Array.isArray(data.features)
         ? data.features.find(f => f && f.properties && f.properties._idx === selectedFeatureIndex)
         : null;
-    if (!feature || !feature.geometry) return;
+    if (!feature || !feature.geometry) { setFocus(map, null); return; }
     const display = toDisplayCrs(turf.featureCollection([feature]), detectCrs(data));
-    tableFocusLayer = L.geoJSON(display.collection, {
-        style: { color: '#e74c3c', weight: 4, opacity: 1, fillColor: '#e74c3c', fillOpacity: 0.45 },
-        pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 9, color: '#f1c40f', weight: 3, fillColor: '#e74c3c', fillOpacity: 0.95 })
-    }).addTo(map);
-    const bounds = tableFocusLayer.getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds, { maxZoom: 18, padding: [50, 50] });
+    setFocus(map, display.collection.features[0]);
+    fitBounds(map, turf.bbox(display.collection), 17);
 }
 
 function syncTableFocus() {
@@ -1390,9 +1276,7 @@ function clearCanvas() {
         window.JETLRuntimeCache.clearAll();
     }
     clearDraft();
-    clearTableFocusLayer();
-    Object.values(mapLayers).forEach(l => { map.removeLayer(l); layerControl.removeLayer(l); });
-    JETLClearObject(mapLayers);
+    clearMapLayers();
     JETLClearObject(executionData);
     if (window.JETLDirty && typeof window.JETLDirty.clearAll === 'function') window.JETLDirty.clearAll();
     if (typeof window.resetNodeDisplayPorts === 'function') window.resetNodeDisplayPorts();
@@ -1416,8 +1300,15 @@ JETLEvents.on('node:error', (e) => anim_NodeError(e.id));
 JETLEvents.on('node:added', (e) => { if (e.element && !e.animated) anim_NodeEnter(e.element); });
 // Al vaciar el espacio de trabajo se olvidan los puertos mostrados y, al cargar
 // un proyecto, también la selección de la tabla y la simbología.
+// Las capas del mapa vacías: lo que pintaban ya no está en el espacio de trabajo.
+function clearMapLayers() {
+    clearNodeLayers(map);
+    JETLClearObject(mapLayers);
+}
+
 JETLEvents.on('workspace:reset', (e) => {
     window.resetNodeDisplayPorts();
+    clearMapLayers();
     if (!e || !e.clearSelection) return;
     selectedRowSet.clear();
     symbologyByNode = {};

@@ -33,7 +33,7 @@ const LAYERS = {
     engine: ['js/processNode.js', 'js/engine/dirty.js', 'js/engine/runPlan.js', 'js/engine/validate.js'],
     state: ['js/state/history.js', 'js/state/draft.js', 'js/state/runHistory.js', 'js/projectPersistence.js', 'js/packages.js'],
     app: ['js/engine.js', 'js/templates.js'],
-    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js', 'js/ui/draftPrompt.js', 'js/ui/actionHub.js', 'js/ui/multiSelect.js', 'js/ui/validationPanel.js', 'js/ui/annotations.js', 'js/ui/launchActions.js'],
+    ui: ['inline:nav', 'js/visualization.js', 'js/schemaUI.js', 'js/modalSystem.js', 'js/mobile.js', 'js/ui/catalog.js', 'js/ui/runPanel.js', 'js/ui/buildInfo.js', 'js/ui/notify.js', 'js/ui/mapEngine.js', 'js/ui/draftPrompt.js', 'js/ui/actionHub.js', 'js/ui/multiSelect.js', 'js/ui/validationPanel.js', 'js/ui/annotations.js', 'js/ui/launchActions.js'],
     shell: ['js/shell.js'],
     dev: ['js/smoke.js']
 };
@@ -41,8 +41,8 @@ const LAYER_NAMES = Object.keys(LAYERS);
 const layerOf = {};
 LAYER_NAMES.forEach((l, i) => LAYERS[l].forEach(f => { layerOf[f] = i; }));
 
-const VENDOR_GLOBALS = new Set(['L', 'turf', 'Drawflow', 'shp', 'geoblaze', 'GeoTIFF', 'osmtogeojson', 'proj4',
-    'wellknown', 'GeoPackage', 'anime', 'jsts', 'rbush', 'RBush', 'maplibregl', 'MaplibreGLLeaflet']);
+const VENDOR_GLOBALS = new Set(['turf', 'Drawflow', 'shp', 'geoblaze', 'GeoTIFF', 'osmtogeojson', 'proj4',
+    'wellknown', 'GeoPackage', 'anime', 'jsts', 'rbush', 'RBush', 'maplibregl']);
 const BROWSER_GLOBALS = new Set([...Object.getOwnPropertyNames(globalThis), 'window', 'document', 'navigator',
     'location', 'localStorage', 'sessionStorage', 'console', 'fetch', 'Blob', 'File', 'FileReader', 'URL', 'Worker',
     'performance', 'alert', 'confirm', 'prompt', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback',

@@ -6,9 +6,11 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
 
 ## Qué hace
 - Editor visual de flujos (Drawflow) con ejecución total o hasta un nodo.
-- Mapa (Leaflet + mapa base oscuro de OpenFreeMap, sin API key; si no responde,
-  OpenStreetMap oscurecido) y tabla de atributos con orden, filtro, selección y
-  export de la selección.
+- Mapa con MapLibre GL (WebGL; `js/ui/mapEngine.js`): pinta todas las entidades
+  hasta 250.000 por capa, con mapa base oscuro de OpenFreeMap sin API key (si no
+  responde, OpenStreetMap oscurecido), lista de capas, ventana de atributos al
+  tocar y resaltado de la selección. Tabla de atributos con orden, filtro,
+  selección y export de la selección.
 - Monitor de ejecución, historial de las últimas 30 ejecuciones con tiempos por
   nodo, e inspector de datos por puerto.
 - Plantillas de flujo, parámetros globales (`${param}`), paquetes de

@@ -1,78 +1,48 @@
-// Dark basemap without API keys.
-// Primary: OpenFreeMap "dark" vector style (no key, no request limits) drawn by
-// MapLibre GL through its Leaflet plugin; both are loaded on demand because
-// MapLibre is ~1 MB. CARTO's dark_all, used before, now needs an API key.
-// Fallback: OpenStreetMap raster tiles darkened with a CSS filter, used when
-// WebGL/MapLibre is unavailable or the style does not load in time.
+// Dark basemap without API keys, as the style of the MapLibre map.
+// Primary: OpenFreeMap "dark" vector style (no key, no request limits). CARTO's
+// dark_all, used before, now needs an API key.
+// Fallback: OpenStreetMap raster tiles, darkened with raster paint properties,
+// when the style does not load in time. Setting a style removes the data layers;
+// js/ui/mapEngine.js puts them back on 'style.load'.
 (function () {
     const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
     const STYLE_TIMEOUT_MS = 8000;
-    const OPENFREEMAP_ATTRIBUTION =
-        '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ' +
-        '&copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> ' +
-        'Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
     const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
 
-    function ensureStyles() {
-        if (document.getElementById('jetl-basemap-styles')) return;
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'js/vendor/maplibre/maplibre-gl.css';
-        document.head.appendChild(link);
-        const style = document.createElement('style');
-        style.id = 'jetl-basemap-styles';
-        style.textContent = '.jetl-basemap-dark { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }';
-        document.head.appendChild(style);
-    }
+    // Inverted and hue-rotated, like the CSS filter used with Leaflet before.
+    const OSM_STYLE = {
+        version: 8,
+        sources: { osm: { type: 'raster', tiles: [OSM_URL], tileSize: 256, maxzoom: 19, attribution: OSM_ATTRIBUTION } },
+        layers: [
+            { id: 'jetl-background', type: 'background', paint: { 'background-color': '#121212' } },
+            { id: 'osm', type: 'raster', source: 'osm', paint: { 'raster-brightness-min': 0.95, 'raster-brightness-max': 0.05, 'raster-hue-rotate': 180, 'raster-contrast': -0.1 } }
+        ]
+    };
 
-    function addFallback(map, reason) {
-        if (map.__jetlBasemapFallback) return;
-        console.warn('[basemap] OpenFreeMap no disponible, se usa OpenStreetMap:', reason);
-        map.__jetlBasemapFallback = L.tileLayer(OSM_URL, {
-            maxZoom: 19,
-            attribution: OSM_ATTRIBUTION,
-            className: 'jetl-basemap-dark'
-        }).addTo(map);
-    }
-
-    async function addBasemap(map) {
-        ensureStyles();
-        let glLayer = null;
+    async function fetchStyle() {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), STYLE_TIMEOUT_MS);
         try {
-            await window.JETLLoadScriptOnce('js/vendor/maplibre/maplibre-gl.js', 'maplibregl');
-            await window.JETLLoadScriptOnce('js/vendor/maplibre/leaflet-maplibre-gl.js', 'MaplibreGLLeaflet');
-            glLayer = L.maplibreGL({ style: STYLE_URL, attribution: OPENFREEMAP_ATTRIBUTION }).addTo(map);
-        } catch (error) {
-            addFallback(map, error && error.message ? error.message : error);
-            return 'osm';
+            const response = await fetch(STYLE_URL, { signal: controller.signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } finally {
+            clearTimeout(timer);
         }
-
-        // Tile errors after the style is ready are transient; only a style that never
-        // loads means the provider is unreachable.
-        const glMap = glLayer.getMaplibreMap();
-        return new Promise((resolve) => {
-            let settled = false;
-            const fail = (reason) => {
-                if (settled) return;
-                settled = true;
-                map.removeLayer(glLayer);
-                addFallback(map, reason);
-                resolve('osm');
-            };
-            const timer = setTimeout(() => fail('timeout'), STYLE_TIMEOUT_MS);
-            glMap.once('style.load', () => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                resolve('openfreemap');
-            });
-            glMap.on('error', (e) => {
-                if (!glMap.isStyleLoaded()) fail(e && e.error && e.error.message ? e.error.message : 'style error');
-            });
-        });
     }
 
     // Resolves to the basemap in use: 'openfreemap' or 'osm'.
+    async function addBasemap(map) {
+        try {
+            map.setStyle(await fetchStyle(), { diff: false });
+            return 'openfreemap';
+        } catch (error) {
+            console.warn('[basemap] OpenFreeMap no disponible, se usa OpenStreetMap:', error && error.message ? error.message : error);
+            map.setStyle(OSM_STYLE, { diff: false });
+            return 'osm';
+        }
+    }
+
     window.JETLAddBasemap = addBasemap;
 })();

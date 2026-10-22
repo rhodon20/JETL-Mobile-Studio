@@ -1970,6 +1970,99 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 .annotation-delete { margin-right:auto; color:#ff8a80; }
 .annotation-delete[hidden] { display:none; }
 .build-info-privacy { order: 10; color:#71b9ff; font-size:.8rem; }
+
+/* Visor de resultados (MapLibre, js/ui/mapEngine.js): controles y ventana en tema oscuro. */
+#map .maplibregl-ctrl-group {
+    background: #1f2023;
+    border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+#map .maplibregl-ctrl-group button {
+    width: 34px;
+    height: 34px;
+    color: #e6e6e6;
+}
+
+#map .maplibregl-ctrl-group button + button {
+    border-top-color: rgba(255, 255, 255, .12);
+}
+
+#map .maplibregl-ctrl-icon {
+    filter: invert(1);
+}
+
+#map .jetl-layer-control[hidden] {
+    display: none;
+}
+
+#map .jetl-layer-list {
+    max-height: 40vh;
+    max-width: 230px;
+    overflow: auto;
+    padding: 6px 8px;
+    border-top: 1px solid rgba(255, 255, 255, .12);
+}
+
+#map .jetl-layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    color: #e6e6e6;
+    font-size: .75rem;
+    white-space: nowrap;
+}
+
+#map .jetl-layer-row span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#map .jetl-layer-swatch {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 2px;
+}
+
+#map .jetl-popup .maplibregl-popup-content {
+    background: #1f2023;
+    color: #e6e6e6;
+    padding: 10px 12px;
+    border-radius: 8px;
+    max-height: 45vh;
+    overflow: auto;
+}
+
+#map .jetl-popup .maplibregl-popup-tip {
+    display: none;
+}
+
+#map .jetl-popup .maplibregl-popup-close-button {
+    color: #e6e6e6;
+    font-size: 18px;
+}
+
+.jetl-popup-table {
+    font-size: 11px;
+    border-collapse: collapse;
+}
+
+.jetl-popup-table td {
+    padding: 2px 6px 2px 0;
+    vertical-align: top;
+    word-break: break-word;
+}
+
+#map.map-unavailable {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #9aa0a6;
+    text-align: center;
+}
 /* ---- css/mobile.css ---- */
 :root {
     --mobile-dock-height: 72px;
@@ -2009,7 +2102,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 }
 
 /* Encuadrar capas desde el mapa: sólo en el móvil (en escritorio está en la barra del visor). */
-.leaflet-control.jetl-fit-control {
+.maplibregl-ctrl.jetl-fit-control {
     display: none;
 }
 
@@ -2264,7 +2357,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
     }
 
     /* Sustituye al botón de encuadrar de la barra del visor (oculto arriba). */
-    .leaflet-control.jetl-fit-control {
+    .maplibregl-ctrl.jetl-fit-control {
         display: block;
     }
 
@@ -3260,7 +3353,6 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         const SafeStorage={isAvailable:!1,init:function(){try{let e="__test__";localStorage.setItem(e,e),localStorage.removeItem(e),this.isAvailable=!0}catch(e){console.warn("Storage disabled")}},save:function(e,t){this.isAvailable&&localStorage.setItem(e,t)},load:function(e){return this.isAvailable?localStorage.getItem(e):null},clear:function(e){this.isAvailable&&localStorage.removeItem(e)}};SafeStorage.init();
 
         const CITIES = [{n:"Madrid",c:[40.416,-3.703]},{n:"Barcelona",c:[41.385,2.173]},{n:"Valencia",c:[39.469,-0.376]},{n:"Sevilla",c:[37.389,-5.984]}];
-        let layerControl;
         let currentNodeId = null;
         let currentRunTimestamp = 0; // Para el control de estado (verde/naranja)
 
@@ -3272,7 +3364,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
         // JETLClearObject, así cualquier referencia guardada sigue siendo válida.
         let editor = null;
         let map = null;
-        const mapLayers = {};          // nodeId -> capa Leaflet dibujada
+        const mapLayers = {};          // nodeId -> capa del mapa (js/ui/mapEngine.js: count, bounds)
         const executionData = {};      // nodeId -> { data, _runId, _contentHash, _ms }
         window.executionData = executionData;
         window._file_cache = {};       // 'file_' + nodeId -> FeatureCollection leída
@@ -4450,7 +4542,7 @@ window.JETLBootModuleLoaded(1, 11, "readers.js");
         const JETL_EXTRAS_VERSION = 'dev';
 
         const JETL_RUNTIME_SCRIPTS = [
-            'js/vendor/leaflet.js',
+            'js/vendor/maplibre/maplibre-gl.js',
             'js/vendor/turf.min.js',
             'js/vendor/osmtogeojson.js',
             'js/vendor/proj4.js',
@@ -4459,7 +4551,7 @@ window.JETLBootModuleLoaded(1, 11, "readers.js");
         ];
 
         const JETL_DEFERRED_STYLES = [
-            'css/vendor/leaflet.css',
+            'js/vendor/maplibre/maplibre-gl.css',
             'css/vendor/fontawesome/css/fontawesome.min.css',
             'css/vendor/fontawesome/css/solid.min.css'
         ];

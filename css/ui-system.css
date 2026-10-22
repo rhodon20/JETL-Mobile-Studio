@@ -775,3 +775,96 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 .annotation-delete { margin-right:auto; color:#ff8a80; }
 .annotation-delete[hidden] { display:none; }
 .build-info-privacy { order: 10; color:#71b9ff; font-size:.8rem; }
+
+/* Visor de resultados (MapLibre, js/ui/mapEngine.js): controles y ventana en tema oscuro. */
+#map .maplibregl-ctrl-group {
+    background: #1f2023;
+    border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+
+#map .maplibregl-ctrl-group button {
+    width: 34px;
+    height: 34px;
+    color: #e6e6e6;
+}
+
+#map .maplibregl-ctrl-group button + button {
+    border-top-color: rgba(255, 255, 255, .12);
+}
+
+#map .maplibregl-ctrl-icon {
+    filter: invert(1);
+}
+
+#map .jetl-layer-control[hidden] {
+    display: none;
+}
+
+#map .jetl-layer-list {
+    max-height: 40vh;
+    max-width: 230px;
+    overflow: auto;
+    padding: 6px 8px;
+    border-top: 1px solid rgba(255, 255, 255, .12);
+}
+
+#map .jetl-layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    color: #e6e6e6;
+    font-size: .75rem;
+    white-space: nowrap;
+}
+
+#map .jetl-layer-row span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#map .jetl-layer-swatch {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 2px;
+}
+
+#map .jetl-popup .maplibregl-popup-content {
+    background: #1f2023;
+    color: #e6e6e6;
+    padding: 10px 12px;
+    border-radius: 8px;
+    max-height: 45vh;
+    overflow: auto;
+}
+
+#map .jetl-popup .maplibregl-popup-tip {
+    display: none;
+}
+
+#map .jetl-popup .maplibregl-popup-close-button {
+    color: #e6e6e6;
+    font-size: 18px;
+}
+
+.jetl-popup-table {
+    font-size: 11px;
+    border-collapse: collapse;
+}
+
+.jetl-popup-table td {
+    padding: 2px 6px 2px 0;
+    vertical-align: top;
+    word-break: break-word;
+}
+
+#map.map-unavailable {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #9aa0a6;
+    text-align: center;
+}
