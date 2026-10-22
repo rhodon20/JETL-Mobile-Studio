@@ -538,7 +538,9 @@ function setMapPerfIndicator(info) {
         el.textContent = '';
         return;
     }
-    if (info.reason === 'sampling') {
+    if (info.reason === 'loading') {
+        el.textContent = `Preparando ${info.total.toLocaleString()} entidades…`;
+    } else if (info.reason === 'sampling') {
         el.textContent = `Modo rendimiento: mostrando ${info.shown.toLocaleString()} de ${info.total.toLocaleString()} entidades`;
     } else {
         el.textContent = `Modo rendimiento: interaccion limitada en ${info.total.toLocaleString()} entidades`;
@@ -655,6 +657,18 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     try {
         if (!map) { showToast('El mapa no está disponible en este dispositivo', 'warn'); return; }
         mapLayers[id] = setNodeLayer(map, id, { collection, label: `${tool.label} (#${id})${portLabel}`, color: baseColor });
+        // MapLibre trocea las capas grandes en su hilo (unos segundos con 170.000
+        // polígonos): mientras, el mapa dice qué está haciendo en vez de quedarse vacío.
+        if (!perfSampleInfo && collection.features.length > 20000) {
+            setMapPerfIndicator({ total: collection.features.length, reason: 'loading' });
+            const started = Date.now();
+            const waitPainted = () => {
+                if (mapLayers[id] !== getNodeLayer(id)) return;
+                if (map.getSource(`jetl-src-${id}`) && map.isSourceLoaded(`jetl-src-${id}`)) setMapPerfIndicator(null);
+                else if (Date.now() - started < 120000) setTimeout(waitPainted, 250);
+            };
+            setTimeout(waitPainted, 250);
+        }
         syncMapFocus(id);
         switchTab('map');
         if (perfSampleInfo) showToast(`Mapa: ${perfSampleInfo.shown.toLocaleString()} de ${perfSampleInfo.total.toLocaleString()} entidades (la tabla las tiene todas)`, 'warn');

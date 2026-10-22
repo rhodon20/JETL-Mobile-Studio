@@ -147,8 +147,10 @@ export function createMap(container, { onFitAll, onTap }) {
         dragRotate: false,
         pitchWithRotate: false,
         touchPitch: false,
-        attributionControl: { compact: true }
+        attributionControl: false
     });
+    // Abajo a la izquierda: a la derecha está el botón de simbología del visor.
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
     map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
     map.addControl(new FitControl(onFitAll), 'top-left');

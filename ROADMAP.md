@@ -29,7 +29,11 @@
    (sin CDN, disponibles sin conexión) y `tests/formats-io.mjs` con archivos
    reales. Pendiente: abrir en QGIS un GeoParquet/GeoPackage exportado y medir
    archivos grandes en el móvil.
-4. **Visor con MapLibre** (después de la prueba cerrada). Medido el 22 de octubre
+4. **Visor con MapLibre: hecho** (22 de octubre, antes de la prueba cerrada por
+   decisión del usuario; `js/ui/mapEngine.js`). Con el Parquet del usuario (174.022
+   polígonos): todas pintadas, 0,8 s de hilo principal y ~8,5 s del worker de
+   MapLibre preparando teselas (con aviso «Preparando…»). Falta medir en un móvil
+   real la fluidez y la memoria del worker. Medición previa, el 22 de octubre
    en Chromium sin GPU (WebGL por software, peor que un móvil real), 174.022
    polígonos pequeños como el Parquet del usuario:
    | | Primer pintado | Mover el mapa (mediana / p90 por paso) | Memoria (hilo principal) |
