@@ -5,3 +5,5 @@ versions/
 *.7z
 .DS_Store
 .wrangler/
+# Archivos de ejemplo de las pruebas de formatos (Shapefile en ZIP)
+!tests/fixtures/**/*.zip
