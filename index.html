@@ -1923,9 +1923,7 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 .action-hub-primary:disabled { opacity:.45; box-shadow:none; cursor:default; }
 .action-hub-item:disabled { opacity:.4; cursor:default; }
 
-/* Color del nodo (js/ui/nodeColor.js): cabecera teñida. El borde del nodo queda para
-   su estado (seleccionado, error, ejecutado). */
-.drawflow .drawflow-node.has-node-color .node-head { border-bottom: 4px solid var(--node-color) !important; background: color-mix(in srgb, var(--node-color) 48%, #1e1e1e); }
+/* Color del resultado de un nodo en el mapa (js/ui/nodeColor.js). */
 .node-color-hint { margin: 0 4px 12px; color: #9aa0a6; font-size: 13px; }
 .node-color-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin: 0 4px 14px; }
 .node-color-swatch { aspect-ratio:1; min-height:48px; border-radius:14px; border:2px solid rgba(255,255,255,.12); background:var(--swatch); cursor:pointer; }

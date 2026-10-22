@@ -32,7 +32,7 @@ const FLOW_ITEMS = [
 const NODE_ITEMS = [
     { icon: 'fa-map-location-dot', label: 'Ver resultado', hub: 'view' },
     { icon: 'fa-note-sticky', label: 'Anotar', hub: 'annotate' },
-    { icon: 'fa-palette', label: 'Color', hub: 'color' },
+    { icon: 'fa-palette', label: 'Color en mapa', hub: 'color' },
     { icon: 'fa-clone', label: 'Duplicar', hub: 'duplicate' },
     { icon: 'fa-crosshairs', label: 'Centrar', hub: 'center' },
     { icon: 'fa-object-group', label: 'Seleccionar varios', hub: 'select' },
@@ -104,8 +104,8 @@ function render(panel) {
 function renderColorPicker(panel, nodeId) {
     const current = getNodeColor(nodeId);
     const swatches = NODE_COLORS.map((color) => `<button type="button" class="node-color-swatch" data-hub-action="set-color" data-color="${color}" style="--swatch:${color}" role="radio" aria-checked="${color === current}" aria-label="Color ${color}"></button>`).join('');
-    panel.innerHTML = `${sheetHead('COLOR DEL NODO', JETLEscapeHtml(nodeLabel(nodeId)))}
-        <p class="node-color-hint">Marca el nodo en el lienzo y su capa en el mapa.</p>
+    panel.innerHTML = `${sheetHead('COLOR EN EL MAPA', JETLEscapeHtml(nodeLabel(nodeId)))}
+        <p class="node-color-hint">Color de su resultado en el mapa.</p>
         <div class="node-color-grid" role="radiogroup" aria-label="Color del nodo">${swatches}</div>
         <div class="action-hub-grid">
             <button type="button" class="action-hub-item" data-hub-action="set-color" data-color="" ${current ? '' : 'disabled'}><i class="fas fa-eraser" aria-hidden="true"></i><span>Quitar color</span></button>

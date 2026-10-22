@@ -20,7 +20,6 @@ import { runLaunchAction } from './ui/launchActions.js';
 import { initActionHub } from './ui/actionHub.js';
 import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 import { initAnnotations } from './ui/annotations.js';
-import { initNodeColors } from './ui/nodeColor.js';
 import { initOfflineMode } from './core/offline.js';
 
 let jetlAppInitialized = false;
@@ -186,7 +185,6 @@ function initializeJETLApp() {
             ['panel de acciones', initActionHub],
             ['multiselección', initMultiSelect],
             ['anotaciones', initAnnotations],
-            ['colores de nodo', initNodeColors],
             ['navegador de flujo', initFlowNavigator],
             ['búsqueda rápida', initQuickSearch]
         ];

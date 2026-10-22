@@ -599,7 +599,9 @@ function resolveNodeDisplayData(nodeId, preferredPort = null) {
 }
 window.resolveNodeDisplayData = resolveNodeDisplayData;
 
-async function showOnMap(id, preferredPort = null, askPort = false) {
+// `recolor`: sólo vuelve a pintar una capa ya visible (cambió el color del nodo),
+// sin llevar al mapa ni tocar la simbología abierta.
+async function showOnMap(id, preferredPort = null, askPort = false, recolor = false) {
     if (!map && typeof window.ensureJETLMap === 'function') window.ensureJETLMap();
     setMapPerfIndicator(null);
     let meta = executionData[id];
@@ -650,8 +652,10 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
     const customStyle = data._custom_style || null;
     const baseColor = (customStyle && customStyle.color) ? customStyle.color : (getNodeColor(id) || tool.color || '#3388ff');
     const portLabel = activePort ? ` [${activePort}]` : '';
-    currentSymbologyNode = id;
-    setupSymbologyPanel(id, data);
+    if (!recolor) {
+        currentSymbologyNode = id;
+        setupSymbologyPanel(id, data);
+    }
     setMapPerfIndicator(perfSampleInfo);
 
     // El mapa recibe una copia ligera (geometría, índice y color): los atributos se
@@ -686,6 +690,7 @@ async function showOnMap(id, preferredPort = null, askPort = false) {
             };
             setTimeout(waitPainted, 250);
         }
+        if (recolor) return;
         syncMapFocus(id);
         switchTab('map');
         if (perfSampleInfo) showToast(`Mapa: ${perfSampleInfo.shown.toLocaleString()} de ${perfSampleInfo.total.toLocaleString()} entidades (la tabla las tiene todas)`, 'warn');
@@ -1328,6 +1333,10 @@ function clearCanvas() {
 
 function anim_NodeEnter(domElement) { if (!domElement) return; anime({ targets: domElement, scale: [.97, 1], translateY: [8, 0], opacity: [0, 1], duration: 220, easing: 'easeOutCubic' }); }
 JETLEvents.on('node:error', (e) => anim_NodeError(e.id));
+// Acciones > Color: la capa del nodo, si ya está en el mapa, toma el color al momento.
+JETLEvents.on('node:color', (e) => {
+    if (mapLayers[e.id] && executionData[e.id]) showOnMap(e.id, nodeViewPortById[e.id] || null, false, true);
+});
 JETLEvents.on('node:added', (e) => { if (e.element && !e.animated) anim_NodeEnter(e.element); });
 // Al vaciar el espacio de trabajo se olvidan los puertos mostrados y, al cargar
 // un proyecto, también la selección de la tabla y la simbología.
