@@ -121,6 +121,15 @@ try {
         const hub = await rect(page, '#action-hub');
         check('on a tablet in landscape Acciones is a floating card next to the bar', hub.visible && hub.width <= 400 && hub.left > 80 && hub.bottom < 820, JSON.stringify(hub));
         await page.keyboard.press('Escape');
+        // Ampliar y cerrar con la X: vuelve el flujo (antes quedaba en blanco hasta girar la tablet).
+        await page.click('#btn-map-expand');
+        await page.waitForTimeout(300);
+        await page.click('#bottom-panel .panel-sheet-close');
+        await page.waitForTimeout(300);
+        const closed = await page.evaluate(() => ({ flow: getComputedStyle(document.getElementById('layout')).display, width: document.getElementById('drawflow').getBoundingClientRect().width }));
+        check('closing the expanded map brings the flow back', closed.flow !== 'none' && closed.width > 900, JSON.stringify(closed));
+        await page.evaluate(() => JETLNativeNav('results'));
+        await page.waitForTimeout(300);
         // Ampliar: el mapa ocupa todo menos la barra; al girar a vertical se deshace.
         await page.click('#btn-map-expand');
         await page.waitForTimeout(400);

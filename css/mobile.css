@@ -2,6 +2,9 @@
     --mobile-dock-height: 72px;
     --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-safe-top: env(safe-area-inset-top, 0px);
+    /* Muesca e indicador de inicio en horizontal (iPhone): con viewport-fit=cover la
+       app ocupa toda la pantalla y aparta de esas zonas lo que se toca. */
+    --mobile-safe-right: env(safe-area-inset-right, 0px);
     /* Hojas del dock (Nodos, Historial, Resultados, Proyecto, Acciones): todas
        suben desde abajo con la misma superficie, asa, cabecera y animación. */
     --sheet-bg: #202023;
@@ -917,6 +920,23 @@ html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape
     animation: sheet-left var(--sheet-motion);
 }
 
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #header {
+    padding-right: calc(14px + var(--mobile-safe-right));
+}
+
+/* Lo que toca el borde derecho deja libre la zona de la muesca. */
+html.ui-touch[data-layout="phone-landscape"] #sidebar,
+html.ui-touch[data-layout="phone-landscape"] #bottom-panel,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal .run-history-content {
+    padding-right: var(--mobile-safe-right);
+}
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet {
+    padding-right: calc(18px + var(--mobile-safe-right));
+}
+html.ui-touch[data-layout="phone-landscape"] body.action-hub-open #action-hub {
+    padding-right: calc(18px + var(--mobile-safe-right));
+}
+
 html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #toast,
 html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #loader {
     left: var(--rail-width);
@@ -944,6 +964,7 @@ html.ui-touch[data-layout="tablet-landscape"] #bottom-panel {
     right: 0;
     width: var(--results-width);
     padding-top: var(--mobile-safe-top);
+    padding-right: var(--mobile-safe-right);
     border-left: 1px solid rgba(255, 255, 255, .1);
     border-radius: 0;
     box-shadow: none;

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui, viewport-fit=cover">
     <meta name="theme-color" content="#202020">
     <!-- Sellado por scripts/build.mjs con el commit y el número de despliegue. -->
     <meta name="jetl-build" content="dev">
@@ -119,12 +119,19 @@
                 return !!active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
             }
 
+            function screenOrientation() {
+                return (window.screen && window.screen.orientation && window.screen.orientation.type) || String(window.orientation);
+            }
+            var appliedOrientation = screenOrientation();
+
             function apply(force) {
                 var next = compute();
                 if (current && current.touch === next.touch && current.layout === next.layout) return;
                 // Un teclado en pantalla puede encoger la ventana: mientras se escribe no
-                // se cambia de disposición (sí de modo, que sólo cambia por el ajuste).
-                if (current && !force && current.touch === next.touch && editingText()) return;
+                // se cambia de disposición, salvo que se haya girado el dispositivo.
+                var turned = screenOrientation() !== appliedOrientation;
+                if (current && !force && !turned && current.touch === next.touch && editingText()) return;
+                appliedOrientation = screenOrientation();
                 var previous = current;
                 current = next;
                 root.classList.toggle('ui-touch', next.touch);
@@ -151,10 +158,22 @@
                     apply(true);
                 }
             };
+            // Al girar, iOS avisa a veces antes de actualizar innerWidth/innerHeight: se
+            // vuelve a mirar un poco después, hasta que las medidas se asientan.
+            var settleTimers = [];
+            function settle() {
+                apply();
+                settleTimers.forEach(window.clearTimeout);
+                settleTimers = [100, 300, 700].map(function (delay) { return window.setTimeout(function () { apply(); }, delay); });
+            }
+            var orientation = window.matchMedia('(orientation: landscape)');
+
             apply(true);
             if (coarse.addEventListener) coarse.addEventListener('change', function () { apply(); });
             if (narrow.addEventListener) narrow.addEventListener('change', function () { apply(); });
-            window.addEventListener('resize', function () { apply(); });
+            if (orientation.addEventListener) orientation.addEventListener('change', settle);
+            window.addEventListener('resize', settle);
+            window.addEventListener('orientationchange', settle);
             document.addEventListener('focusout', function () { window.setTimeout(apply, 300); });
         })();
     </script>
@@ -2210,6 +2229,9 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
     --mobile-dock-height: 72px;
     --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-safe-top: env(safe-area-inset-top, 0px);
+    /* Muesca e indicador de inicio en horizontal (iPhone): con viewport-fit=cover la
+       app ocupa toda la pantalla y aparta de esas zonas lo que se toca. */
+    --mobile-safe-right: env(safe-area-inset-right, 0px);
     /* Hojas del dock (Nodos, Historial, Resultados, Proyecto, Acciones): todas
        suben desde abajo con la misma superficie, asa, cabecera y animación. */
     --sheet-bg: #202023;
@@ -3125,6 +3147,23 @@ html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape
     animation: sheet-left var(--sheet-motion);
 }
 
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #header {
+    padding-right: calc(14px + var(--mobile-safe-right));
+}
+
+/* Lo que toca el borde derecho deja libre la zona de la muesca. */
+html.ui-touch[data-layout="phone-landscape"] #sidebar,
+html.ui-touch[data-layout="phone-landscape"] #bottom-panel,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal .run-history-content {
+    padding-right: var(--mobile-safe-right);
+}
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet {
+    padding-right: calc(18px + var(--mobile-safe-right));
+}
+html.ui-touch[data-layout="phone-landscape"] body.action-hub-open #action-hub {
+    padding-right: calc(18px + var(--mobile-safe-right));
+}
+
 html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #toast,
 html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #loader {
     left: var(--rail-width);
@@ -3152,6 +3191,7 @@ html.ui-touch[data-layout="tablet-landscape"] #bottom-panel {
     right: 0;
     width: var(--results-width);
     padding-top: var(--mobile-safe-top);
+    padding-right: var(--mobile-safe-right);
     border-left: 1px solid rgba(255, 255, 255, .1);
     border-radius: 0;
     box-shadow: none;

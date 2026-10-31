@@ -61,6 +61,8 @@ function initTabletResults() {
     initResize(panel);
     panel.addEventListener('click', (event) => {
         if (window.JETLUi?.layout() !== 'tablet-landscape' || !event.target.closest('.panel-sheet-close')) return;
+        // Con el mapa ampliado el lienzo está oculto: cerrar vuelve al flujo, no lo deja en blanco.
+        if (document.body.classList.contains('map-panel-maximized')) window.toggleMapPanelExpand?.(false);
         document.body.classList.add('results-hidden');
         JETLEvents.emit('canvas:fit');
     });
