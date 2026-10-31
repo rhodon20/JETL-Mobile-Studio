@@ -193,6 +193,8 @@
                 if (overlay) overlay.style.display = 'block';
             } else if (view === 'results') {
                 document.body.classList.add('mobile-results-open');
+                // Tablet en horizontal: Resultados vuelve a mostrar el panel fijo si se ocultó.
+                document.body.classList.remove('results-hidden');
                 var runtime = typeof window.JETLEnsureRuntime === 'function'
                     ? window.JETLEnsureRuntime()
                     : window.JETLRuntimeReady;
@@ -3003,10 +3005,10 @@ html:where(.ui-touch),
     html.ui-desktop #header .toolbar .btn[data-ui-mode] { display: inline-flex; }
 }
 
-/* ---- Móvil en horizontal: la barra de navegación pasa al lateral izquierdo (en
-   horizontal falta altura, no anchura) y las hojas salen por la derecha, a media
+/* ---- En horizontal (móvil y tablet): la barra de navegación pasa al lateral
+   izquierdo (falta altura, no anchura) y las hojas salen por la derecha, a media
    pantalla, para seguir viendo parte del flujo. ---- */
-html.ui-touch[data-layout="phone-landscape"] {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) {
     --mobile-dock-height: 0px;
     --rail-width: calc(72px + env(safe-area-inset-left, 0px));
     --side-sheet-width: min(520px, 62vw);
@@ -3015,7 +3017,7 @@ html.ui-touch[data-layout="phone-landscape"] {
     --sheet-shadow: -18px 0 50px rgba(0, 0, 0, .5);
 }
 
-html.ui-touch[data-layout="phone-landscape"] body {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) body {
     padding-left: var(--rail-width);
     padding-bottom: var(--mobile-safe-bottom);
 }
@@ -3025,7 +3027,7 @@ html.ui-touch[data-layout="phone-landscape"] #header {
     flex-basis: 46px;
 }
 
-html.ui-touch[data-layout="phone-landscape"] #mobile-dock {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-dock {
     top: 0;
     right: auto;
     bottom: 0;
@@ -3041,7 +3043,7 @@ html.ui-touch[data-layout="phone-landscape"] #mobile-dock {
     box-shadow: 10px 0 28px rgba(0, 0, 0, .28);
 }
 
-html.ui-touch[data-layout="phone-landscape"] .mobile-run-btn {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) .mobile-run-btn {
     height: 58px;
     margin-top: 0;
     border-width: 3px;
@@ -3050,7 +3052,7 @@ html.ui-touch[data-layout="phone-landscape"] .mobile-run-btn {
 /* Hojas a la derecha, de alto completo. */
 html.ui-touch[data-layout="phone-landscape"] #sidebar,
 html.ui-touch[data-layout="phone-landscape"] #bottom-panel,
-html.ui-touch[data-layout="phone-landscape"] #mobile-project-sheet {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet {
     top: 0;
     bottom: 0;
     left: auto;
@@ -3061,7 +3063,7 @@ html.ui-touch[data-layout="phone-landscape"] #mobile-project-sheet {
 }
 
 html.ui-touch[data-layout="phone-landscape"] #sidebar,
-html.ui-touch[data-layout="phone-landscape"] #mobile-project-sheet {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet {
     transform: translateX(calc(100% + 4px)) !important;
 }
 
@@ -3071,26 +3073,26 @@ html.ui-touch[data-layout="phone-landscape"] #bottom-panel {
 
 html.ui-touch[data-layout="phone-landscape"] #mobile-state-nodes:checked ~ #layout #sidebar,
 html.ui-touch[data-layout="phone-landscape"] body.mobile-nodes-open #sidebar,
-html.ui-touch[data-layout="phone-landscape"] #mobile-state-project:checked ~ #mobile-project-sheet,
-html.ui-touch[data-layout="phone-landscape"] body.mobile-sheet-open #mobile-project-sheet,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-state-project:checked ~ #mobile-project-sheet,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) body.mobile-sheet-open #mobile-project-sheet,
 html.ui-touch[data-layout="phone-landscape"] #mobile-state-results:checked ~ #bottom-panel,
 html.ui-touch[data-layout="phone-landscape"] body.mobile-results-open #bottom-panel {
     transform: translate3d(0, 0, 0) !important;
 }
 
-html.ui-touch[data-layout="phone-landscape"] #mobile-project-sheet { overflow-y: auto; }
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet { overflow-y: auto; }
 
 /* El asa de arrastre es de las hojas que suben desde abajo. */
-html.ui-touch[data-layout="phone-landscape"] #sidebar > .mobile-sheet-handle,
-html.ui-touch[data-layout="phone-landscape"] #mobile-project-sheet > .mobile-sheet-handle,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #sidebar > .mobile-sheet-handle,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-project-sheet > .mobile-sheet-handle,
 html.ui-touch[data-layout="phone-landscape"] #bottom-panel::before,
-html.ui-touch[data-layout="phone-landscape"] #run-history-modal .run-history-content::before,
-html.ui-touch[data-layout="phone-landscape"] #action-hub::before {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal .run-history-content::before,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #action-hub::before {
     display: none;
 }
 
-html.ui-touch[data-layout="phone-landscape"] #mobile-scrim,
-html.ui-touch[data-layout="phone-landscape"] #sidebar-overlay {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #mobile-scrim,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #sidebar-overlay {
     inset: 0 0 0 var(--rail-width) !important;
 }
 
@@ -3106,26 +3108,188 @@ html.ui-touch[data-layout="phone-landscape"] body.action-hub-open #action-hub {
     animation: sheet-left var(--sheet-motion);
 }
 
-html.ui-touch[data-layout="phone-landscape"] #run-history-modal {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal {
     inset: 0 0 0 var(--rail-width) !important;
     align-items: stretch !important;
     justify-content: flex-end !important;
 }
 
-html.ui-touch[data-layout="phone-landscape"] #run-history-modal .run-history-content {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal .run-history-content {
     width: var(--side-sheet-width) !important;
     height: 100dvh;
     padding-top: calc(var(--mobile-safe-top) + 8px);
     border-radius: var(--sheet-radius) 0 0 var(--sheet-radius) !important;
 }
 
-html.ui-touch[data-layout="phone-landscape"] #run-history-modal.is-open .run-history-content {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #run-history-modal.is-open .run-history-content {
     animation: sheet-left var(--sheet-motion);
 }
 
-html.ui-touch[data-layout="phone-landscape"] #toast,
-html.ui-touch[data-layout="phone-landscape"] #loader {
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #toast,
+html.ui-touch:is([data-layout="phone-landscape"], [data-layout="tablet-landscape"]) #loader {
     left: var(--rail-width);
+}
+
+/* ---- Tablet en horizontal: modo «estudio». Flujo en el centro y Resultados fijos a
+   la derecha (el divisor reparte el espacio; la X los oculta y Resultados los
+   vuelve a mostrar); el catálogo, junto a la barra; Acciones, tarjeta flotante. ---- */
+html.ui-touch[data-layout="tablet-landscape"] {
+    --rail-width: calc(84px + env(safe-area-inset-left, 0px));
+    --results-width: 42vw;
+    --side-sheet-width: min(520px, 46vw);
+}
+
+html.ui-touch[data-layout="tablet-landscape"] body { padding-right: var(--results-width); }
+html.ui-touch[data-layout="tablet-landscape"] body.results-hidden,
+html.ui-touch[data-layout="tablet-landscape"] body.map-panel-maximized { padding-right: 0; }
+
+html.ui-touch[data-layout="tablet-landscape"] #mobile-dock { grid-auto-rows: 72px; gap: 8px; }
+
+html.ui-touch[data-layout="tablet-landscape"] #bottom-panel {
+    top: 0;
+    bottom: 0;
+    left: auto;
+    right: 0;
+    width: var(--results-width);
+    padding-top: var(--mobile-safe-top);
+    border-left: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 0;
+    box-shadow: none;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none !important;
+    transition: none;
+}
+html.ui-touch[data-layout="tablet-landscape"] body.results-hidden #bottom-panel { visibility: hidden; pointer-events: none; }
+html.ui-touch[data-layout="tablet-landscape"] body.map-panel-maximized #bottom-panel { left: var(--rail-width); width: auto; }
+
+/* Divisor: franja izquierda de Resultados. */
+html.ui-touch[data-layout="tablet-landscape"] #bottom-panel::before {
+    top: 50%;
+    left: 0;
+    width: 5px;
+    height: 48px;
+    margin: -24px 0 0 3px;
+    cursor: ew-resize;
+}
+html.ui-touch[data-layout="tablet-landscape"] body.map-panel-maximized #bottom-panel::before { display: none; }
+
+/* Sin velo: el flujo y los resultados se usan a la vez. */
+html.ui-touch[data-layout="tablet-landscape"] body.mobile-results-open #mobile-scrim,
+html.ui-touch[data-layout="tablet-landscape"] #mobile-state-results:checked ~ #mobile-scrim {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Ampliar el mapa a toda la pantalla, como en escritorio. */
+html.ui-touch[data-layout="tablet-landscape"] #btn-map-expand {
+    display: grid;
+    place-items: center;
+    padding: 0;
+}
+html.ui-touch[data-layout="tablet-landscape"] #panel-tabs .panel-tabs-main {
+    grid-template-columns: 42px repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+html.ui-touch[data-layout="tablet-landscape"] #sidebar {
+    top: 0;
+    bottom: 0;
+    left: var(--rail-width);
+    right: auto;
+    width: min(400px, 40vw);
+    padding-top: calc(var(--mobile-safe-top) + 10px);
+    border-radius: 0 var(--sheet-radius) var(--sheet-radius) 0;
+    box-shadow: 18px 0 50px rgba(0, 0, 0, .5);
+    transform: translateX(calc(-100% - var(--rail-width) - 4px)) !important;
+}
+html.ui-touch[data-layout="tablet-landscape"] #mobile-state-nodes:checked ~ #layout #sidebar,
+html.ui-touch[data-layout="tablet-landscape"] body.mobile-nodes-open #sidebar { transform: translateX(0) !important; }
+
+html.ui-touch[data-layout="tablet-landscape"] body.action-hub-open #action-hub {
+    top: auto;
+    left: calc(var(--rail-width) + 12px);
+    right: auto;
+    bottom: calc(16px + var(--mobile-safe-bottom));
+    width: min(400px, calc(100vw - var(--rail-width) - 24px));
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .6);
+    animation: none;
+}
+
+html.ui-touch[data-layout="tablet-landscape"] #toast { right: var(--results-width); }
+html.ui-touch[data-layout="tablet-landscape"] body.results-hidden #toast { right: 0; }
+
+/* ---- Tablet en vertical: la misma interfaz que el móvil aprovechando el espacio.
+   Barra flotante de ancho fijo; Resultados a media pantalla, sin tapar el flujo
+   (el asa ajusta su altura); el catálogo, panel lateral; Proyecto, Acciones e
+   Historial, tarjetas de anchura limitada. ---- */
+html.ui-touch[data-layout="tablet"] {
+    --dock-float-gap: 14px;
+    --mobile-dock-height: calc(68px + var(--dock-float-gap));
+    --card-width: min(640px, calc(100vw - 32px));
+    --results-top: 48dvh;
+}
+
+html.ui-touch[data-layout="tablet"] #mobile-dock {
+    left: 0;
+    right: 0;
+    bottom: calc(var(--dock-float-gap) + var(--mobile-safe-bottom));
+    width: min(560px, calc(100vw - 32px));
+    height: 68px;
+    margin: 0 auto;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 22px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .45);
+}
+
+html.ui-touch[data-layout="tablet"] .mobile-run-btn { margin-top: -14px; }
+
+/* Resultados: mitad inferior; el flujo de arriba sigue a la vista y se puede tocar. */
+html.ui-touch[data-layout="tablet"] #bottom-panel { top: var(--results-top); }
+html.ui-touch[data-layout="tablet"] body.mobile-results-open #mobile-scrim,
+html.ui-touch[data-layout="tablet"] #mobile-state-results:checked ~ #mobile-scrim {
+    opacity: 0;
+    pointer-events: none;
+}
+html.ui-touch[data-layout="tablet"] #bottom-panel::before { width: 64px; margin-left: -32px; cursor: ns-resize; }
+html.ui-touch[data-layout="tablet"] #bottom-panel.is-resizing { transition: none; }
+
+/* Catálogo: panel lateral izquierdo. */
+html.ui-touch[data-layout="tablet"] #sidebar {
+    top: var(--sheet-top);
+    bottom: var(--sheet-bottom);
+    left: 0;
+    right: auto;
+    width: min(420px, 52vw);
+    border-radius: 0 var(--sheet-radius) var(--sheet-radius) 0;
+    transform: translateX(calc(-100% - 4px)) !important;
+}
+html.ui-touch[data-layout="tablet"] #mobile-state-nodes:checked ~ #layout #sidebar,
+html.ui-touch[data-layout="tablet"] body.mobile-nodes-open #sidebar { transform: translateX(0) !important; }
+html.ui-touch[data-layout="tablet"] #sidebar > .mobile-sheet-handle { display: none; }
+
+/* Proyecto, Acciones e Historial: tarjetas centradas sobre la barra. */
+html.ui-touch[data-layout="tablet"] #mobile-project-sheet,
+html.ui-touch[data-layout="tablet"] body.action-hub-open #action-hub {
+    left: 0;
+    right: 0;
+    width: var(--card-width);
+    margin: 0 auto;
+    bottom: calc(var(--sheet-bottom) + 10px);
+    border-radius: var(--sheet-radius);
+}
+/* Cerrada, la tarjeta baja del todo: con la barra flotante asomaría por los lados. */
+html.ui-touch[data-layout="tablet"] #mobile-project-sheet { transform: translateY(calc(100% + var(--sheet-bottom) + 24px)); }
+html.ui-touch[data-layout="tablet"] body.mobile-sheet-open #mobile-project-sheet,
+html.ui-touch[data-layout="tablet"] #mobile-state-project:checked ~ #mobile-project-sheet { transform: translateY(0); }
+html.ui-touch[data-layout="tablet"] #run-history-modal { justify-content: center !important; }
+html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
+    width: var(--card-width) !important;
+    margin-bottom: 10px;
+    border-radius: var(--sheet-radius) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

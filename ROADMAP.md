@@ -55,9 +55,11 @@
    aprobadas por el usuario). Fase 1 hecha: una sola decisión táctil/escritorio
    (pantalla táctil o <= 768 px, o el ajuste Proyecto > Interfaz), y móvil en
    horizontal con barra lateral y hojas por la derecha (antes recibía la interfaz
-   de escritorio). Fase 2: tablet en vertical (resultados a media pantalla, barra
-   flotante, catálogo lateral). Fase 3: tablet en horizontal (flujo y resultados
-   lado a lado, Acciones como tarjeta). Sin probar en un iPad real.
+   de escritorio). Fases 2 y 3 hechas: tablet en vertical (resultados a media
+   pantalla con asa, barra flotante, catálogo lateral) y en horizontal (flujo y
+   resultados lado a lado con divisor, ampliar mapa, Acciones como tarjeta);
+   `js/ui/tabletResults.js` y `tests/ui-layouts.mjs`. Sin probar en un iPad real
+   (sólo emulado en Chromium).
 6. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
 

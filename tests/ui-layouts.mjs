@@ -69,6 +69,69 @@ try {
         await browser.close();
     }
 
+    const rect = (page, selector) => page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), width: Math.round(r.width), height: Math.round(r.height), visible: getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none' };
+    }, selector);
+
+    // Tablet en vertical: barra flotante, resultados a media pantalla sin velo, catálogo a la izquierda.
+    {
+        const { browser, page } = await boot({ width: 820, height: 1180 }, true);
+        const dock = await rect(page, '#mobile-dock');
+        check('on a tablet in portrait the bar floats with a fixed width', dock.width <= 560 && dock.left > 0 && dock.bottom < 1180, JSON.stringify(dock));
+        await page.evaluate(() => JETLNativeNav('results'));
+        await page.waitForTimeout(500);
+        const results = await rect(page, '#bottom-panel');
+        const scrim = await page.evaluate(() => getComputedStyle(document.getElementById('mobile-scrim')).opacity);
+        check('on a tablet in portrait the results take the lower half and leave the flow usable', results.top > 450 && results.top < 700 && Number(scrim) === 0, JSON.stringify({ results, scrim }));
+        await page.evaluate(() => JETLNativeNav('nodes'));
+        await page.waitForTimeout(500);
+        const catalog = await rect(page, '#sidebar');
+        check('on a tablet in portrait the catalog is a side panel', catalog.left === 0 && catalog.width <= 430, JSON.stringify(catalog));
+        await browser.close();
+    }
+
+    // Tablet en horizontal: flujo y resultados lado a lado.
+    {
+        const { browser, page } = await boot({ width: 1180, height: 820 }, true);
+        await page.waitForFunction(() => typeof map !== 'undefined' && map, null, { timeout: 30000 });
+        const panel = await rect(page, '#bottom-panel');
+        const flow = await rect(page, '#drawflow');
+        check('on a tablet in landscape the results are always shown on the right, next to the flow', panel.visible && panel.right === 1180 && panel.width > 400 && flow.right <= panel.left + 1 && flow.left >= 80, JSON.stringify({ panel, flow }));
+        await page.click('#bottom-panel .panel-sheet-close');
+        await page.waitForTimeout(300);
+        const hidden = await rect(page, '#bottom-panel');
+        const wide = await rect(page, '#drawflow');
+        await page.evaluate(() => JETLNativeNav('results'));
+        await page.waitForTimeout(300);
+        const shown = await rect(page, '#bottom-panel');
+        check('the X hides the results panel and Resultados brings it back', !hidden.visible && wide.right === 1180 && shown.visible, JSON.stringify({ hidden, wide, shown }));
+        const before = shown.width;
+        await page.mouse.move(shown.left + 6, 400);
+        await page.mouse.down();
+        await page.mouse.move(shown.left - 150, 400, { steps: 5 });
+        await page.mouse.up();
+        await page.waitForTimeout(200);
+        const dragged = await rect(page, '#bottom-panel');
+        check('dragging the divider gives the results more room', dragged.width > before + 100, JSON.stringify({ before, after: dragged.width }));
+        await page.click('#mobile-run');
+        await page.waitForTimeout(400);
+        const hub = await rect(page, '#action-hub');
+        check('on a tablet in landscape Acciones is a floating card next to the bar', hub.visible && hub.width <= 400 && hub.left > 80 && hub.bottom < 820, JSON.stringify(hub));
+        await page.keyboard.press('Escape');
+        // Ampliar: el mapa ocupa todo menos la barra; al girar a vertical se deshace.
+        await page.click('#btn-map-expand');
+        await page.waitForTimeout(400);
+        const expanded = await rect(page, '#bottom-panel');
+        await page.setViewportSize({ width: 820, height: 1180 });
+        await page.waitForTimeout(500);
+        const rotated = await page.evaluate(() => ({ maximized: document.body.classList.contains('map-panel-maximized'), layout: document.documentElement.dataset.layout, flow: getComputedStyle(document.getElementById('layout')).display }));
+        check('Ampliar takes the map to full screen, and turning the tablet brings the flow back', expanded.left <= 90 && expanded.right === 1180 && !rotated.maximized && rotated.layout === 'tablet' && rotated.flow !== 'none', JSON.stringify({ expanded, rotated }));
+        await browser.close();
+    }
+
     // Ordenador con ratón: escritorio, aunque la ventana sea ancha o mediana.
     {
         const { browser, page } = await boot({ width: 1400, height: 900 }, false);

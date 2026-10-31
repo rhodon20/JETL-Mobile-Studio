@@ -26,7 +26,9 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   con ratón. La decide la cabecera de `index.html` (`window.JETLUi`, clases
   `ui-touch`/`ui-desktop` y `data-layout` en `<html>`), y se puede fijar en
   Proyecto > Interfaz. En horizontal la barra pasa al lateral izquierdo y las
-  hojas salen por la derecha.
+  hojas salen por la derecha. En tablet: en vertical, barra flotante, Resultados
+  en la mitad inferior (asa para ajustar) y catálogo lateral; en horizontal, flujo
+  y Resultados lado a lado con un divisor, y Acciones como tarjeta flotante.
 - Política de privacidad: `privacy.html` (enlazada desde el panel de versión). «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
   problemas que lleva a cada nodo), nota en el lienzo, encuadrar, plantillas y
