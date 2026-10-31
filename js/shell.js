@@ -253,8 +253,31 @@ function syncGridSnapButton() {
     });
 }
 
+// Interfaz táctil, de escritorio o automática (Proyecto > Interfaz). La decide la
+// cabecera de index.html (JETLUi); aquí sólo se elige y se refleja.
+function syncUiModeButtons() {
+    const pref = window.JETLUi?.preference() || 'auto';
+    document.querySelectorAll('.ui-mode-options [data-ui-mode]').forEach((button) => {
+        button.setAttribute('aria-checked', String(button.dataset.uiMode === pref));
+    });
+}
+
+function initUiModeSetting() {
+    syncUiModeButtons();
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-ui-mode]');
+        if (!button || !window.JETLUi) return;
+        window.JETLUi.setPreference(button.dataset.uiMode);
+        syncUiModeButtons();
+        const names = { auto: 'automática', touch: 'táctil', desktop: 'de escritorio' };
+        showToast(`Interfaz ${names[window.JETLUi.preference()]}`, 'info');
+    });
+    window.addEventListener('jetl:ui-change', syncUiModeButtons);
+}
+
 function initEngineDelegation() {
     syncGridSnapButton();
+    initUiModeSetting();
     document.addEventListener('click', (e) => {
         const schemaActionEl = e.target.closest('[data-schema-action]');
         if (schemaActionEl && !window.JETLSchemaUI) {

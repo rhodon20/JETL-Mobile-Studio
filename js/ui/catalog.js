@@ -235,7 +235,7 @@ function focusFlowNode(nodeId) {
     const viewport = document.getElementById('drawflow');
     if (!node || !viewport || !editor?.precanvas) return false;
 
-    const zoom = Math.min(1, Math.max(editor.zoom_min || 0.5, window.innerWidth <= 768 ? 0.88 : (editor.zoom || 1)));
+    const zoom = Math.min(1, Math.max(editor.zoom_min || 0.5, window.JETLUi?.isTouch() ? 0.88 : (editor.zoom || 1)));
     const centerX = node.offsetLeft + node.offsetWidth / 2;
     const centerY = node.offsetTop + node.offsetHeight / 2;
     const x = viewport.clientWidth / 2 - centerX * zoom;
@@ -295,7 +295,7 @@ function initQuickSearch() {
 
     if (!qs || !input || !results || !workspace || qs.dataset.ready === 'true') return;
     qs.dataset.ready = 'true';
-    const isMobileSearch = () => window.matchMedia('(max-width: 768px)').matches;
+    const isMobileSearch = () => !!window.JETLUi?.isTouch();
 
     workspace.addEventListener('mousemove', (e) => {
         if (qs.style.display !== 'block') {

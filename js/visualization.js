@@ -1090,7 +1090,7 @@ function togglePanelHeight() {
     if (mapPanelExpanded) return;
     const body = document.body;
     const button = document.getElementById('btn-panel-collapse');
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const isMobile = !!window.JETLUi?.isTouch();
 
     if (isMobile) {
         body.classList.remove('mobile-results-open');

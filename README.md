@@ -22,6 +22,11 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   apariencia (Resultados ocupa casi toda la pantalla). Al encadenar nodos el
   flujo crece hacia abajo en dos columnas, en zigzag. En Android, mantener pulsado
   el icono ofrece Nuevo flujo, Recuperar borrador, Abrir proyecto e Historial.
+- Interfaz táctil en móvil y tablet, en cualquier orientación; la de escritorio,
+  con ratón. La decide la cabecera de `index.html` (`window.JETLUi`, clases
+  `ui-touch`/`ui-desktop` y `data-layout` en `<html>`), y se puede fijar en
+  Proyecto > Interfaz. En horizontal la barra pasa al lateral izquierdo y las
+  hojas salen por la derecha.
 - Política de privacidad: `privacy.html` (enlazada desde el panel de versión). «Acciones» abre un panel según el contexto:
   sin selección, ejecutar todo, buscar en el lienzo, validar el flujo (lista de
   problemas que lleva a cada nodo), nota en el lienzo, encuadrar, plantillas y

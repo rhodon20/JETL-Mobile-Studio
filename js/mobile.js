@@ -1,10 +1,9 @@
 (function () {
     'use strict';
 
-    const mobileQuery = window.matchMedia('(max-width: 768px)');
-
+    // Interfaz táctil (móvil y tablet): la decide la cabecera de index.html (JETLUi).
     function isMobile() {
-        return mobileQuery.matches;
+        return !!window.JETLUi?.isTouch();
     }
 
     function setActive(view) {
@@ -115,7 +114,7 @@
         window.setTimeout(() => openView('flow'), 0);
     });
 
-    mobileQuery.addEventListener?.('change', () => {
+    window.addEventListener('jetl:ui-change', () => {
         if (!isMobile()) closeTransientViews();
         else scheduleFlowFit();
     });

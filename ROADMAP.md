@@ -51,7 +51,14 @@
    todo descompresión y crear ~10 millones de valores; extraer columnas con
    `toArray` no mejoró (medido). Bajarla exigiría leer en un worker o no
    materializar todas las columnas.
-5. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
+5. **Interfaz táctil en tablet y en horizontal** (31 de octubre, maquetas
+   aprobadas por el usuario). Fase 1 hecha: una sola decisión táctil/escritorio
+   (pantalla táctil o <= 768 px, o el ajuste Proyecto > Interfaz), y móvil en
+   horizontal con barra lateral y hojas por la derecha (antes recibía la interfaz
+   de escritorio). Fase 2: tablet en vertical (resultados a media pantalla, barra
+   flotante, catálogo lateral). Fase 3: tablet en horizontal (flujo y resultados
+   lado a lado, Acciones como tarjeta). Sin probar en un iPad real.
+6. **Perfilar ejecuciones lentas reales** (p. ej. OSM Reader + 2 nodos con
    4.445 entidades: 38,5 s en el historial del usuario).
 
 ## Ideas para más adelante (sin fecha)

@@ -70,7 +70,7 @@ test('el centrado aplica una transformación real y selecciona el nodo', () => {
     let dispatched = null;
     let synced = false;
     const context = {
-        window: { innerWidth: 390, JETLSyncCanvasViewport() { synced = true; } },
+        window: { innerWidth: 390, JETLUi: { isTouch: () => true }, JETLSyncCanvasViewport() { synced = true; } },
         document: {
             getElementById(id) {
                 if (id === 'node-2') return node;
