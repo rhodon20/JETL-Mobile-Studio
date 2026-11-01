@@ -1,9 +1,23 @@
 # App de Android (Google Play)
 
 La app de Android es una **Trusted Web Activity (TWA)**: un envoltorio mínimo que
-abre la web publicada en Cloudflare (`https://jetl-studio.javierlorenzom93.workers.dev`)
+abre la web publicada en GitHub Pages (`https://rhodon20.github.io/JETL-Mobile-Studio/`)
 a pantalla completa con Chrome. La app no lleva el código de JETL Studio: cada
 despliegue de la web llega a los usuarios sin publicar una versión nueva en Play.
+
+Hasta la versión 1.0.0 abría la copia de Cloudflare
+(`https://jetl-studio.javierlorenzom93.workers.dev`), que sigue publicándose para
+los enlaces desde el ordenador. Se cambió (1.0.1, noviembre de 2026) porque en España
+algunos proveedores bloquean IP de Cloudflare los fines de semana: un usuario nuevo
+veía un error de certificado al abrir la app por primera vez. Los borradores se
+guardan por dirección: los testers de la 1.0.0 no ven los suyos en la 1.0.1.
+
+Android busca el vínculo de la app en la raíz del dominio
+(`https://rhodon20.github.io/.well-known/assetlinks.json`), que no es esta web (vive
+en una subcarpeta) sino el repositorio `rhodon20/rhodon20.github.io`. Ese repositorio
+sólo tiene una copia de `.well-known/assetlinks.json` y un `.nojekyll` (sin él, GitHub
+Pages no publica carpetas que empiezan por punto). Si cambian las huellas, hay que
+actualizar las dos copias; la CI (`deploy`) falla si no coinciden.
 
 | Dato | Valor |
 | --- | --- |
@@ -11,7 +25,7 @@ despliegue de la web llega a los usuarios sin publicar una versión nueva en Pla
 | Proyecto | `android/`, generado con Bubblewrap 1.27.0 a partir de `manifest.json` |
 | Configuración | `android/twa-manifest.json` (fuente de verdad del envoltorio) |
 | Compilación | `.github/workflows/android.yml` → artefacto `jetl-studio-android` |
-| Verificación de dominio | `.well-known/assetlinks.json`, publicado por el build |
+| Verificación de dominio | `.well-known/assetlinks.json`; copia en la raíz de `rhodon20.github.io` (repositorio `rhodon20.github.io`) |
 
 ## Cuándo hay que recompilar la app
 

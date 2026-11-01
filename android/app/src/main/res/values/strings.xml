@@ -46,7 +46,7 @@
         \"relation\": [\"delegate_permission/common.handle_all_urls\"],
         \"target\": {
             \"namespace\": \"web\",
-            \"site\": \"https://jetl-studio.javierlorenzom93.workers.dev\"
+            \"site\": \"https://rhodon20.github.io\"
         }
     }]
     

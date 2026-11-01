@@ -1,7 +1,7 @@
 name: Android (TWA)
 
 # La app de Android es una Trusted Web Activity: abre la web publicada en
-# Cloudflare a pantalla completa. Sólo hace falta recompilarla cuando cambia
+# GitHub Pages a pantalla completa (docs/ANDROID.md). Sólo hace falta recompilarla cuando cambia
 # el envoltorio (android/), no cuando cambia la web.
 on:
   push:

@@ -49,9 +49,33 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+      # La app de Google Play abre esta copia (GitHub Pages no pasa por Cloudflare,
+      # que se bloquea en España algunos fines de semana). Android busca el vínculo
+      # de la app en la raíz del dominio, que publica el repositorio
+      # rhodon20.github.io: tiene que coincidir con .well-known/assetlinks.json.
+      - uses: actions/checkout@v4
+      - name: Verify GitHub Pages and the Android app link
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          want=${GITHUB_SHA::7}
+          for i in $(seq 1 60); do
+            # El parámetro evita la caché de Pages (hasta 10 minutos).
+            got=$(curl -fsS "${PAGE_URL%/}/version.json?check=$i-$RANDOM" | jq -r .sha || true)
+            [ "$got" = "$want" ] && break
+            sleep 10
+          done
+          [ "$got" = "$want" ] || { echo "::error::${PAGE_URL}version.json sirve '$got', se esperaba '$want'"; exit 1; }
+          root="https://$(echo "$PAGE_URL" | cut -d/ -f3)"
+          headers=$(curl -sS -o "$RUNNER_TEMP/assetlinks.live.json" -D - "$root/.well-known/assetlinks.json")
+          echo "$headers" | head -1 | grep -q ' 200' || { echo "::error::$root/.well-known/assetlinks.json no está publicado (repositorio rhodon20.github.io)"; echo "$headers"; exit 1; }
+          echo "$headers" | grep -qi '^content-type: application/json' || { echo "::error::assetlinks.json sin content-type JSON"; exit 1; }
+          jq -S . .well-known/assetlinks.json | diff - <(jq -S . "$RUNNER_TEMP/assetlinks.live.json") || { echo "::error::assetlinks.json de $root distinto del de este repositorio"; exit 1; }
+          echo "Publicado y verificado: $PAGE_URL ($want); vínculo de la app en $root"
 
-  # Cloudflare Workers (archivos estáticos): alojamiento en la raíz de un dominio,
-  # necesario para la app de Google Play (/.well-known/assetlinks.json). Sólo en
+  # Cloudflare Workers (archivos estáticos): copia para enlaces desde el ordenador
+  # (la app de Google Play abre la de GitHub Pages). Sólo en
   # main, tras pasar las pruebas, y sólo si el repositorio tiene los secretos
   # CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID (si faltan, se salta).
   deploy-cloudflare:

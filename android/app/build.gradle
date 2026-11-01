@@ -22,8 +22,8 @@ plugins {
 
 def twaManifest = [
     applicationId: 'es.jetljlm.studio',
-    hostName: 'jetl-studio.javierlorenzom93.workers.dev', // The domain being opened in the TWA.
-    launchUrl: '/index.html', // The start path for the TWA. Must be relative to the domain.
+    hostName: 'rhodon20.github.io', // The domain being opened in the TWA.
+    launchUrl: '/JETL-Mobile-Studio/index.html', // The start path for the TWA. Must be relative to the domain.
     name: 'JETL Studio', // The application name.
     launcherName: 'JETL Studio', // The name shown on the Android Launcher.
     themeColor: '#202020', // The color used for the status bar.
@@ -39,7 +39,7 @@ def twaManifest = [
     // - short_name: Shorter string used if |name| is too long.
     // - url: Absolute path of the URL to launch the app with (e.g '/create').
     // - icon: Name of the resource in the drawable folder to use as an icon.
-    shortcuts: [[name:'Nuevo flujo', short_name:'Nuevo', url:'https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=new', icon:'shortcut_0'],[name:'Recuperar el último borrador', short_name:'Borrador', url:'https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=draft', icon:'shortcut_1'],[name:'Abrir un proyecto', short_name:'Abrir', url:'https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=open', icon:'shortcut_2'],[name:'Historial de ejecuciones', short_name:'Historial', url:'https://jetl-studio.javierlorenzom93.workers.dev/index.html?action=history', icon:'shortcut_3']],
+    shortcuts: [[name:'Nuevo flujo', short_name:'Nuevo', url:'https://rhodon20.github.io/JETL-Mobile-Studio/index.html?action=new', icon:'shortcut_0'],[name:'Recuperar el último borrador', short_name:'Borrador', url:'https://rhodon20.github.io/JETL-Mobile-Studio/index.html?action=draft', icon:'shortcut_1'],[name:'Abrir un proyecto', short_name:'Abrir', url:'https://rhodon20.github.io/JETL-Mobile-Studio/index.html?action=open', icon:'shortcut_2'],[name:'Historial de ejecuciones', short_name:'Historial', url:'https://rhodon20.github.io/JETL-Mobile-Studio/index.html?action=history', icon:'shortcut_3']],
     // The duration of fade out animation in milliseconds to be played when removing splash screen.
     splashScreenFadeOutDuration: 300,
     generatorApp: 'bubblewrap-core 1.27.0', // Application that generated the Android Project
@@ -57,8 +57,8 @@ android {
         applicationId "es.jetljlm.studio"
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "1.0.1"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -76,12 +76,12 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'https://jetl-studio.javierlorenzom93.workers.dev/manifest.json'
+            resValue "string", "webManifestUrl", 'https://rhodon20.github.io/JETL-Mobile-Studio/manifest.json'
         
 
         
             // This is used by Meta Quest.
-            resValue "string", "fullScopeUrl", 'https://jetl-studio.javierlorenzom93.workers.dev/'
+            resValue "string", "fullScopeUrl", 'https://rhodon20.github.io/JETL-Mobile-Studio/'
         
 
         

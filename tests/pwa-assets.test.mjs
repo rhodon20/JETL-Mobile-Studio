@@ -64,7 +64,10 @@ test('la app Android (TWA) y la verificación de dominio coinciden con la web pu
     assert.ok(links.target.sha256_cert_fingerprints.length > 0);
     for (const fingerprint of links.target.sha256_cert_fingerprints) assert.match(fingerprint, /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/);
     assert.equal(new URL(twa.webManifestUrl).host, twa.host);
-    assert.equal(twa.startUrl, `/${manifest.start_url.replace(/^\.\//, '')}`);
+    // La app vive en una subcarpeta de GitHub Pages: la ruta de inicio es la del manifiesto dentro de ella.
+    assert.equal(new URL(twa.fullScopeUrl).host, twa.host);
+    assert.equal(twa.startUrl, new URL(manifest.start_url, twa.fullScopeUrl).pathname);
+    assert.ok(twa.shortcuts.every((s) => s.url.startsWith(twa.fullScopeUrl)), 'los accesos directos deben abrir la app publicada');
     assert.deepEqual(twa.shortcuts.map((s) => new URL(s.url).search), manifest.shortcuts.map((s) => new URL(s.url, 'https://x/').search));
     const gradle = readFileSync(new URL('android/app/build.gradle', root), 'utf8');
     assert.ok(gradle.includes(`hostName: '${twa.host}'`) && gradle.includes(`applicationId "${twa.packageId}"`), 'build.gradle desactualizado: regenerar con bubblewrap update');
