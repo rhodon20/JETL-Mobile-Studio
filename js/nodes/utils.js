@@ -53,7 +53,7 @@ const _utilRequestBody = (config, inputs) => {
 };
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     util_creator: {
-        cat: '3. UTILS', label: 'Creator', icon: 'fa-wand-magic-sparkles', color: '#7f8c8d', in: 0, out: 1,
+        cat: '3. UTILS', label: 'Crear entidad', alias: 'Creator', help: 'Crea entidades sin necesitar un archivo: indica cuántas (hasta 100 000), si llevan un punto X/Y o no tienen geometría, y sus atributos con su tipo. En los valores, {i} se sustituye por el número de cada entidad.', icon: 'fa-wand-magic-sparkles', color: '#7f8c8d', in: 0, out: 1,
         tpl: () => _utilEditor('df-creator-config', '1 entidad · sin geometría'),
         run: (id, inputs, dom) => {
             const config = _utilConfig(dom, '[df-creator-config]', { count: 1, geometry_mode: 'none', x: 0, y: 0, crs: '', instance_attr: '_creation_instance', attributes: [{ enabled: true, name: 'path', value: '', type: 'string' }] });
@@ -76,7 +76,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_http_caller: {
-        cat: '3. UTILS', label: 'HTTP Caller', icon: 'fa-globe', color: '#7f8c8d', in: 1, out: 1,
+        cat: '3. UTILS', label: 'Petición HTTP', alias: 'HTTP Caller', help: 'Hace una petición web (GET, POST, PUT, PATCH o DELETE) con autenticación opcional. En la URL puedes usar {atributo} de la primera entidad de entrada. Devuelve una entidad sin geometría con el estado, las cabeceras y el cuerpo de la respuesta.', icon: 'fa-globe', color: '#7f8c8d', in: 1, out: 1,
         tpl: () => _utilEditor('df-http-config', 'Petición HTTP configurable'),
         run: async (id, inputs, dom) => {
             const config = _utilConfig(dom, '[df-http-config]', { method: 'GET', url: '', timeout: 15, auth: 'none', headers: {}, body: '' });
@@ -88,7 +88,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_rest_request: {
-        cat: '3. UTILS', label: 'REST Request', icon: 'fa-cloud-arrow-down', color: '#7f8c8d', in: 1, out: 1,
+        cat: '3. UTILS', label: 'Petición REST', alias: 'REST Request', help: 'Llama a un servicio REST a partir de una URL base, una ruta y unos parámetros de consulta, que admiten {atributo} de la primera entidad. Si no indicas cuerpo, envía la entrada como JSON. Devuelve una entidad con la respuesta.', icon: 'fa-cloud-arrow-down', color: '#7f8c8d', in: 1, out: 1,
         tpl: () => _utilEditor('df-rest-config', 'Endpoint REST configurable'),
         run: async (id, inputs, dom) => {
             const config = _utilConfig(dom, '[df-rest-config]', { base_url: '', path: '', method: 'GET', timeout: 15, auth: 'none', query: {}, headers: {}, body: '' });
@@ -100,7 +100,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_graphql_request: {
-        cat: '3. UTILS', label: 'GraphQL Request', icon: 'fa-diagram-project', color: '#7f8c8d', in: 1, out: 1,
+        cat: '3. UTILS', label: 'Consulta GraphQL', alias: 'GraphQL Request', help: 'Envía una consulta GraphQL (con variables y nombre de operación opcionales) al servidor indicado, y admite autenticación. Devuelve una entidad sin geometría con el estado y la respuesta (texto y JSON).', icon: 'fa-diagram-project', color: '#7f8c8d', in: 1, out: 1,
         tpl: () => _utilEditor('df-graphql-config', 'Consulta GraphQL'),
         run: async (id, inputs, dom) => {
             const config = _utilConfig(dom, '[df-graphql-config]', { endpoint: '', operation_name: '', query: '', variables: {}, timeout: 15, auth: 'none', headers: {} });
@@ -110,7 +110,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_response_inspector: {
-        cat: '3. UTILS', label: 'Response Inspector', icon: 'fa-magnifying-glass', color: '#7f8c8d', in: 1, out: 1,
+        cat: '3. UTILS', label: 'Inspeccionar respuesta', alias: 'Response Inspector', help: 'Muestra en el propio nodo el código de estado, el tipo de contenido y el cuerpo de la respuesta de una petición web anterior. Deja pasar los datos sin cambios.', icon: 'fa-magnifying-glass', color: '#7f8c8d', in: 1, out: 1,
         tpl: () => `<div style="font-size:.65em;color:#aaa"><b data-response-status>Sin respuesta</b><div data-response-type></div><pre data-response-body style="max-height:68px;overflow:auto;white-space:pre-wrap;margin:4px 0"></pre></div>`,
         run: (id, inputs, dom) => {
             const source = inputs?.[0] || _utilEmpty(); const properties = source.features?.[0]?.properties || {};
@@ -127,10 +127,10 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         help: 'Compatibilidad de proyectos Desktop. En Studio actúa como paso transparente; la ejecución externa de workspaces requiere backend.',
         tpl: () => `<div style="font-size:.65em;color:#aaa">Compatibilidad · paso transparente</div>`, run: (id, inputs) => inputs?.[0] || null
     },
-    util_filter_geo: { cat: '3. UTILS', label: 'Geometry Filter', icon: 'fa-shapes', color: '#7f8c8d', in: 1, out: 3, tpl: () => `<div style="font-size:0.6em">1:Poly 2:Line 3:Pt</div>`, run: (id, i) => { const p = [], l = [], pt = []; i[0].features.forEach(f => { const t = turf.getType(f).toLowerCase(); if (t.includes('poly')) p.push(f); else if (t.includes('line')) l.push(f); else pt.push(f) }); return { output_1: turf.featureCollection(p), output_2: turf.featureCollection(l), output_3: turf.featureCollection(pt) } } },
+    util_filter_geo: { cat: '3. UTILS', label: 'Filtrar por geometría', alias: 'Geometry Filter', help: 'Reparte las entidades según su tipo de geometría en tres salidas: 1, polígonos; 2, líneas; 3, puntos y el resto de tipos.', icon: 'fa-shapes', color: '#7f8c8d', in: 1, out: 3, tpl: () => `<div style="font-size:0.6em">1:Poly 2:Line 3:Pt</div>`, run: (id, i) => { const p = [], l = [], pt = []; i[0].features.forEach(f => { const t = turf.getType(f).toLowerCase(); if (t.includes('poly')) p.push(f); else if (t.includes('line')) l.push(f); else pt.push(f) }); return { output_1: turf.featureCollection(p), output_2: turf.featureCollection(l), output_3: turf.featureCollection(pt) } } },
 
     util_junction: {
-        cat: '3. UTILS', label: 'Junction', icon: 'fa-circle', color: '#7f8c8d',
+        cat: '3. UTILS', label: 'Unir ramas', alias: 'Junction', help: 'Junta en una sola salida todas las entidades que llegan por sus cinco entradas, sin modificarlas. Sirve para unir varias ramas del flujo.', icon: 'fa-circle', color: '#7f8c8d',
         in: 5, // Múltiples entradas para permitir la fusión
         out: 1,
         tpl: () => ``, // Se mantiene vacío para conservar el estilo minimalista
@@ -149,8 +149,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_tee: {
-        cat: '3. UTILS', label: 'Junction Splitter', icon: 'fa-code-branch', color: '#9b59b6', in: 1, out: 4,
-        help: 'Clona una rama en cuatro salidas independientes.',
+        cat: '3. UTILS', label: 'Bifurcar', alias: 'Junction Splitter', icon: 'fa-code-branch', color: '#9b59b6', in: 1, out: 4,
+        help: 'Copia la entrada en cuatro salidas idénticas e independientes: lo que se cambie en una rama no afecta a las demás.',
         tpl: () => `<div style="display:grid;gap:4px;align-items:center;justify-items:center;min-height:26px"><div class="junction-point"></div><div style="font-size:0.68em;color:#8bc">Una entrada · cuatro salidas</div></div>`,
         run: (id, inputs) => {
             const source = inputs?.[0] || turf.featureCollection([]);
@@ -163,7 +163,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_holder: {
-        cat: '3. UTILS', label: 'Inspector', icon: 'fa-eye', color: '#7f8c8d',
+        cat: '3. UTILS', label: 'Inspeccionar', alias: 'Inspector', help: 'Muestra la capa en el visor con el color que elijas, sin cambiar sus datos. Sirve para revisar resultados intermedios del flujo.', icon: 'fa-eye', color: '#7f8c8d',
         in: 1, out: 1,
         tpl: (id) => `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px">
@@ -199,13 +199,13 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     util_runner: {
-        cat: '3. UTILS', label: 'Batch Runner', icon: 'fa-play', color: '#fff', in: 5, out: 0,
+        cat: '3. UTILS', label: 'Ejecutar en lote', alias: 'Batch Runner', help: 'Conecta aquí los nodos finales (hasta cinco) para ejecutarlos todos a la vez. No tiene salidas ni modifica los datos.', icon: 'fa-play', color: '#fff', in: 5, out: 0,
         tpl: () => `<div style="font-size:0.7em;color:#aaa">Conecta nodos finales aquí y ejecútalos todos juntos.</div>`,
         run: (id, inputs) => { return inputs; } // No hace nada, solo fuerza el "Pull" de sus padres
     },
 
     util_sampler: {
-        cat: '3. UTILS', label: 'Random Sampler', icon: 'fa-dice', color: '#7f8c8d',
+        cat: '3. UTILS', label: 'Muestra aleatoria', alias: 'Random Sampler', help: 'Se queda con una muestra de las entidades: N al azar, una de cada N, las N primeras o las N últimas. Si N no es válido, usa 10.', icon: 'fa-dice', color: '#7f8c8d',
         in: 1, out: 1,
         tpl: () => `
         <div style="margin-bottom:4px">

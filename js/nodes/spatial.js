@@ -203,8 +203,8 @@ function spatialRelatorCompat(source, suppliers, config) {
 
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     sp_anchored_snapper: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Anchored Snapper', icon: 'fa-anchor', color: '#8e44ad', in: 2, out: 4,
-        help: 'Desplaza candidatos del input 2 hacia anchors del input 1.',
+        cat: '2.2 VECTOR - SPATIAL', label: 'Ajustar a referencia', alias: 'Anchored Snapper', icon: 'fa-anchor', color: '#8e44ad', in: 2, out: 4,
+        help: 'Mueve cada vértice de los objetos de la entrada 2 al vértice más cercano de la entrada 1 (anclas) si está a menos de la distancia indicada (por defecto 10 m; m, km o millas). Salida 1: ajustados; salida 2: sin cambios; salida 3: vacía; salida 4: anclas.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-anchor"></i><div><strong data-geom-transform-summary>Segment · 10 m</strong><small>4 salidas Desktop</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"snapping_type":"segment","distance":10,"unit":"meters","group_by":[]}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = spatialReadConfigCompat(dom, { snapping_type: 'segment', distance: 10, unit: 'meters', group_by: [] });
@@ -234,8 +234,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_neighbor_finder: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Neighbor Finder', icon: 'fa-crosshairs', color: '#8e44ad', in: 2, out: 2,
-        help: 'Busca el candidato más próximo para cada feature fuente.',
+        cat: '2.2 VECTOR - SPATIAL', label: 'Buscar vecinos', alias: 'Neighbor Finder', icon: 'fa-crosshairs', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca para cada objeto de la entrada 1 el más cercano de la entrada 2 (entre centroides) y guarda la distancia en metros en _distance. Distancia máxima en metros (vacía = sin límite); puede copiar los atributos del vecino que falten. Salida 1: con vecino; salida 2: sin vecino.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-crosshairs"></i><div><strong data-geom-transform-summary>Sin límite</strong><small>Vecino más próximo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"max_distance":"","distance_factor":"","merge_attrs":false}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = spatialReadConfigCompat(dom, { max_distance: '', distance_factor: '', merge_attrs: false });
@@ -262,8 +262,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_spatial_relator: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Spatial Relator', icon: 'fa-project-diagram', color: '#8e44ad', in: 2, out: 1,
-        help: 'Cuenta y describe Suppliers relacionados para cada Requestor.',
+        cat: '2.2 VECTOR - SPATIAL', label: 'Relación espacial', alias: 'Spatial Relator', icon: 'fa-project-diagram', color: '#8e44ad', in: 2, out: 1,
+        help: 'Cuenta, para cada objeto de la entrada 1, cuántos de la entrada 2 cumplen la relación elegida (por defecto, intersecan) y lo guarda en un campo (related_suppliers). Puede exigir atributos comunes, copiar los atributos del primer o último relacionado y crear una lista de relaciones.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-project-diagram"></i><div><strong data-geom-transform-summary>Intersects · related_suppliers</strong><small>Requestors + Suppliers</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"intersects","count_attr":"related_suppliers","merge_attrs":false,"merge_mode":"prefix","supplier_selection":"first","prefix":"supplier_","generate_list":false,"list_name":"_relations","list_attrs":true,"group_by":[]}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = spatialReadConfigCompat(dom, { mode: 'intersects', count_attr: 'related_suppliers', merge_attrs: false, merge_mode: 'prefix', supplier_selection: 'first', prefix: 'supplier_', generate_list: false, list_name: '_relations', list_attrs: true, group_by: [] });
@@ -283,49 +283,49 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_point_point_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnPoint Overlayer', icon: 'fa-bullseye', color: '#8e44ad', in: 2, out: 2,
-        help: 'Replica puntos coincidentes y añade atributos del overlay.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Punto sobre punto', alias: 'PointOnPoint Overlayer', icon: 'fa-bullseye', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca para cada punto de la entrada 1 los puntos de la entrada 2 con las mismas coordenadas y crea una copia por coincidencia con los atributos de la entrada 2 con prefijo (por defecto pt_). Salida 1: coincidentes; salida 2: sin coincidencia.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo overlay</span><input type="text" df-prefix class="node-control" value="pt_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
         run: async (id, inputs, dom) => spatialPointPointOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'pt_'))
     },
 
     sp_point_line_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnLine Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
-        help: 'Replica puntos situados sobre líneas y añade atributos del overlay.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Punto sobre línea', alias: 'PointOnLine Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca para cada punto de la entrada 1 las líneas de la entrada 2 sobre las que cae exactamente y crea una copia por línea con sus atributos con prefijo (por defecto line_). Salida 1: puntos sobre alguna línea; salida 2: el resto.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo línea</span><input type="text" df-prefix class="node-control" value="line_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
         run: async (id, inputs, dom) => spatialPointPredicateOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'line_'), (point, line) => turf.booleanPointOnLine(point, line))
     },
 
     sp_point_area_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'PointOnArea Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
-        help: 'Replica puntos contenidos en áreas y añade atributos del overlay.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Punto sobre área', alias: 'PointOnArea Overlayer', icon: 'fa-map-pin', color: '#8e44ad', in: 2, out: 2,
+        help: 'Busca para cada punto de la entrada 1 los polígonos de la entrada 2 que lo contienen y crea una copia por polígono con sus atributos con prefijo (por defecto area_). Salida 1: puntos dentro de algún área; salida 2: puntos fuera.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
         run: async (id, inputs, dom) => spatialPointPredicateOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'), (point, area) => turf.booleanPointInPolygon(point, area))
     },
 
     sp_area_area_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'AreaOnArea Overlayer', icon: 'fa-object-group', color: '#8e44ad', in: 2, out: 2,
-        help: 'Genera una geometría por cada intersección área-área.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Área sobre área', alias: 'AreaOnArea Overlayer', icon: 'fa-object-group', color: '#8e44ad', in: 2, out: 2,
+        help: 'Calcula la intersección de cada polígono de la entrada 1 con cada polígono de la entrada 2 y devuelve cada trozo común con los atributos de ambos (los de la entrada 2 con prefijo, por defecto area_). Salida 1: intersecciones; salida 2: polígonos sin solape.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
         run: async (id, inputs, dom) => spatialAreaAreaOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'))
     },
 
     sp_line_area_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'LineOnArea Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
-        help: 'Divide líneas y separa tramos interiores y exteriores.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Línea sobre área', alias: 'LineOnArea Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
+        help: 'Corta las líneas de la entrada 1 por los bordes de los polígonos de la entrada 2. Salida 1: tramos dentro de algún polígono, con sus atributos con prefijo (por defecto area_); salida 2: tramos fuera, con los atributos originales.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo área</span><input type="text" df-prefix class="node-control" value="area_"></label><div style="font-size:0.6em;color:#888">Out 1 inside · Out 2 outside</div>`,
         run: async (id, inputs, dom) => spatialLineAreaOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'area_'))
     },
 
     sp_line_line_overlayer: {
-        cat: '2.2 VECTOR - OVERLAYERS', label: 'LineOnLine Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
-        help: 'Replica líneas fuente por cada línea overlay relacionada.',
+        cat: '2.2 VECTOR - OVERLAYERS', label: 'Línea sobre línea', alias: 'LineOnLine Overlayer', icon: 'fa-grip-lines', color: '#8e44ad', in: 2, out: 2,
+        help: 'Para cada línea de la entrada 1 busca las líneas de la entrada 2 que la tocan o cruzan y crea una copia por cada una con sus atributos con prefijo (por defecto line_). No corta las líneas. Salida 1: relacionadas; salida 2: sin relación.',
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Prefijo línea</span><input type="text" df-prefix class="node-control" value="line_"></label><div style="font-size:0.6em;color:#888">Out 1 matched · Out 2 unmatched</div>`,
         run: async (id, inputs, dom) => spatialLineLineOverlayerCompat(inputs[0] || turf.featureCollection([]), inputs[1] || turf.featureCollection([]), resolveParamText(dom.querySelector('[df-prefix]')?.value || 'line_'))
     },
 
     geo_kink_remover: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Kink Remover', icon: 'fa-band-aid', color: '#8e44ad', in: 1, out: 1,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Quitar quiebros', alias: 'Kink Remover', help: 'Separa en partes válidas los polígonos que se cruzan a sí mismos y simplifica líneas y polígonos para quitar picos. El umbral (por defecto 5) se usa como tolerancia de umbral×0,00005 grados (≈28 m con 5); con 0 sólo quita vértices repetidos.', icon: 'fa-band-aid', color: '#8e44ad', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Umbral Z-Kink (Grados)</span>
@@ -406,7 +406,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_angle_calculator: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Angle Calculator', icon: 'fa-ruler-combined', color: '#8e44ad', in: 1, out: 1,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Calcular ángulos', alias: 'Angle Calculator', help: 'Crea un punto en cada vértice cuyo ángulo sea menor o igual que el máximo (por defecto 45°), con los atributos del objeto y los campos angle, _vertex_index y _parent_id. En polígonos sólo revisa el anillo exterior; en líneas, no los extremos.', icon: 'fa-ruler-combined', color: '#8e44ad', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Ángulo Máximo (Grados)</span>
@@ -498,7 +498,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_min_area_solver: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'MinArea Solver', icon: 'fa-compress-alt', color: '#8e44ad',
+        cat: '2.2 VECTOR - SPATIAL', label: 'Fusionar áreas pequeñas', alias: 'MinArea Solver', help: 'Detecta polígonos con área menor que el mínimo (por defecto 100 m²; también ha o km²) y los fusiona con el vecino con el que comparten más borde, o sólo los descarta. Salida 1: intactos; salida 2: polígonos que absorbieron otros; salida 3: pequeños no fusionados o descartados.', icon: 'fa-compress-alt', color: '#8e44ad',
         in: 1,
         out: 3, // Out 1: Intactos | Out 2: Fusionados (Merged) | Out 3: Fallidos (Failed)
         tpl: () => `
@@ -614,7 +614,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_snap: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Snapper', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 3,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Ajustar', alias: 'Snapper', help: 'Mueve cada vértice de la entrada 1 al vértice más cercano de la entrada 2 si está a menos de la distancia indicada (por defecto 1 m; m, km o millas). Salida 1: todos los objetos de la entrada 1, ajustados o no; las salidas 2 y 3 quedan vacías.', icon: 'fa-magnet', color: '#8e44ad', in: 2, out: 3,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Distancia de Atracción</span>
@@ -710,7 +710,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_spatial_filter: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Spatial Filter', icon: 'fa-filter', color: '#8e44ad', in: 2, out: 2,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Filtro espacial', alias: 'Spatial Filter', help: 'Separa los objetos de la entrada 1 según si cumplen la relación elegida (contiene, dentro de, cruza, toca, igual, disjunto o solapa) con al menos un objeto de la entrada 2. Salida 1: los que la cumplen; salida 2: los que no.', icon: 'fa-filter', color: '#8e44ad', in: 2, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Criterio (Input 1 vs Input 2)</span>
@@ -795,8 +795,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_spatial_join: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Spatial Join', icon: 'fa-link', color: '#8e44ad', in: 2, out: 2,
-        help: 'Une atributos de Input2 en Input1 según relación espacial.',
+        cat: '2.2 VECTOR - SPATIAL', label: 'Unión espacial', alias: 'Spatial Join', icon: 'fa-link', color: '#8e44ad', in: 2, out: 2,
+        help: 'Añade a cada objeto de la entrada 1 los atributos de los de la entrada 2 con los que interseca, está dentro o contiene, con prefijo (por defecto j_): del primero o como suma, media, mín. y máx. numéricos. Salida 1: resultado; salida 2: sin coincidencia.',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Relación</span>
@@ -904,7 +904,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_nearest_neighbor: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Nearest Neighbor', icon: 'fa-shoe-prints', color: '#8e44ad', in: 2, out: 2,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Vecino más cercano', alias: 'Nearest Neighbor', help: 'Busca para cada objeto de la entrada 1 el más cercano de la entrada 2 (entre centroides) dentro de un radio opcional en km o m (vacío = sin límite). Añade _neighbor_dist y, si se marca, los atributos del vecino con prefijo neighbor_. Salida 1: con vecino; salida 2: sin vecino.', icon: 'fa-shoe-prints', color: '#8e44ad', in: 2, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Radio Máximo</span>
@@ -1005,7 +1005,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_intersector: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Intersector', icon: 'fa-times', color: '#8e44ad', in: 2, out: 2,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Intersectar', alias: 'Intersector', help: 'Si ambas entradas tienen líneas, las corta en sus cruces: salida 1, tramos de las dos entradas (campo _origin); salida 2, puntos de cruce. Si son polígonos, la salida 1 da las zonas comunes de cada par con los atributos de ambos.', icon: 'fa-times', color: '#8e44ad', in: 2, out: 2,
         tpl: () => `<div style="font-size:0.7em;color:#aaa">Calcula intersección. <br>Si son líneas, las corta.</div>
                     <div style="font-size:0.6em;color:#888;margin-top:2px">Out 1: Geometría (Líneas/Polys) | Out 2: Puntos</div>`,
         run: async (id, inputs) => {
@@ -1116,7 +1116,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_clip: {
-        cat: '2.2 VECTOR - SPATIAL', label: 'Clipper (Robust)', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 2,
+        cat: '2.2 VECTOR - SPATIAL', label: 'Recortar', alias: 'Clipper (Robust)', help: 'Recorta los polígonos de la entrada 1 con la unión de los polígonos de la entrada 2, conservando sus atributos. Salida 1: partes dentro; salida 2: partes fuera y objetos que no tocan la máscara. Los puntos y líneas que tocan la máscara van enteros a la salida 2.', icon: 'fa-crop', color: '#8e44ad', in: 2, out: 2,
         tpl: () => `<div>Out 1: Inside | Out 2: Outside</div>`,
         run: async (id, i) => {
             if (!i[0] || !i[1] || !i[1].features.length) throw new Error("Faltan datos");

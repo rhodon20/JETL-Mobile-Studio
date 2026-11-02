@@ -342,8 +342,8 @@ async function readerInspectCompat(dom, nodeName, configOverride = null) {
 if (typeof window !== 'undefined') window.JETLReaderTools = { inspect: readerInspectCompat, config: readerConfigCompat, editedData: readerEditedDataCompat, defaults: READER_NODE_DEFAULTS, editLimits: { features: READER_EDIT_MAX_FEATURES, chars: READER_EDIT_MAX_CHARS } };
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     reader_geojson: {
-        cat: '1. READERS', label: 'GeoJSON Reader', icon: 'fa-file-code', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee uno o varios GeoJSON localmente en Studio.',
+        cat: '1. READERS', label: 'Lector GeoJSON', alias: 'GeoJSON Reader', icon: 'fa-file-code', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee uno o varios archivos GeoJSON (.geojson, .json) y los junta en una sola capa, añadiendo el campo jetl_source_file con el archivo de origen. Puedes exigir el mismo esquema o unir los campos, y editar una copia de trabajo sin tocar el original.',
         tpl: () => readerFileTemplateCompat('.geojson,.json', 'GeoJSON · colección', READER_NODE_DEFAULTS.reader_geojson),
         run: async (id, inputs, dom) => {
             const options = readerConfigCompat(dom, 'reader_geojson'); const edited = readerEditedOrNullCompat(dom, 'reader_geojson', options); if (edited) return edited;
@@ -353,8 +353,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_kml: {
-        cat: '1. READERS', label: 'KML Reader', icon: 'fa-globe', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee uno o varios KML localmente en Studio.',
+        cat: '1. READERS', label: 'Lector KML', alias: 'KML Reader', icon: 'fa-globe', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee uno o varios archivos KML y los junta en una sola capa, con el campo jetl_source_file que indica el archivo de origen. Si sus atributos difieren, elige entre unir los campos o exigir el mismo esquema.',
         tpl: () => readerFileTemplateCompat('.kml', 'KML · colección', READER_NODE_DEFAULTS.reader_kml),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios KML');
@@ -363,8 +363,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_csv: {
-        cat: '1. READERS', label: 'CSV Reader', icon: 'fa-file-csv', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee CSV localmente y detecta coordenadas lat/lon o WKT.',
+        cat: '1. READERS', label: 'Lector CSV', alias: 'CSV Reader', icon: 'fa-file-csv', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee uno o varios CSV. El separador se detecta solo (coma, punto y coma o tabulador). Crea puntos desde columnas de latitud/longitud (lat, lon, x, y…) o geometrías desde una columna WKT. Puedes editar una copia de trabajo.',
         tpl: () => readerFileTemplateCompat('.csv', 'CSV · lat/lon o WKT', READER_NODE_DEFAULTS.reader_csv),
         run: async (id, inputs, dom) => {
             const options = readerConfigCompat(dom, 'reader_csv');
@@ -375,8 +375,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_excel: {
-        cat: '1. READERS', label: 'Excel Reader', icon: 'fa-file-excel', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee Excel localmente y detecta coordenadas lat/lon.',
+        cat: '1. READERS', label: 'Lector Excel', alias: 'Excel Reader', icon: 'fa-file-excel', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee libros Excel (.xlsx, .xls). Usa la hoja indicada o la primera si no indicas ninguna. Crea puntos desde columnas de latitud/longitud o geometrías desde una columna WKT. Si hay varios archivos, se juntan en una sola capa.',
         tpl: () => readerFileTemplateCompat('.xlsx,.xls', 'Excel · hoja y esquema', READER_NODE_DEFAULTS.reader_excel),
         run: async (id, inputs, dom) => {
             const options = readerConfigCompat(dom, 'reader_excel');
@@ -387,8 +387,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_shp: {
-        cat: '1. READERS', label: 'SHP Reader', icon: 'fa-map', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee SHP comprimido en ZIP localmente; conjuntos sueltos requieren backend.',
+        cat: '1. READERS', label: 'Lector Shapefile', alias: 'SHP Reader', icon: 'fa-map', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee un Shapefile comprimido en ZIP (con .shp, .shx, .dbf y .prj) y lo pasa a coordenadas geográficas (EPSG:4326) usando su .prj. Los archivos sueltos sin comprimir solo se pueden leer con el servidor de JETL.',
         tpl: () => readerFileTemplateCompat('.zip,.shp,.shx,.dbf,.prj,.cpg', 'ZIP recomendado', READER_NODE_DEFAULTS.reader_shp),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona un SHP ZIP o su conjunto de archivos');
@@ -402,8 +402,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_gpx: {
-        cat: '1. READERS', label: 'GPX Reader', icon: 'fa-route', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
-        help: 'Lee GPX y expone tracks, routes y waypoints como capas independientes.',
+        cat: '1. READERS', label: 'Lector GPX', alias: 'GPX Reader', icon: 'fa-route', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
+        help: 'Lee uno o varios GPX y reparte su contenido en tres salidas: 1, tracks (una línea por segmento); 2, rutas; 3, waypoints como puntos. Conserva el nombre, la descripción, el tipo, la hora y la altitud.',
         tpl: () => readerFileTemplateCompat('.gpx', '16 salidas por capas', READER_NODE_DEFAULTS.reader_gpx),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona uno o varios GPX');
@@ -420,8 +420,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     reader_gdb: {
         requiresBackend: true,
-        cat: '1. READERS', label: 'GDB Reader', icon: 'fa-folder', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
-        help: 'Lee File Geodatabase por capas mediante backend, sin cargar GDAL pesado en móvil.',
+        cat: '1. READERS', label: 'Lector GDB', alias: 'GDB Reader', icon: 'fa-folder', color: '#e67e22', in: 0, out: READER_MULTI_OUTPUTS,
+        help: 'Lee una File Geodatabase comprimida en ZIP y saca cada capa por una salida, con un máximo de 16. Puedes elegir qué capas leer. Necesita el servidor de JETL: no se procesa en el dispositivo.',
         tpl: () => readerFileTemplateCompat('.zip,.gdb', 'Requiere backend · 16 salidas', READER_NODE_DEFAULTS.reader_gdb),
         run: async (id, inputs, dom) => {
             const sources = readerSelectedFilesCompat(dom); if (!sources.length) throw new Error('Selecciona un GDB comprimido en ZIP');
@@ -440,8 +440,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
 
     reader_feature_reader: {
         requiresBackend: true,
-        cat: '1. READERS', label: 'FeatureReader', icon: 'fa-folder-open', color: '#e67e22', in: 1, out: 3, inputClonePolicy: 'none',
-        help: 'Lee datasets dinámicamente desde atributos del feature iniciador mediante backend.',
+        cat: '1. READERS', label: 'Lector de entidades', alias: 'FeatureReader', icon: 'fa-folder-open', color: '#e67e22', in: 1, out: 3, inputClonePolicy: 'none',
+        help: 'Por cada entidad de entrada, lee el archivo cuya ruta viene en un atributo, una ruta fija o una plantilla. Salidas: 1, entidades leídas; 2, rechazadas (archivo ausente o lectura vacía); 3, resumen. Necesita el servidor de JETL.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-folder-open"></i><div><strong data-geom-transform-summary>CSV · atributo</strong><small>1 entrada · 3 salidas</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-fr-config>${JSON.stringify(FEATURE_READER_DEFAULT_CONFIG)}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const initiators = inputs[0];
@@ -459,7 +459,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_osm: {
-        cat: '1. READERS', label: 'OSM Reader', icon: 'fa-globe', color: '#e67e22', in: 0, out: 1,
+        cat: '1. READERS', label: 'Lector OSM', alias: 'OSM Reader', help: 'Descarga de OpenStreetMap la capa elegida (edificios, carreteras, parques, servicios, agua o usos del suelo) en un cuadrado de hasta 2200 m de lado alrededor del lugar que escribas. Necesita conexión a internet.', icon: 'fa-globe', color: '#e67e22', in: 0, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Lugar / Zona</span>
@@ -541,14 +541,14 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_file: {
-        cat: '1. READERS', label: 'File Reader', icon: 'fa-folder-open', color: '#e67e22', in: 0, out: 1,
+        cat: '1. READERS', label: 'Lector de archivo', alias: 'File Reader', help: 'Lee un archivo y detecta su formato por la extensión: GeoJSON/JSON, KML, Shapefile en ZIP, GeoPackage o Parquet. Todo sale por una única salida; si el GeoPackage tiene varias tablas, se juntan y el campo _table indica la de origen.', icon: 'fa-folder-open', color: '#e67e22', in: 0, out: 1,
         tpl: () => `<input type="file" data-load-file="1" class="node-control"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div>`,
         run: async (id) => { const v = window._file_cache && window._file_cache['file_' + id]; if (!v) throw new Error("Sin archivo"); return v; }
     },
 
     reader_gpkg: {
-        cat: '1. READERS', label: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee todas las tablas vectoriales de un GeoPackage, cada una por una salida (como en Desktop): al elegir el archivo el nodo tiene tantas salidas como tablas.',
+        cat: '1. READERS', label: 'Lector GeoPackage', alias: 'GPKG Reader', icon: 'fa-database', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee las tablas vectoriales de un GeoPackage y saca cada tabla por su propia salida, con un máximo de 16. Al elegir el archivo, el nodo muestra una salida por tabla. Los datos se pasan siempre a EPSG:4326, aunque el archivo use otro sistema.',
         tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".gpkg"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div><div class="reader-layer-list" data-reader-layers></div>`,
         run: async (id) => {
             const v = window._file_cache && window._file_cache['file_' + id];
@@ -568,20 +568,20 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     reader_parquet: {
-        cat: '1. READERS', label: 'Parquet Reader', icon: 'fa-table', color: '#e67e22', in: 0, out: 1,
-        help: 'Lee GeoParquet (geometría WKB o WKT) y Parquet sin geometría como tabla.',
+        cat: '1. READERS', label: 'Lector Parquet', alias: 'Parquet Reader', icon: 'fa-table', color: '#e67e22', in: 0, out: 1,
+        help: 'Lee archivos GeoParquet con la geometría en WKB o WKT, y también Parquet sin geometría, que se carga como tabla de atributos. Las coordenadas se pasan a EPSG:4326 aunque el archivo esté en otro sistema.',
         tpl: () => `<input type="file" data-load-file="1" class="node-control" accept=".parquet"><div style="font-size:0.7em;color:#aaa" class="file-lbl">Sin archivo</div>`,
         run: async (id) => { const v = window._file_cache && window._file_cache['file_' + id]; if (!v) throw new Error("Sin archivo"); return v; }
     },
 
-    reader_http: { cat: '1. READERS', label: 'HTTP JSON', icon: 'fa-cloud-download-alt', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-u placeholder="URL (GeoJSON)">`, run: async (id, i, d) => { const u = resolveParamTextReader(d.querySelector('[df-u]').value); const r = await fetch(u); return await r.json(); } },
+    reader_http: { cat: '1. READERS', label: 'GeoJSON desde URL', alias: 'HTTP JSON', help: 'Descarga un GeoJSON desde la dirección web indicada. El servidor debe permitir el acceso desde el navegador (CORS) y devolver JSON válido. Solo se conecta a la dirección que escribas.', icon: 'fa-cloud-download-alt', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-u placeholder="URL (GeoJSON)">`, run: async (id, i, d) => { const u = resolveParamTextReader(d.querySelector('[df-u]').value); const r = await fetch(u); return await r.json(); } },
 
-    reader_wkt: { cat: '1. READERS', label: 'WKT/Text', icon: 'fa-font', color: '#e67e22', in: 0, out: 1, tpl: () => `<textarea class="node-control" df-w placeholder="POINT(30 10)"></textarea>`, run: async (id, i, d) => { const t = resolveParamTextReader(d.querySelector('[df-w]').value); const w = wellknown(t); return turf.featureCollection([turf.feature(w)]) } },
+    reader_wkt: { cat: '1. READERS', label: 'Texto WKT', alias: 'WKT/Text', help: 'Convierte en una entidad la geometría escrita en texto WKT, por ejemplo POINT(30 10) o POLYGON((...)). Útil para pruebas o para definir una zona a mano.', icon: 'fa-font', color: '#e67e22', in: 0, out: 1, tpl: () => `<textarea class="node-control" df-w placeholder="POINT(30 10)"></textarea>`, run: async (id, i, d) => { const t = resolveParamTextReader(d.querySelector('[df-w]').value); const w = wellknown(t); return turf.featureCollection([turf.feature(w)]) } },
 
-    reader_bbox_gen: { cat: '1. READERS', label: 'BBox Creator', icon: 'fa-vector-square', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-b placeholder="minX,minY,maxX,maxY" value="-3.75,40.4,-3.65,40.5">`, run: (id, i, d) => { const b = resolveParamTextReader(d.querySelector('[df-b]').value).split(',').map(Number); return turf.featureCollection([turf.bboxPolygon(b)]) } },
+    reader_bbox_gen: { cat: '1. READERS', label: 'Crear extensión (BBox)', alias: 'BBox Creator', help: 'Crea un rectángulo a partir de cuatro valores separados por comas: X mínima, Y mínima, X máxima e Y máxima (en grados, longitud y latitud).', icon: 'fa-vector-square', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-b placeholder="minX,minY,maxX,maxY" value="-3.75,40.4,-3.65,40.5">`, run: (id, i, d) => { const b = resolveParamTextReader(d.querySelector('[df-b]').value).split(',').map(Number); return turf.featureCollection([turf.bboxPolygon(b)]) } },
 
     reader_geotiff: {
-        cat: '1. READERS', label: 'GeoTIFF Reader', icon: 'fa-file-image', color: '#e67e22',
+        cat: '1. READERS', label: 'Lector GeoTIFF', alias: 'GeoTIFF Reader', help: 'Carga un raster GeoTIFF (.tif, .tiff) para usarlo en otros nodos de raster. Genera un rectángulo con su extensión y atributos con el nombre, el ancho y el alto en píxeles. La imagen se guarda en la memoria del dispositivo.', icon: 'fa-file-image', color: '#e67e22',
         in: 0, out: 1,
         tpl: (id) => `
             <div style="margin-bottom:4px">
@@ -631,9 +631,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
 
-    gen_point: { cat: '1. READERS', label: 'Point Creator', icon: 'fa-map-pin', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-c placeholder="Lon,Lat" value="-3.703,40.416">`, run: (id, i, d) => { const c = resolveParamTextReader(d.querySelector('[df-c]').value).split(',').map(Number); return turf.featureCollection([turf.point(c)]) } },
+    gen_point: { cat: '1. READERS', label: 'Crear punto', alias: 'Point Creator', help: 'Crea un punto a partir de las coordenadas «longitud,latitud» en grados (por ejemplo, -3.703,40.416).', icon: 'fa-map-pin', color: '#e67e22', in: 0, out: 1, tpl: () => `<input class="node-control" df-c placeholder="Lon,Lat" value="-3.703,40.416">`, run: (id, i, d) => { const c = resolveParamTextReader(d.querySelector('[df-c]').value).split(',').map(Number); return turf.featureCollection([turf.point(c)]) } },
 
-    gen_grid: { cat: '1. READERS', label: 'Grid Generator', icon: 'fa-th', color: '#e67e22', in: 0, out: 1, tpl: () => `<select class="node-control" df-t><option value="hex">Hex</option><option value="sq">Square</option></select><input class="node-control" type="number" df-s value="1" placeholder="Size km">`, run: (id, i, d) => { const t = resolveParamTextReader(d.querySelector('[df-t]').value), s = parseFloat(resolveParamTextReader(d.querySelector('[df-s]').value)), b = [-3.8, 40.3, -3.6, 40.5]; return t === 'hex' ? turf.hexGrid(b, s) : turf.squareGrid(b, s) } },
+    gen_grid: { cat: '1. READERS', label: 'Crear malla', alias: 'Grid Generator', help: 'Genera una malla de hexágonos o de cuadrados con el tamaño de celda indicado en kilómetros. La malla cubre siempre una zona fija de Madrid, entre -3.8 y -3.6 de longitud y entre 40.3 y 40.5 de latitud.', icon: 'fa-th', color: '#e67e22', in: 0, out: 1, tpl: () => `<select class="node-control" df-t><option value="hex">Hex</option><option value="sq">Square</option></select><input class="node-control" type="number" df-s value="1" placeholder="Size km">`, run: (id, i, d) => { const t = resolveParamTextReader(d.querySelector('[df-t]').value), s = parseFloat(resolveParamTextReader(d.querySelector('[df-s]').value)), b = [-3.8, 40.3, -3.6, 40.5]; return t === 'hex' ? turf.hexGrid(b, s) : turf.squareGrid(b, s) } },
 
-    gen_random: { cat: '1. READERS', label: 'Random Points', icon: 'fa-dice', color: '#e67e22', in: 0, out: 1, tpl: () => `<input type="number" df-n value="50" class="node-control">`, run: (id, i, d) => turf.randomPoint(parseInt(resolveParamTextReader(d.querySelector('[df-n]').value)), { bbox: [-3.8, 40.3, -3.6, 40.5] }) }
+    gen_random: { cat: '1. READERS', label: 'Puntos aleatorios', alias: 'Random Points', help: 'Genera el número indicado de puntos aleatorios dentro de una zona fija de Madrid (entre -3.8 y -3.6 de longitud y entre 40.3 y 40.5 de latitud). Útil para hacer pruebas.', icon: 'fa-dice', color: '#e67e22', in: 0, out: 1, tpl: () => `<input type="number" df-n value="50" class="node-control">`, run: (id, i, d) => turf.randomPoint(parseInt(resolveParamTextReader(d.querySelector('[df-n]').value)), { bbox: [-3.8, 40.3, -3.6, 40.5] }) }
 });

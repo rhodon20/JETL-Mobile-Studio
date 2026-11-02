@@ -427,7 +427,7 @@ function evalTestGroup(props, conditions) {
 
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     attr_stats: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Stats Calc', icon: 'fa-calculator', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Estadísticas', alias: 'Stats Calc', help: 'Calcula suma, mínimo, máximo, media y recuento de los campos numéricos indicados sobre todos los elementos y los añade a cada uno como stats_<campo>_sum, _min, etc. «Concatenadas» junta todos los campos. Con «Rechazar», salida 2: los que no tienen números.', icon: 'fa-calculator', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Campos numericos</span>
@@ -534,7 +534,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_renamer: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Renamer', icon: 'fa-tag', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Renombrar campos', alias: 'Renamer', help: 'Cambia el nombre de atributos según pares antiguo:nuevo separados por comas (p. ej. id:uid); el asistente los añade por ti. Si falta un campo, el elemento sigue como está o, si lo eliges, va a la salida 2 con el motivo en _renamer_error.', icon: 'fa-tag', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Mapeo (Viejo:Nuevo)</span>
@@ -613,8 +613,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_keeper: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 1,
-        help: 'Mantiene únicamente los atributos seleccionados. La configuración completa se abre en un modal.',
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Mantener campos', alias: 'Keeper', icon: 'fa-check-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Conserva solo los atributos marcados en el editor (o escritos a mano, separados por comas) y elimina el resto; la geometría no cambia. Un elemento que no tenga ninguno de esos campos sale con todos sus atributos.',
         tpl: () => `
             <div class="node-editor-summary"><i class="fas fa-check-square"></i><div><strong data-ak-count>0 campos</strong><small>Conservar atributos</small></div></div>
             <button type="button" class="btn node-editor-open" data-schema-action="keeper-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
@@ -679,8 +679,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_creator: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 1,
-        help: 'Crea varios atributos con valores, referencias o expresiones en orden.',
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Crear campos', alias: 'Attr Creator', icon: 'fa-plus-square', color: '#27ae60', in: 1, out: 1,
+        help: 'Crea uno o varios atributos en orden, con tipo y valor por defecto opcionales. El valor puede ser texto fijo, @Value(campo), @upper/@lower/@trim(campo), @round/@floor/@ceil(campo), @concat(...) o una expresión que empiece por «=» (p. ej. =props.a + 1).',
         tpl: () => `
             <div class="node-editor-summary"><i class="fas fa-plus-square"></i><div><strong data-ac-count>0 atributos</strong><small>Creaciones ordenadas</small></div></div>
             <button type="button" class="btn node-editor-open" data-schema-action="creator-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
@@ -730,7 +730,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_counter: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Counter', icon: 'fa-sort-numeric-down', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Contador', alias: 'Counter', help: 'Numera los elementos en el orden en que llegan y guarda el número en el campo indicado (por defecto _id), empezando por el valor inicial.', icon: 'fa-sort-numeric-down', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Nombre Campo ID</span>
@@ -768,7 +768,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_sorter: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Sorter', icon: 'fa-sort-alpha-down', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Ordenar', alias: 'Sorter', help: 'Ordena los elementos por el valor de un campo, de forma ascendente o descendente. Los números se comparan como números y el texto de forma natural (2 antes que 10); los valores vacíos quedan al principio en orden ascendente.', icon: 'fa-sort-alpha-down', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Campo a Ordenar</span>
@@ -828,7 +828,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_list_concatenator: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Concatenator', icon: 'fa-list', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Concatenar lista', alias: 'List Concatenator', help: 'Une los valores de un atributo de lista en un solo texto con el separador elegido y lo guarda en el campo destino. Admite rutas anidadas como items{}.nombre y puede omitir los valores vacíos.', icon: 'fa-list', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-list"></i>
@@ -860,7 +860,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_substring: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Substring Extractor', icon: 'fa-i-cursor', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Extraer subcadena', alias: 'Substring Extractor', help: 'Copia en el campo destino los caracteres del campo de origen entre la posición inicial y la final, ambas incluidas y contando desde 0 (0–3 = los 4 primeros). Los índices negativos cuentan desde el final (-1 es el último).', icon: 'fa-i-cursor', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-i-cursor"></i>
@@ -889,7 +889,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_aggregator: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Aggregator', icon: 'fa-layer-group', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Agrupar', alias: 'Aggregator', help: 'Agrupa los elementos con el mismo valor en los campos indicados (separados por comas; vacío = un solo grupo) y saca uno por grupo, con el primer valor no vacío de cada atributo. Las geometrías se combinan en una múltiple o se descartan si lo eliges.', icon: 'fa-layer-group', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary"><i class="fas fa-layer-group"></i><div><strong data-aggregator-summary>MATRICULA</strong><small>Agrupar y producir Multi*</small></div></div>
             <button type="button" class="btn node-editor-open" data-schema-action="aggregator-open-editor"><i class="fas fa-pen"></i> Configurar</button>
@@ -982,7 +982,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_manager_v2: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Manager v2', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Gestor de campos', alias: 'Attribute Manager v2', help: 'Aplica reglas en orden para eliminar, renombrar, asignar o crear atributos. El valor admite texto, @Value(campo), cálculos como @Value(a)*2, @round(), @upper(), @concat() y @if(condición,sí,no); cada regla puede tener una condición, p. ej. @Value(tipo)==A.', icon: 'fa-table-columns', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary"><i class="fas fa-table-columns"></i><div><strong data-attr-manager-summary>0 reglas</strong><small>Reglas estilo FME</small></div></div>
             <button type="button" class="btn node-editor-open" data-schema-action="attr-manager-v2-open-editor"><i class="fas fa-pen"></i> Abrir editor</button>
@@ -1003,7 +1003,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_splitter: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Attribute Splitter', icon: 'fa-cut', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Dividir campo', alias: 'Attribute Splitter', help: 'Divide el texto del campo de origen por el separador indicado y guarda los trozos como lista en el campo destino (por defecto _list). Los trozos vacíos se omiten; con separador vacío se separa letra a letra.', icon: 'fa-cut', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-cut"></i>
@@ -1030,7 +1030,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_list_exploder: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'List Exploder', icon: 'fa-list-ol', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Expandir lista', alias: 'List Exploder', help: 'Crea un elemento por cada valor del atributo de lista: en cada copia ese atributo contiene un único valor y el campo de índice guarda su posición (desde 0). Un valor que no es lista da una copia; una lista vacía o nula, ninguna.', icon: 'fa-list-ol', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-list-ol"></i>
@@ -1059,7 +1059,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_string_replacer: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Replacer', icon: 'fa-exchange-alt', color: '#27ae60', in: 1, out: 1,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Reemplazar texto', alias: 'String Replacer', help: 'Reemplaza texto en los atributos de cada regla (atributo, buscar, reemplazar), de forma literal o con expresión regular (\\1 para grupos). Puedes distinguir mayúsculas y elegir qué hacer sin coincidencia: dejarlo igual, poner nulo o un valor fijo.', icon: 'fa-exchange-alt', color: '#27ae60', in: 1, out: 1,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-exchange-alt"></i>
@@ -1090,7 +1090,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_string_formatter: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'String Formatter', icon: 'fa-text-width', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Formatear texto', alias: 'String Formatter', help: 'Aplica una operación de texto a los campos elegidos: mayúsculas, minúsculas, capitalizar, quitar espacios, reemplazar (buscar|reemplazo), añadir sufijo, rellenar a la izquierda (longitud|carácter) o plantilla con {campo}. Con error: vacía los campos o salida 2.', icon: 'fa-text-width', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-text-width"></i>
@@ -1214,7 +1214,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_feature_merger: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Feature Merger', icon: 'fa-code-branch', color: '#27ae60', in: 2, out: 3,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Combinar entidades', alias: 'Feature Merger', help: 'Copia atributos de la entrada 2 a los elementos de la entrada 1 que coinciden en los pares campo1:campo2 (separados por comas); usa la primera coincidencia. Salida 1: unidos; salida 2: de la entrada 1 sin pareja; salida 3: de la entrada 2 sin usar.', icon: 'fa-code-branch', color: '#27ae60', in: 2, out: 3,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Relación (Input1 : Input2)</span>
@@ -1323,8 +1323,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_join_adv: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'FeatureJoiner', icon: 'fa-link', color: '#27ae60', in: 2, out: 3,
-        help: 'Join tabular por claves (left/inner).',
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Unir por atributo', alias: 'FeatureJoiner', icon: 'fa-link', color: '#27ae60', in: 2, out: 3,
+        help: 'Une la entrada 1 con la 2 por pares campo1:campo2 y añade los atributos de la 2 con un prefijo (j_ por defecto), una fila por coincidencia. En modo izquierda salen también los no unidos. Salida 1: resultado; 2: entrada 1 sin pareja; 3: entrada 2 sin usar.',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Relacion (Input1 : Input2)</span>
@@ -1415,8 +1415,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
     attr_calc_pro: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Field Calculator Pro', icon: 'fa-keyboard', color: '#27ae60', in: 1, out: 2,
-        help: 'Expresiones JS con helpers: props, feat, Math, turf.',
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Calculadora de campos', alias: 'Field Calculator Pro', icon: 'fa-keyboard', color: '#27ae60', in: 1, out: 2,
+        help: 'Calcula un campo con una expresión JavaScript por elemento, p. ej. props["pob"] / props["area"]. Dispones de props (atributos), feat (el elemento), Math y turf; ${param} se sustituye antes. Si falla, asigna nulo o envía el elemento a la salida 2.',
         tpl: () => `
             <div class="node-editor-summary">
                 <i class="fas fa-keyboard"></i>
@@ -1500,7 +1500,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
     attr_area: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Area Calc', icon: 'fa-ruler-combined', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Calcular área', alias: 'Area Calc', help: 'Calcula el área de cada polígono y la guarda en el campo indicado, en m², km², hectáreas o pies cuadrados, con 4 decimales. Puntos y líneas dan 0. Si el cálculo falla, asigna nulo o envía el elemento a la salida 2.', icon: 'fa-ruler-combined', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Nombre del Campo</span>
@@ -1578,7 +1578,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_length: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Length Calc', icon: 'fa-ruler-horizontal', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Calcular longitud', alias: 'Length Calc', help: 'Calcula la longitud de cada línea y la guarda en el campo indicado, en km, m, cm, millas o pies, con 4 decimales. Lo que no es línea recibe nulo o, si lo eliges, va a la salida 2.', icon: 'fa-ruler-horizontal', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Nombre del Campo</span>
@@ -1668,7 +1668,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     attr_matcher: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Matcher', icon: 'fa-clone', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Buscar coincidencias', alias: 'Matcher', help: 'Detecta elementos repetidos comparando la geometría exacta, los atributos o ambos; puedes limitar la comparación a ciertos campos (vacío = todos). Salida 1: la primera aparición de cada uno; salida 2: las repeticiones.', icon: 'fa-clone', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div style="margin-bottom:6px">
                 <span style="font-size:0.7em;color:#aaa">Criterio de Coincidencia</span>
@@ -1769,7 +1769,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
     attr_test: {
-        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Tester', icon: 'fa-balance-scale', color: '#27ae60', in: 1, out: 2,
+        cat: '2.3 VECTOR - ATTRIBUTES', label: 'Filtrar por condición', alias: 'Tester', help: 'Separa los elementos según condiciones campo-operador-valor unidas con AND/OR, evaluadas de izquierda a derecha. «like» busca texto contenido, «starts»/«ends» el inicio o final, «in» una lista separada por comas. Salida 1: cumplen; salida 2: no cumplen.', icon: 'fa-balance-scale', color: '#27ae60', in: 1, out: 2,
         tpl: () => `
             <div df-test-rows style="display:flex; flex-direction:column; gap:6px;"></div>
             <div style="display:flex; gap:6px; margin-top:6px;">

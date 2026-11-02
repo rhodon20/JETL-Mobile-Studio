@@ -43,7 +43,12 @@ https://rhodon20.github.io/JETL-Mobile-Studio/
   Parquet/GeoParquet, OSM (Overpass), WKT y GeoTIFF.
 - Escritura: GeoJSON, CSV, KML, Excel, Shapefile (ZIP), GeoPackage (en EPSG:4326,
   reproyectando si hace falta) y GeoParquet.
-- GPKG Reader saca cada tabla vectorial por una salida (hasta 16), como Desktop.
+- Nodos con nombres en español (p. ej. «Recortar», «Punto central»); cada uno guarda
+  como `alias` su nombre de referencia (el de Desktop), que también sirve para
+  buscarlo. Los proyectos `.jetl` usan el identificador interno (`geo_buffer`…), así
+  que siguen siendo compatibles con Desktop. La ayuda de cada nodo se abre al tocar
+  su icono (i). `docs/NODE_REVIEW.md` lista los posibles fallos por comprobar.
+- El Lector GeoPackage saca cada tabla vectorial por una salida (hasta 16), como Desktop.
 - GeoPackage y Parquet en otro CRS (p. ej. EPSG:25830) se leen ya en EPSG:4326, como
   el Shapefile con su .prj: los nodos de geoprocesamiento trabajan en grados.
 - Las librerías de GeoPackage, Parquet/Arrow, Excel y escritura de Shapefile van

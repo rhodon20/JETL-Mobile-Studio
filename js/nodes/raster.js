@@ -7,7 +7,7 @@ async function ensureRasterLibraries() {
 }
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     sp_point_sampling: {
-        cat: '4. RASTER', label: 'Multi-Band Sampler', icon: 'fa-crosshairs', color: '#8e44ad',
+        cat: '4. RASTER', label: 'Muestrear bandas', alias: 'Multi-Band Sampler', help: 'Lee los valores de un GeoTIFF (conectado desde un lector) en cada punto de la otra entrada y los guarda como <prefijo>_b0, _b1… (todas las bandas o los índices indicados, desde 0). Sin puntos, genera una malla de puntos cada N píxeles.', icon: 'fa-crosshairs', color: '#8e44ad',
         in: 2,
         out: 1,
         tpl: () => `
@@ -194,9 +194,9 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     sp_zonal_stats: {
-        cat: '4. RASTER', label: 'Zonal Stats', icon: 'fa-chart-area', color: '#8e44ad',
+        cat: '4. RASTER', label: 'Estadística zonal', alias: 'Zonal Stats', icon: 'fa-chart-area', color: '#8e44ad',
         in: 2, out: 1,
-        help: 'Estadisticas zonales (poligonos + GeoTIFF).',
+        help: 'Calcula para cada polígono el mínimo, máximo, media y suma de los píxeles de un GeoTIFF (sólo la primera banda) y los guarda como <prefijo>_min, _max, _mean y _sum (por defecto zs). Si falla, marca <prefijo>_err. Las entradas se detectan solas.',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Prefijo</span>

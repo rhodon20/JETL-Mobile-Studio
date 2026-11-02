@@ -56,6 +56,7 @@ function restoreLocalDraft() {
         resetEditorState();
         editor.import(flow);
         invalidateAllNodes('draft_restored');
+        JETLEvents.emit('workspace:replaced');
         JETLEvents.emit('canvas:fit');
         if (typeof window.showToast === 'function') window.showToast('Borrador restaurado', 'success');
         return true;
@@ -367,6 +368,38 @@ function addNodeClick(k) {
     return id;
 }
 
+function nodeTitleHtml(tool) {
+    return `<i class="fas ${JETLEscapeHtml(tool.icon)}"></i> ${JETLEscapeHtml(tool.label)}`;
+}
+
+// La ayuda se abre al tocar el icono (js/ui/nodeHelp.js); el title queda para el ratón.
+function nodeHelpIconHtml(tool) {
+    return tool.help ? `<i class="fas fa-circle-info node-help node-action" data-node-action="help" role="button" aria-label="Ayuda del nodo" title="${JETLEscapeHtml(tool.help)}"></i>` : '';
+}
+
+// Proyectos y borradores guardan el HTML de cada nodo tal como se creó: al abrirlos,
+// la cabecera toma el nombre y la ayuda actuales del registro (los parámetros, en el
+// cuerpo del nodo, no se tocan).
+function refreshNodeHeaders() {
+    const nodes = editor?.drawflow?.drawflow?.Home?.data || {};
+    Object.values(nodes).forEach((node) => {
+        const tool = TOOL_REGISTRY[node.name];
+        const el = document.getElementById('node-' + node.id);
+        const head = el?.querySelector('.node-head');
+        if (!tool || !head) return;
+        const title = head.querySelector('.node-title') || head.querySelector(':scope > div > span:not(.count-badge):not(.time-badge)');
+        if (title) {
+            title.classList.add('node-title');
+            title.innerHTML = nodeTitleHtml(tool);
+        }
+        const actions = head.querySelector('.node-actions');
+        if (!actions) return;
+        actions.querySelector('.node-help')?.remove();
+        if (tool.help) actions.insertAdjacentHTML('afterbegin', nodeHelpIconHtml(tool));
+    });
+}
+JETLEvents.on('workspace:replaced', refreshNodeHeaders);
+
 function addNode(k, x, y) {
     const t = TOOL_REGISTRY[k];
     let pos = { x: 100, y: 100 };
@@ -377,16 +410,15 @@ function addNode(k, x, y) {
     }
 
     const isJunc = k === 'util_junction';
-    const helpIcon = t.help ? `<i class="fas fa-circle-info node-help" title="${t.help}"></i>` : '';
     const html = isJunc ? `<div class="junction-point"></div>` :
         `<div class="node-head" style="border-bottom:3px solid ${JETLEscapeHtml(t.color)}">
             <div style="display:flex;align-items:center;">
                 <span class="count-badge node-badge-count">0</span>
-                <span><i class="fas ${JETLEscapeHtml(t.icon)}"></i> ${JETLEscapeHtml(t.label)}</span>
+                <span class="node-title">${nodeTitleHtml(t)}</span>
                 <span class="time-badge node-badge-time"></span>
             </div>
             <div class="node-actions">
-                ${helpIcon}
+                ${nodeHelpIconHtml(t)}
                 <i class="fas fa-play-circle node-btn node-action" data-node-action="run" title="Ejecutar hasta aqui"></i>
                 <i class="fas fa-eye node-btn eye-btn node-action" data-node-action="view" title="Ver en Mapa"></i>
                 <i class="fas fa-times node-action" data-node-action="delete" style="cursor:pointer;opacity:0.6;margin-left:4px" title="Eliminar nodo"></i>

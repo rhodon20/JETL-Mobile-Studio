@@ -10,27 +10,50 @@ JETLEvents.on('tools:changed', () => {
     renderSidebar(f ? String(f.value || '') : '');
 });
 
-// Nodos que sólo funcionan con el backend de Desktop (GDB, FeatureReader): siguen
-// registrados para abrir sus proyectos, pero no se ofrecen si no hay backend.
+// Nodos que siguen registrados para abrir proyectos que los usan, pero no se ofrecen:
+// los ocultos (hidden: versiones antiguas) y los que sólo funcionan con el backend de
+// Desktop (GDB, FeatureReader) cuando no lo hay.
 function offeredInCatalog(tool) {
+    if (tool.hidden) return false;
     return !tool.requiresBackend || !!(window.JETLBackend || window.JETLBackendIntegration);
 }
 
-// Categorías del registro ("2.1 VECTOR - GEOMETRY") con nombre legible e icono.
-const CATEGORY_ICONS = [
-    [/READERS/, 'fa-file-import'], [/GEOMETRY/, 'fa-draw-polygon'], [/OVERLAY/, 'fa-layer-group'],
-    [/SPATIAL/, 'fa-location-crosshairs'], [/ATTRIBUTE/, 'fa-table-list'], [/UTILS/, 'fa-screwdriver-wrench'],
-    [/RASTER/, 'fa-image'], [/WRITERS/, 'fa-file-export']
+// Categorías del registro ("2.1 VECTOR - GEOMETRY"): nombre en español e icono. La
+// clave del registro no cambia (la ejecución y los paquetes la usan); sólo se muestra así.
+const CATEGORIES = [
+    [/READERS/, 'Entradas', 'fa-file-import'], [/GEOMETRY/, 'Geometría', 'fa-draw-polygon'],
+    [/OVERLAY/, 'Superposición', 'fa-layer-group'], [/SPATIAL/, 'Análisis espacial', 'fa-location-crosshairs'],
+    [/ATTRIBUTE/, 'Atributos', 'fa-table-list'], [/UTILS/, 'Utilidades', 'fa-screwdriver-wrench'],
+    [/RASTER/, 'Ráster', 'fa-image'], [/WRITERS/, 'Exportar', 'fa-file-export']
 ];
 
+function categoryEntry(cat) {
+    return CATEGORIES.find(([pattern]) => pattern.test(String(cat).toUpperCase())) || null;
+}
+
 function categoryName(cat) {
+    const hit = categoryEntry(cat);
+    if (hit) return hit[1];
     const name = String(cat).replace(/^[\d.]+\s*/, '').toLocaleLowerCase('es').replace(/\s*-\s*/g, ' · ');
     return name.charAt(0).toLocaleUpperCase('es') + name.slice(1);
 }
 
 function categoryIcon(cat) {
-    const hit = CATEGORY_ICONS.find(([pattern]) => pattern.test(String(cat).toUpperCase()));
-    return hit ? hit[1] : 'fa-cube';
+    const hit = categoryEntry(cat);
+    return hit ? hit[2] : 'fa-cube';
+}
+
+// Búsqueda sin distinguir mayúsculas ni tildes ("geometria" encuentra «Geometría»).
+function searchText(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+}
+
+// Un nodo se encuentra por su nombre, su categoría o su nombre de referencia (alias,
+// el habitual en otras herramientas: quien busque «Clipper» encuentra «Recortar»).
+function toolMatches(tool, query) {
+    const needle = searchText(query).trim();
+    if (!needle) return true;
+    return [tool.label, tool.alias, categoryName(tool.cat)].some((text) => searchText(text).includes(needle));
 }
 
 function renderSidebar(filter) {
@@ -39,7 +62,7 @@ function renderSidebar(filter) {
     const cats = {};
     Object.entries(TOOL_REGISTRY).forEach(([k, tool]) => {
         if (!offeredInCatalog(tool)) return;
-        if (filter && !tool.label.toLowerCase().includes(filter.toLowerCase())) return;
+        if (filter && !toolMatches(tool, filter)) return;
         if (!cats[tool.cat]) cats[tool.cat] = [];
         cats[tool.cat].push({ k, ...tool });
     });
@@ -103,14 +126,12 @@ function buildFlowNavigatorEntries(flowData, registry, query = '') {
     const data = flowData && flowData.drawflow && flowData.drawflow.Home
         ? flowData.drawflow.Home.data || {}
         : {};
-    const needle = String(query || '').trim().toLocaleLowerCase('es');
+    const needle = searchText(query).trim();
     return Object.entries(data).map(([id, node]) => {
         const tool = registry[node.name] || {};
         const label = tool.label || node.name || `Nodo ${id}`;
-        const category = tool.cat || 'Sin categoría';
-        const searchable = [id, node.name, label, category, JSON.stringify(node.data || {})]
-            .join(' ')
-            .toLocaleLowerCase('es');
+        const category = tool.cat ? categoryName(tool.cat) : 'Sin categoría';
+        const searchable = searchText([id, node.name, label, tool.alias || '', category, JSON.stringify(node.data || {})].join(' '));
         const inputs = Object.values(node.inputs || {}).reduce((total, input) => total + (input.connections || []).length, 0);
         const outputs = Object.values(node.outputs || {}).reduce((total, output) => total + (output.connections || []).length, 0);
         return {
@@ -343,13 +364,13 @@ function initQuickSearch() {
     function renderMatches(value) {
         const val = String(value || '').trim().toLocaleLowerCase('es');
         results.innerHTML = '';
-        const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => offeredInCatalog(t) && (t.label.toLowerCase().includes(val) || t.cat.toLowerCase().includes(val)));
+        const matches = Object.entries(TOOL_REGISTRY).filter(([k, t]) => offeredInCatalog(t) && toolMatches(t, val));
 
         matches.slice(0, 10).forEach(([k, t], i) => {
             const item = document.createElement('div');
             item.className = 'qs-item' + (i === 0 ? ' selected' : '');
             item.dataset.k = k;
-            item.innerHTML = `<i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> ${JETLEscapeHtml(t.label)} <span style="font-size:0.7em;opacity:0.5;margin-left:auto">${JETLEscapeHtml(t.cat)}</span>`;
+            item.innerHTML = `<i class="fas ${JETLEscapeHtml(t.icon)}" style="color:${JETLEscapeHtml(t.color)}"></i> ${JETLEscapeHtml(t.label)} <span style="font-size:0.7em;opacity:0.5;margin-left:auto">${JETLEscapeHtml(categoryName(t.cat))}</span>`;
             results.appendChild(item);
         });
 

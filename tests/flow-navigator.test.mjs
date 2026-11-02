@@ -10,8 +10,11 @@ const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 function loadEntryBuilder() {
     const source = engine.match(/function buildFlowNavigatorEntries[\s\S]*?\n}\nwindow\.buildFlowNavigatorEntries = buildFlowNavigatorEntries;/)?.[0];
     assert.ok(source, 'No se encontró el constructor del navegador');
+    // Usa los nombres de categoría y la búsqueda sin tildes del mismo fichero.
+    const helpers = engine.match(/const CATEGORIES = [\s\S]*?\nfunction searchText[\s\S]*?\n}\n/)?.[0];
+    assert.ok(helpers, 'No se encontraron las categorías y searchText');
     const context = { window: {} };
-    vm.runInNewContext(source, context, { filename: 'flow-navigator-builder.js' });
+    vm.runInNewContext(helpers + source, context, { filename: 'flow-navigator-builder.js' });
     return context.window.buildFlowNavigatorEntries;
 }
 
@@ -30,8 +33,8 @@ const flow = {
 };
 
 const registry = {
-    reader_osm: { label: 'OSM Reader', cat: 'Lectores', icon: 'fa-globe', color: '#16a085' },
-    attr_creator: { label: 'Attribute Creator', cat: 'Atributos', icon: 'fa-plus', color: '#2980b9' }
+    reader_osm: { label: 'Lector OSM', alias: 'OSM Reader', cat: '1. READERS', icon: 'fa-globe', color: '#16a085' },
+    attr_creator: { label: 'Crear campos', alias: 'Attr Creator', cat: '2.3 VECTOR - ATTRIBUTES', icon: 'fa-plus', color: '#2980b9' }
 };
 
 test('filtra nodos por nombre, categoría, configuración e ID', () => {
@@ -40,6 +43,10 @@ test('filtra nodos por nombre, categoría, configuración e ID', () => {
     assert.deepEqual(Array.from(build(flow, registry, 'atributos'), (entry) => entry.id), ['2']);
     assert.deepEqual(Array.from(build(flow, registry, 'densidad'), (entry) => entry.id), ['2']);
     assert.deepEqual(Array.from(build(flow, registry, '1'), (entry) => entry.id), ['1']);
+    // Por el nombre de referencia (alias) y sin tildes; la categoría se muestra en español.
+    assert.deepEqual(Array.from(build(flow, registry, 'attr creator'), (entry) => entry.id), ['2']);
+    assert.deepEqual(Array.from(build(flow, registry, 'entradas'), (entry) => entry.id), ['1']);
+    assert.deepEqual(Array.from(build(flow, registry, 'lector osm'), (entry) => entry.category), ['Entradas']);
 });
 
 test('resume las conexiones de cada resultado', () => {

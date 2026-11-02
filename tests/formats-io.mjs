@@ -204,13 +204,15 @@ try {
     });
     check('WKB decodes PostGIS EWKB, ISO Z/M and big endian', wkb[0] === '{"type":"Point","coordinates":[-3.7,40.42]}' && wkb[1] === '{"type":"Point","coordinates":[1,2,3]}' && wkb[2] === '{"type":"Point","coordinates":[5,6]}', wkb.join(' '));
 
-    // GDB y FeatureReader necesitan el backend de Desktop: registrados (abren sus proyectos), no ofrecidos.
+    // GDB y el lector de entidades necesitan el backend de Desktop, y los nodos ocultos
+    // son versiones antiguas: registrados (abren sus proyectos), no ofrecidos.
     const catalog = await page.evaluate(() => {
         JETLNativeNav('nodes');
         const text = document.getElementById('sidebar-content').textContent;
-        return { registered: ['reader_gdb', 'writer_gdb', 'reader_feature_reader'].every((k) => TOOL_REGISTRY[k]), shown: ['GDB Reader', 'FeatureReader'].filter((l) => text.includes(l)), gpkgShown: text.includes('GPKG Reader') };
+        const keys = ['reader_gdb', 'writer_gdb', 'reader_feature_reader', 'attr_manager', 'util_workspace_runner'];
+        return { registered: keys.every((k) => TOOL_REGISTRY[k]), shown: keys.map((k) => TOOL_REGISTRY[k].label).filter((l) => text.includes(l)), gpkgShown: text.includes('Lector GeoPackage') };
     });
-    check('backend-only nodes stay registered but out of the catalog', catalog.registered && catalog.shown.length === 0 && catalog.gpkgShown, JSON.stringify(catalog));
+    check('backend-only and hidden nodes stay registered but out of the catalog', catalog.registered && catalog.shown.length === 0 && catalog.gpkgShown, JSON.stringify(catalog));
 
     check('no format library is fetched from outside the app', external.length === 0, external.join(', '));
 

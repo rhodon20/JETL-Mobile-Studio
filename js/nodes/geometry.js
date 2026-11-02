@@ -349,8 +349,8 @@ function geometryLineBuilderCompat(collection, config) {
 
 Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     geo_area_builder: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Area Builder', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
-        help: 'Construye polígonos a partir de linework cerrado.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Construir áreas', alias: 'Area Builder', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
+        help: 'Crea polígonos a partir de las áreas cerradas que forman las líneas de entrada; los bordes de polígonos también se usan como líneas. Las líneas deben cortarse en sus cruces para que se detecten las áreas.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-draw-polygon"></i><div><strong>Linework → áreas</strong><small>Polygonize</small></div></div>`,
         run: async (id, inputs) => {
             const lines = [];
@@ -371,8 +371,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_centerline_replacer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Centerline Replacer', icon: 'fa-project-diagram', color: '#2980b9', in: 1, out: 2,
-        help: 'Sustituye áreas por su línea central mediante el backend Geometry de Desktop.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Línea central', alias: 'Centerline Replacer', icon: 'fa-project-diagram', color: '#2980b9', in: 1, out: 2,
+        help: 'Sustituye cada área por su línea central. Puedes ajustar la densificación, la longitud mínima de rama, la tolerancia de simplificación (todas en «auto» por defecto) y si se extienden los extremos. Necesita el servidor de JETL.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-project-diagram"></i><div><strong data-geom-transform-summary>Centerline · auto</strong><small>Requiere backend</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"centerline","densify_distance":"auto","min_branch_length":"auto","simplify_tolerance":"auto","extend":false,"timeout_seconds":30}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { mode: 'centerline', densify_distance: 'auto', min_branch_length: 'auto', simplify_tolerance: 'auto', extend: false, timeout_seconds: 30 });
@@ -384,8 +384,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_extruder: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Extruder', icon: 'fa-cube', color: '#2980b9', in: 1, out: 2,
-        help: 'Extruye geometría 2D a GeoJSON 3D con altura fija o por atributo.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extruir', alias: 'Extruder', icon: 'fa-cube', color: '#2980b9', in: 1, out: 2,
+        help: 'Da altura a la geometría y la convierte en 3D: los puntos pasan a ser segmentos verticales, las líneas a paredes y los polígonos a sólidos. La altura (10 por defecto) y la cota de base pueden ser fijas o venir de un atributo. Salida 1: correctas; salida 2: con error.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-cube"></i><div><strong data-geom-transform-summary>Altura 10</strong><small>GeoJSON 3D</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"height_mode":"fixed","height_value":10,"height_field":"","base_mode":"zero","base_value":0,"base_field":"","on_error":"reject"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { height_mode: 'fixed', height_value: 10, base_mode: 'zero', base_value: 0, on_error: 'reject' });
@@ -404,8 +404,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_generalizer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Generalizer', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
-        help: 'Alias canónico Desktop de Topo Simplify.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Generalizar', alias: 'Generalizer', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
+        help: 'Simplifica geometrías con la tolerancia indicada, en grados (0,00005 por defecto), y limpia vértices repetidos. En mallas de polígonos simplifica una sola vez los bordes compartidos para que no queden huecos ni solapes entre vecinos.',
         tpl: () => ((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY.geo_topo_simplify?.tpl?.() || `<div>Generalizer</div>`),
         run: async (id, inputs, dom) => {
             const tool = (typeof window !== 'undefined' ? window : global).TOOL_REGISTRY.geo_topo_simplify;
@@ -415,7 +415,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_geometry_coercer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Geometry Coercer', icon: 'fa-exchange-alt', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Forzar tipo de geometría', alias: 'Geometry Coercer', help: 'Cambia el tipo de geometría: «Línea» convierte los polígonos en sus contornos y descarta los puntos; «Punto» genera el centroide de cada entidad. Los atributos se conservan.', icon: 'fa-exchange-alt', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<label><span style="font-size:0.7em;color:#aaa">Geometría destino</span><select df-target class="node-control"><option value="line">Line</option><option value="point">Point/Centroid</option><option value="polygon">Polygon</option></select></label>`,
         run: async (id, inputs, dom) => {
             const collection = inputs[0] || turf.featureCollection([]);
@@ -438,15 +438,15 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_line_builder: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Line Builder', icon: 'fa-route', color: '#2980b9', in: 1, out: 1,
-        help: 'Construye líneas a partir de puntos agrupados y ordenados.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Construir líneas', alias: 'Line Builder', icon: 'fa-route', color: '#2980b9', in: 1, out: 1,
+        help: 'Une puntos en líneas: los agrupa por uno o varios campos (separados por comas) y los ordena por otro campo antes de unirlos. Se descartan los grupos con menos de dos puntos. Opcionalmente quita las coordenadas repetidas.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-route"></i><div><strong data-geom-transform-summary>Job · img</strong><small>Agrupar puntos</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"group_by":"Job","sort_by":"img","remove_duplicates":false}</textarea></div>`,
         run: async (id, inputs, dom) => geometryLineBuilderCompat(inputs[0], geometryReadTransformConfig(dom, { group_by: 'Job', sort_by: 'img', remove_duplicates: false }))
     },
 
     geo_multi_bufferer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'MultiBufferer', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 2,
-        help: 'Genera bandas de buffer sucesivas para varias distancias.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Buffer múltiple', alias: 'MultiBufferer', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 2,
+        help: 'Genera varias zonas de influencia (p. ej. 10,20) como anillos concéntricos sin solaparse, en metros por defecto. También puede crear líneas paralelas a líneas, calculadas en el sistema proyectado indicado. Salida 1: resultado; salida 2: entidades con error.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-layer-group"></i><div><strong data-geom-transform-summary>Buffers 10,20</strong><small>Bandas múltiples</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"output_mode":"polygons","distances":"10,20","unit":"meters","side":"both","projected_crs":"EPSG:25830"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { output_mode: 'polygons', distances: '10,20', unit: 'meters', side: 'both', projected_crs: 'EPSG:25830' });
@@ -488,8 +488,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_offsetter: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Offsetter', icon: 'fa-arrows-alt', color: '#2980b9', in: 1, out: 2,
-        help: 'Desplaza coordenadas X/Y/Z mediante valores fijos o atributos.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Desplazar', alias: 'Offsetter', icon: 'fa-arrows-alt', color: '#2980b9', in: 1, out: 2,
+        help: 'Desplaza todas las coordenadas sumando un valor en X, Y y Z, fijo o tomado de un atributo. El desplazamiento está en las unidades de los datos (grados si están en EPSG:4326). Salida 1: correctas; salida 2: con error.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-arrows-alt"></i><div><strong data-geom-transform-summary>X 0 · Y 0</strong><small>Offset XYZ</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"x_mode":"fixed","x_value":0,"x_field":"","y_mode":"fixed","y_value":0,"y_field":"","z_mode":"fixed","z_value":0,"z_field":"","on_error":"reject"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { x_mode: 'fixed', x_value: 0, y_mode: 'fixed', y_value: 0, z_mode: 'fixed', z_value: 0, on_error: 'reject' });
@@ -510,8 +510,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_crs_setter: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate System Setter', icon: 'fa-globe-europe', color: '#2980b9', in: 1, out: 1,
-        help: 'Asigna un CRS sin transformar coordenadas.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Asignar SRC', alias: 'Coordinate System Setter', icon: 'fa-globe-europe', color: '#2980b9', in: 1, out: 1,
+        help: 'Indica el sistema de coordenadas de los datos (EPSG:4326 por defecto) sin transformar las coordenadas. Úsalo cuando los datos ya están en ese sistema pero no lo tienen declarado. Puedes decidir si se sobrescribe el que ya tuvieran.',
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-globe-europe"></i><div><strong data-geom-transform-summary>EPSG:4326</strong><small>Asignar CRS</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"crs":"EPSG:4326","overwrite":true}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { crs: 'EPSG:4326', overwrite: true });
@@ -528,7 +528,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_horizontal_angle_calculator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Horizontal Angle Calculator', icon: 'fa-compass', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Ángulo horizontal', alias: 'Horizontal Angle Calculator', help: 'Calcula en cada línea el rumbo desde el primer vértice hasta el último (0 = norte, en sentido horario) y el ángulo matemático (0 = este, en sentido antihorario). El resultado se guarda en grados o radianes, en _azimuth y _angle.', icon: 'fa-compass', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-compass"></i><div><strong data-geom-transform-summary>Grados</strong><small>Azimut + ángulo</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"horizontal_azimuth","angle_type":"feature","unit":"degrees","calculation_model":"auto","azimuth_attr":"_azimuth","angle_attr":"_angle"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { unit: 'degrees', azimuth_attr: '_azimuth', angle_attr: '_angle' });
@@ -557,7 +557,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_rotator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Rotator', icon: 'fa-redo-alt', color: '#2980b9', in: 1, out: 2,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Rotar', alias: 'Rotator', help: 'Gira la geometría en sentido antihorario el ángulo indicado en grados (fijo o desde un atributo) alrededor del centroide, del centro de la caja envolvente o de un punto dado. Salida 1: correctas; salida 2: con error.', icon: 'fa-redo-alt', color: '#2980b9', in: 1, out: 2,
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-redo-alt"></i><div><strong data-geom-transform-summary>0° · centroide</strong><small>Rotación antihoraria</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"angle_mode":"fixed","angle_value":0,"angle_field":"","origin_mode":"centroid","origin_x":0,"origin_y":0,"origin_x_field":"","origin_y_field":"","on_error":"reject"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { angle_mode: 'fixed', angle_value: 0, origin_mode: 'centroid', on_error: 'reject' });
@@ -576,7 +576,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_densifier: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Densifier', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 2,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Densificar', alias: 'Densifier', help: 'Añade vértices a líneas y contornos de polígonos para que ningún tramo supere el intervalo (1 por defecto), en las unidades de los datos (grados en EPSG:4326). Modo uniforme o de intervalo exacto. Salida 1: correctas; salida 2: con error.', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 2,
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-grip-lines"></i><div><strong data-geom-transform-summary>Uniforme · 1</strong><small>Añadir vértices</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"mode":"uniform","interval_mode":"fixed","interval_value":1,"interval_field":"","on_error":"reject"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { mode: 'uniform', interval_mode: 'fixed', interval_value: 1, on_error: 'reject' });
@@ -595,7 +595,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_measure_extractor: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'MeasureExtractor', icon: 'fa-ruler-horizontal', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extraer medidas', alias: 'MeasureExtractor', help: 'Lee la tercera coordenada de los vértices como medida y la guarda en atributos: la lista completa, el primer vértice, un vértice por índice o el inicio y el final.', icon: 'fa-ruler-horizontal', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div class="node-editor-summary"><i class="fas fa-ruler-horizontal"></i><div><strong data-geom-transform-summary>Lista measures</strong><small>Extraer tercera coordenada</small></div></div><button type="button" class="btn node-editor-open" data-schema-action="geom-transform-open-editor"><i class="fas fa-pen"></i> Configurar</button><div class="node-editor-storage"><textarea df-geom-transform-config>{"measure_type":"whole","index":0,"point_attr":"measure","start_attr":"measure_start","end_attr":"measure_end","list_attr":"measures"}</textarea></div>`,
         run: async (id, inputs, dom) => {
             const config = geometryReadTransformConfig(dom, { measure_type: 'whole', index: 0, point_attr: 'measure', start_attr: 'measure_start', end_attr: 'measure_end', list_attr: 'measures' });
@@ -604,8 +604,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_coordinate_extractor: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Coordinate Extractor', icon: 'fa-map-marker-alt', color: '#2980b9', in: 1, out: 1,
-        help: 'Extrae una coordenada de la geometría y la guarda como atributos X/Y/Z.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extraer coordenadas', alias: 'Coordinate Extractor', icon: 'fa-map-marker-alt', color: '#2980b9', in: 1, out: 1,
+        help: 'Copia las coordenadas X, Y y Z de un vértice a atributos (_x, _y, _z por defecto). El índice empieza en 0 y los negativos cuentan desde el final (-1 = último vértice).',
         tpl: () => `
             <div style="display:grid;gap:4px">
                 <label><span style="font-size:0.7em;color:#aaa">Índice (-1 = última)</span><input type="number" df-index class="node-control" value="-1"></label>
@@ -637,8 +637,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_crs_extractor: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'CRS Extractor', icon: 'fa-globe-americas', color: '#2980b9', in: 1, out: 1,
-        help: 'Extrae el sistema de coordenadas y lo añade como propiedad.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extraer SRC', alias: 'CRS Extractor', icon: 'fa-globe-americas', color: '#2980b9', in: 1, out: 1,
+        help: 'Añade a cada entidad el código del sistema de coordenadas de la capa en los atributos crs_code y crs_name. Si la capa no lo tiene declarado, quedan vacíos.',
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Añade crs_code, crs_name y crs_wkt</div>`,
         run: async (id, inputs) => {
             const source = inputs[0];
@@ -656,7 +656,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_deaggregator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Deaggregator', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Desagregar', alias: 'Deaggregator', help: 'Divide las geometrías múltiples y las colecciones en entidades simples. Cada parte conserva los atributos originales y recibe su número de parte en _part_number, empezando por 0.', icon: 'fa-layer-group', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Multipart <i class="fas fa-arrow-right"></i> Singlepart + part number</div>`,
         run: async (id, inputs) => {
             const source = inputs[0] || turf.featureCollection([]);
@@ -673,7 +673,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_hull_creator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Hull Creator', icon: 'fa-circle-notch', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Envolvente', alias: 'Hull Creator', help: 'Crea un único polígono que envuelve todas las entidades de la capa, que debe tener al menos 4. Puede ser convexo o cóncavo. En el cóncavo, K (1–10) controla lo ajustado que queda: un valor bajo da una forma más ceñida.', icon: 'fa-circle-notch', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <label><span style="font-size:0.7em;color:#aaa">Tipo de hull</span><select df-hulltype class="node-control"><option value="convex">Convexo</option><option value="concave">Cóncavo</option></select></label>
             <label><span style="font-size:0.7em;color:#aaa">K (1–10)</span><input type="number" df-k value="3" min="1" max="10" class="node-control"></label>`,
@@ -695,7 +695,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_centroid: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'CenterPoint', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Punto central', alias: 'CenterPoint', help: 'Sustituye cada geometría por un punto en su centro, calculado como la media de sus vértices. Conserva los atributos. En formas cóncavas o en L el punto puede caer fuera.', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Centroide</div>`,
         run: async (id, i) => {
             const fc = i[0] || turf.featureCollection([]);
@@ -716,7 +716,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_simplify: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Simplifier', icon: 'fa-compress-arrows-alt', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Simplificar', alias: 'Simplifier', help: 'Reduce el número de vértices manteniendo la forma general. La tolerancia está en grados (0,0001 por defecto, unos 10 m): cuanto mayor sea, más vértices se eliminan.', icon: 'fa-compress-arrows-alt', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Tolerancia (Grados)</span>
@@ -744,8 +744,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_topo_simplify: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Topo Simplify', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
-        help: 'Simplificación con limpieza topológica (cleanCoords).',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Simplificar topología', alias: 'Topo Simplify', icon: 'fa-wave-square', color: '#2980b9', in: 1, out: 1,
+        help: 'Simplifica geometrías con la tolerancia indicada, en grados (0,00005 por defecto), y limpia vértices repetidos. En mallas de polígonos simplifica una sola vez los bordes compartidos para que no queden huecos ni solapes. Opcionalmente puede mantener el borde exterior sin cambios.',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Tolerancia (Grados)</span>
@@ -848,8 +848,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
         }
     },
     geo_line_merge: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Line Merger', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 1,
-        help: 'Une lineas colineales dentro de la misma capa.',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Unir líneas', alias: 'Line Merger', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 1,
+        help: 'Une en una sola línea los tramos conectados por sus extremos cuando en ese punto solo se encuentran dos líneas. Cada línea resultante conserva los atributos del primer tramo. Se descartan las geometrías que no son líneas.',
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Merge LineStrings</div>`,
         run: async (id, inputs) => {
             const mergeLinesLocal = (fc) => {
@@ -944,8 +944,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_reproject: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Reproject', icon: 'fa-sync', color: '#2980b9', in: 1, out: 1,
-        help: 'Reproyecta geometrías con proj4 (EPSG:4326 -> EPSG:3857, etc).',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Reproyectar', alias: 'Reproject', icon: 'fa-sync', color: '#2980b9', in: 1, out: 1,
+        help: 'Transforma las coordenadas de un sistema a otro (por defecto de EPSG:4326 a EPSG:3857) y marca los datos con el sistema de destino. Ambos sistemas se indican con su código EPSG.',
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Origen (EPSG)</span>
@@ -1023,8 +1023,8 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_repair: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Geometry Repair', icon: 'fa-toolbox', color: '#2980b9', in: 1, out: 1,
-        help: 'Repara geometrías inválidas (worker con JSTS).',
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Reparar geometría', alias: 'Geometry Repair', icon: 'fa-toolbox', color: '#2980b9', in: 1, out: 1,
+        help: 'Corrige geometrías no válidas, como polígonos que se cruzan a sí mismos o vértices repetidos, y conserva los atributos.',
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">makeValid / buffer(0)</div>`,
         run: async (id, inputs) => {
             const features = inputs[0];
@@ -1060,7 +1060,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_chunk: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Line Chopper', icon: 'fa-cut', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Trocear líneas', alias: 'Line Chopper', help: 'Corta cada línea en tramos de la longitud indicada (100 m por defecto, en metros o kilómetros, medidos sobre el terreno). Cada tramo conserva los atributos de su línea. Las geometrías que no son líneas pasan sin cambios.', icon: 'fa-cut', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Longitud de Segmento</span>
@@ -1108,7 +1108,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_dissolve: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Dissolver', icon: 'fa-object-group', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Disolver', alias: 'Dissolver', help: 'Une los polígonos que se tocan o se solapan en una sola geometría. Si indicas campos (separados por comas), solo se unen los que tienen los mismos valores; si lo dejas vacío, se une toda la capa.', icon: 'fa-object-group', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Disolver por campos</span>
@@ -1205,7 +1205,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_explode: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Exploder', icon: 'fa-shapes', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Separar partes', alias: 'Exploder', help: 'Divide las geometrías múltiples en entidades simples, una por cada parte. Cada parte conserva los atributos de la entidad original.', icon: 'fa-shapes', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Multipart <i class="fas fa-arrow-right"></i> Singlepart</div>`,
         run: async (id, inputs) => {
             const fc = inputs[0] || turf.featureCollection([]);
@@ -1239,7 +1239,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_vertex_creator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Vertex Creator', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Crear vértices', alias: 'Vertex Creator', help: 'Genera puntos a partir de líneas y polígonos: todos los vértices, solo el inicio, solo el final, ambos, o los extremos sueltos (los que no tocan ninguna otra línea).', icon: 'fa-draw-polygon', color: '#2980b9', in: 1, out: 1,
         // CORRECCIÓN: Usamos tpl explícito para compatibilidad con tu index.html actual
         tpl: () => `
             <div style="margin-bottom:4px">
@@ -1332,7 +1332,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_triangulator: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Triangulator', icon: 'fa-shapes', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Triangular', alias: 'Triangulator', help: 'Divide cada polígono en triángulos que cubren su superficie. Cada triángulo conserva los atributos del polígono. Se descartan las geometrías que no son polígonos.', icon: 'fa-shapes', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Polygons <i class="fas fa-arrow-right"></i> Triangles (TIN)</div>`,
         run: async (id, inputs) => {
             const res = [];
@@ -1376,7 +1376,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_donut_extractor: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Donut Extractor', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Extraer huecos', alias: 'Donut Extractor', help: 'Extrae los huecos interiores de los polígonos como polígonos nuevos, con los atributos del polígono que los contenía. Los polígonos sin huecos no generan salida.', icon: 'fa-dot-circle', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Extract Polygon Holes</div>`,
         run: async (id, inputs) => {
             if (JETLWorkersEnabled()) {
@@ -1419,7 +1419,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_line_closer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Line Closer', icon: 'fa-vector-square', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Cerrar líneas', alias: 'Line Closer', help: 'Cierra cada línea uniendo su último vértice con el primero y la convierte en polígono, conservando los atributos. Las geometrías que no son líneas se descartan.', icon: 'fa-vector-square', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">LineString <i class="fas fa-arrow-right"></i> Polygon</div>`,
         run: async (id, inputs) => {
             const fc = inputs[0] || turf.featureCollection([]);
@@ -1462,7 +1462,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_line_to_polygon: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Line to Polygon', icon: 'fa-vector-square', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Línea a polígono', alias: 'Line to Polygon', help: 'Convierte cada línea en un polígono cerrándola si hace falta. Las líneas múltiples dan un polígono por parte. Se conservan los atributos y se descartan las geometrías que no son líneas.', icon: 'fa-vector-square', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Line/MultiLine <i class="fas fa-arrow-right"></i> Polygon</div>`,
         run: async (id, inputs) => {
             const polys = [];
@@ -1510,7 +1510,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_polygon_to_line: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Polygon to Line', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Polígono a línea', alias: 'Polygon to Line', help: 'Convierte los polígonos en líneas que siguen su contorno, incluidos los huecos interiores, y conserva los atributos. Los polígonos múltiples dan una línea por parte. Se descartan las geometrías que no son polígonos.', icon: 'fa-grip-lines', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div style="font-size:0.7em;color:#aaa;text-align:center">Polygon/MultiPolygon <i class="fas fa-arrow-right"></i> Line</div>`,
         run: async (id, inputs) => {
             const lines = [];
@@ -1572,7 +1572,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_point_surf: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'CenterPointInside', icon: 'fa-map-marker', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Punto interior', alias: 'CenterPointInside', help: 'Sustituye cada geometría por un punto situado siempre dentro de ella, también en formas cóncavas, en L o con huecos.', icon: 'fa-map-marker', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Interior garantizado</div>`,
         run: async (id, i) => {
             const fc = i[0] || turf.featureCollection([]);
@@ -1593,7 +1593,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_bbox: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Envelope', icon: 'fa-square-full', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Rectángulo envolvente', alias: 'Envelope', help: 'Sustituye cada geometría por el rectángulo que la envuelve, alineado con los ejes.', icon: 'fa-square-full', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Caja Límite</div>`,
         run: async (id, i) => {
             const fc = i[0] || turf.featureCollection([]);
@@ -1614,7 +1614,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_voronoi: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Voronoi', icon: 'fa-th-large', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Polígonos de Voronoi', alias: 'Voronoi', help: 'Divide el espacio alrededor de los puntos en celdas: cada celda abarca la zona más cercana a su punto. Usa solo los puntos, quita los repetidos y extiende el área de cálculo un 50 % más allá de los puntos. Cada celda lleva los atributos de su punto.', icon: 'fa-th-large', color: '#2980b9', in: 1, out: 1,
         tpl: () => `<div>Polígonos</div>`,
         run: async (id, i) => {
             const inputs = i[0];
@@ -1679,7 +1679,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_buffer: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Bufferer', icon: 'fa-bullseye', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Buffer', alias: 'Bufferer', help: 'Crea una zona de influencia alrededor de cada geometría con el radio indicado (100 m por defecto, en metros o kilómetros, medidos sobre el terreno). El resultado puede ser un polígono por entidad o todas las zonas unidas en una.', icon: 'fa-bullseye', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Radio / Unidad</span>
@@ -1744,7 +1744,7 @@ Object.assign((typeof window !== 'undefined' ? window : global).TOOL_REGISTRY, {
     },
 
     geo_random_fill: {
-        cat: '2.1 VECTOR - GEOMETRY', label: 'Random Fill', icon: 'fa-braille', color: '#2980b9', in: 1, out: 1,
+        cat: '2.1 VECTOR - GEOMETRY', label: 'Relleno aleatorio', alias: 'Random Fill', help: 'Genera puntos al azar dentro de cada polígono (50 por defecto). Cada punto lleva los atributos de su polígono y un número en _generated_id. En polígonos muy finos pueden salir menos puntos de los pedidos.', icon: 'fa-braille', color: '#2980b9', in: 1, out: 1,
         tpl: () => `
             <div style="margin-bottom:4px">
                 <span style="font-size:0.7em;color:#aaa">Puntos por Polígono</span>

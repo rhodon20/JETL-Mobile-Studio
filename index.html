@@ -2224,6 +2224,33 @@ body.action-hub-open #action-hub { display:block; position:fixed; left:0; right:
 #sidebar-content .cat-title.active .cat-icon { transform: none; }
 #sidebar-content .cat-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.08); color: #aab; font-size: .9em; text-align: center; letter-spacing: 0; }
 .catalog-empty { padding: 24px 16px; color: #9aa0a6; text-align: center; }
+
+/* Ayuda de un nodo (js/ui/nodeHelp.js): tarjeta abajo, sobre la barra de navegación. */
+#node-help-card {
+    position: fixed;
+    z-index: 2147483646;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--mobile-dock-height, 0px) + var(--mobile-safe-bottom, 0px) + 16px);
+    width: min(440px, calc(100vw - 24px));
+    margin: 0 auto;
+    padding: 14px 16px 16px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 18px;
+    background: #232327;
+    color: #e7e7e9;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+}
+#node-help-card[hidden] { display: none; }
+.node-help-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.node-help-head > i { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 11px; background: #2c2e33; font-size: 16px; }
+.node-help-head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.node-help-head strong { font-size: 16px; }
+.node-help-head small { color: #9aa0a6; font-size: 12px; }
+.node-help-close { width: 36px; height: 36px; flex: none; border: 0; border-radius: 50%; background: #303034; color: #ddd; cursor: pointer; }
+#node-help-card p { margin: 0; font-size: 14px; line-height: 1.5; color: #d4d6db; }
+.drawflow .node-help { cursor: pointer; }
+html.ui-touch .drawflow .node-help { padding: 6px; margin: -6px 0; }
 /* ---- css/mobile.css ---- */
 :root {
     --mobile-dock-height: 72px;
@@ -3693,7 +3720,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="formatter-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formatter-editor-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-text-width"></i><div><strong id="formatter-editor-title">String Formatter</strong><small>Transforma uno o varios campos de texto</small></div></div>
+                <div class="modal-title"><i class="fas fa-text-width"></i><div><strong id="formatter-editor-title">Formatear texto</strong><small>Transforma uno o varios campos de texto</small></div></div>
                 <button class="modal-close" data-ui-action="close-formatter-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">
@@ -3743,7 +3770,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="string-replacer-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="string-replacer-editor-title">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-exchange-alt"></i><div><strong id="string-replacer-editor-title">String Replacer</strong><small>Aplica reglas de sustitución en orden</small></div></div>
+                <div class="modal-title"><i class="fas fa-exchange-alt"></i><div><strong id="string-replacer-editor-title">Reemplazar texto</strong><small>Aplica reglas de sustitución en orden</small></div></div>
                 <button class="modal-close" data-ui-action="close-string-replacer-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">
@@ -3768,7 +3795,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="aggregator-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="aggregator-editor-title">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-layer-group"></i><div><strong id="aggregator-editor-title">Aggregator</strong><small>Agrupa atributos y geometrías</small></div></div>
+                <div class="modal-title"><i class="fas fa-layer-group"></i><div><strong id="aggregator-editor-title">Agrupar</strong><small>Agrupa atributos y geometrías</small></div></div>
                 <button class="modal-close" data-ui-action="close-aggregator-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">
@@ -3800,7 +3827,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="keeper-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="keeper-editor-title">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-check-square"></i><div><strong id="keeper-editor-title">Attribute Keeper</strong><small>Selecciona los atributos que permanecerán</small></div></div>
+                <div class="modal-title"><i class="fas fa-check-square"></i><div><strong id="keeper-editor-title">Mantener campos</strong><small>Selecciona los atributos que permanecerán</small></div></div>
                 <button class="modal-close" data-ui-action="close-keeper-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">
@@ -3815,7 +3842,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="creator-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="creator-editor-title">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-plus-square"></i><div><strong id="creator-editor-title">Attribute Creator</strong><small>Crea varios atributos en orden</small></div></div>
+                <div class="modal-title"><i class="fas fa-plus-square"></i><div><strong id="creator-editor-title">Crear campos</strong><small>Crea varios atributos en orden</small></div></div>
                 <button class="modal-close" data-ui-action="close-creator-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">
@@ -3842,7 +3869,7 @@ html.ui-touch[data-layout="tablet"] #run-history-modal .run-history-content {
     <div id="reader-editor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reader-editor-title">
         <div class="modal-content modal-content-wide">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-file-import"></i><div><strong id="reader-editor-title">Reader</strong><small id="reader-editor-subtitle">Fuente, esquema y vista previa</small></div></div>
+                <div class="modal-title"><i class="fas fa-file-import"></i><div><strong id="reader-editor-title">Entrada</strong><small id="reader-editor-subtitle">Fuente, esquema y vista previa</small></div></div>
                 <button class="modal-close" data-ui-action="close-reader-editor" aria-label="Cerrar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body modal-form">

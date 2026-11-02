@@ -21,6 +21,7 @@ import { initActionHub } from './ui/actionHub.js';
 import { initMultiSelect, isSelecting, pickedIds } from './ui/multiSelect.js';
 import { initAnnotations } from './ui/annotations.js';
 import { initTabletResults } from './ui/tabletResults.js';
+import { showNodeHelp } from './ui/nodeHelp.js';
 import { initOfflineMode } from './core/offline.js';
 
 let jetlAppInitialized = false;
@@ -442,6 +443,7 @@ function initEngineDelegation() {
 
             if (action === 'run') runEnginePartial(nodeId);
             else if (action === 'view') showNodeResult(nodeId);
+            else if (action === 'help') showNodeHelp(nodeId);
             else if (action === 'delete') editor.removeNodeId(nodeEl.id);
         });
 

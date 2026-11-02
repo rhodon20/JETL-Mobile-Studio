@@ -908,7 +908,7 @@
         const config = _readAttributeTextConfig(nodeEl, resolvedKind);
         currentAttributeTextEditor = { nodeId: String(nodeId), kind: resolvedKind };
 
-        const titles = { list: 'List Concatenator', substring: 'Substring Extractor', splitter: 'Attribute Splitter', exploder: 'List Exploder' };
+        const titles = { list: 'Concatenar lista', substring: 'Extraer subcadena', splitter: 'Dividir campo', exploder: 'Expandir lista' };
         const subtitles = {
             list: 'Convierte una lista de atributos en texto', substring: 'Extrae un intervalo de caracteres con fin inclusivo',
             splitter: 'Divide texto en una lista', exploder: 'Crea una feature por elemento de la lista'
@@ -1169,7 +1169,7 @@
         const resolvedVersion = version === 'v2' ? 'v2' : 'legacy';
         const config = _readAttributeManagerConfig(nodeEl, resolvedVersion);
         currentAttributeManagerEditor = { nodeId: String(nodeId), version: resolvedVersion };
-        document.getElementById('attribute-manager-editor-title').textContent = resolvedVersion === 'v2' ? 'Attribute Manager v2' : 'Attribute Manager';
+        document.getElementById('attribute-manager-editor-title').textContent = resolvedVersion === 'v2' ? 'Gestor de campos' : 'Attribute Manager';
         document.getElementById('attribute-manager-editor-subtitle').textContent = resolvedVersion === 'v2' ? 'Editor FME actual de una salida' : 'Contrato Desktop legado con salida de rechazados';
         document.getElementById('attribute-manager-editor-preserve').checked = config.preserveOthers !== false;
         document.getElementById('attribute-manager-editor-error-field').hidden = resolvedVersion !== 'legacy';
@@ -1223,7 +1223,7 @@
 
     const GEOMETRY_TRANSFORM_EDITORS = {
         geo_crs_setter: {
-            title: 'Coordinate System Setter', subtitle: 'Asigna metadatos CRS sin reproyectar',
+            title: 'Asignar SRC', subtitle: 'Asigna metadatos CRS sin reproyectar',
             fields: [
                 { key: 'crs', label: 'CRS', type: 'text', value: 'EPSG:4326', placeholder: 'EPSG:4326' },
                 { key: 'overwrite', label: 'Sobrescribir CRS existente', type: 'checkbox', value: true }
@@ -1231,7 +1231,7 @@
             summary: (config) => String(config.crs || 'EPSG:4326')
         },
         geo_horizontal_angle_calculator: {
-            title: 'Horizontal Angle Calculator', subtitle: 'Azimut y ángulo horizontal de líneas',
+            title: 'Ángulo horizontal', subtitle: 'Azimut y ángulo horizontal de líneas',
             fields: [
                 { key: 'unit', label: 'Unidad', type: 'select', value: 'degrees', options: [['degrees', 'Grados'], ['radians', 'Radianes']] },
                 { key: 'azimuth_attr', label: 'Atributo de azimut', type: 'text', value: '_azimuth' },
@@ -1240,7 +1240,7 @@
             summary: (config) => config.unit === 'radians' ? 'Radianes' : 'Grados'
         },
         geo_rotator: {
-            title: 'Rotator', subtitle: 'Rotación antihoraria con origen configurable',
+            title: 'Rotar', subtitle: 'Rotación antihoraria con origen configurable',
             fields: [
                 { key: 'angle_mode', label: 'Origen del ángulo', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
                 { key: 'angle_value', label: 'Ángulo (grados)', type: 'number', value: 0 },
@@ -1255,7 +1255,7 @@
             summary: (config) => `${config.angle_mode === 'field' ? config.angle_field || 'atributo' : Number(config.angle_value || 0) + '°'} · ${config.origin_mode || 'centroid'}`
         },
         geo_densifier: {
-            title: 'Densifier', subtitle: 'Añade vértices a líneas y anillos',
+            title: 'Densificar', subtitle: 'Añade vértices a líneas y anillos',
             fields: [
                 { key: 'mode', label: 'Distribución', type: 'select', value: 'uniform', options: [['uniform', 'Uniforme'], ['exact', 'Intervalo exacto']] },
                 { key: 'interval_mode', label: 'Origen del intervalo', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
@@ -1266,7 +1266,7 @@
             summary: (config) => `${config.mode === 'exact' ? 'Exacto' : 'Uniforme'} · ${config.interval_mode === 'field' ? config.interval_field || 'atributo' : config.interval_value}`
         },
         geo_measure_extractor: {
-            title: 'MeasureExtractor', subtitle: 'Lee la tercera coordenada como medida',
+            title: 'Extraer medidas', subtitle: 'Lee la tercera coordenada como medida',
             fields: [
                 { key: 'measure_type', label: 'Modo', type: 'select', value: 'whole', options: [['whole', 'Lista completa'], ['point', 'Primer punto'], ['vertex', 'Vértice por índice'], ['endpoints', 'Inicio y fin']] },
                 { key: 'index', label: 'Índice de vértice', type: 'number', value: 0 },
@@ -1278,7 +1278,7 @@
             summary: (config) => ({ whole: `Lista ${config.list_attr || 'measures'}`, point: config.point_attr || 'measure', vertex: `Vértice ${config.index ?? 0}`, endpoints: 'Inicio + fin' }[config.measure_type] || 'Medidas')
         },
         geo_centerline_replacer: {
-            title: 'Centerline Replacer', subtitle: 'Línea central mediante backend Geometry',
+            title: 'Línea central', subtitle: 'Línea central mediante backend Geometry',
             fields: [
                 { key: 'densify_distance', label: 'Distancia de densificación', type: 'text', value: 'auto' },
                 { key: 'min_branch_length', label: 'Longitud mínima de rama', type: 'text', value: 'auto' },
@@ -1289,7 +1289,7 @@
             summary: (config) => `Centerline · ${config.densify_distance || 'auto'}`
         },
         geo_extruder: {
-            title: 'Extruder', subtitle: 'Convierte geometría 2D en GeoJSON 3D',
+            title: 'Extruir', subtitle: 'Convierte geometría 2D en GeoJSON 3D',
             fields: [
                 { key: 'height_mode', label: 'Origen de altura', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
                 { key: 'height_value', label: 'Altura', type: 'number', value: 10 },
@@ -1302,7 +1302,7 @@
             summary: (config) => `Altura ${config.height_mode === 'field' ? config.height_field || 'atributo' : config.height_value}`
         },
         geo_line_builder: {
-            title: 'Line Builder', subtitle: 'Agrupa y ordena puntos para construir líneas',
+            title: 'Construir líneas', subtitle: 'Agrupa y ordena puntos para construir líneas',
             fields: [
                 { key: 'group_by', label: 'Agrupar por (separado por comas)', type: 'text', value: 'Job' },
                 { key: 'sort_by', label: 'Ordenar por', type: 'text', value: 'img' },
@@ -1311,7 +1311,7 @@
             summary: (config) => `${config.group_by || 'sin grupo'} · ${config.sort_by || 'sin orden'}`
         },
         geo_multi_bufferer: {
-            title: 'MultiBufferer', subtitle: 'Bandas de buffer o líneas paralelas',
+            title: 'Buffer múltiple', subtitle: 'Bandas de buffer o líneas paralelas',
             fields: [
                 { key: 'output_mode', label: 'Salida', type: 'select', value: 'polygons', options: [['polygons', 'Bandas poligonales'], ['offset_lines', 'Líneas paralelas']] },
                 { key: 'distances', label: 'Distancias', type: 'text', value: '10,20', placeholder: '10,20,50' },
@@ -1322,7 +1322,7 @@
             summary: (config) => `${config.output_mode === 'offset_lines' ? 'Paralelas' : 'Buffers'} ${config.distances || ''}`
         },
         geo_offsetter: {
-            title: 'Offsetter', subtitle: 'Desplaza coordenadas X, Y y Z',
+            title: 'Desplazar', subtitle: 'Desplaza coordenadas X, Y y Z',
             fields: [
                 { key: 'x_mode', label: 'Origen X', type: 'select', value: 'fixed', options: [['fixed', 'Valor fijo'], ['field', 'Atributo']] },
                 { key: 'x_value', label: 'Offset X', type: 'number', value: 0 },
@@ -1338,7 +1338,7 @@
             summary: (config) => `X ${config.x_mode === 'field' ? config.x_field || 'attr' : config.x_value} · Y ${config.y_mode === 'field' ? config.y_field || 'attr' : config.y_value}`
         },
         sp_anchored_snapper: {
-            title: 'Anchored Snapper', subtitle: 'Ajusta candidatos contra una red de anchors',
+            title: 'Ajustar a referencia', subtitle: 'Ajusta candidatos contra una red de anchors',
             fields: [
                 { key: 'snapping_type', label: 'Tipo de ajuste', type: 'select', value: 'segment', options: [['segment', 'Segmento'], ['vertex', 'Vértice']] },
                 { key: 'distance', label: 'Distancia máxima', type: 'number', value: 10, min: 0 },
@@ -1348,7 +1348,7 @@
             summary: (config) => `${config.snapping_type === 'vertex' ? 'Vértice' : 'Segmento'} · ${config.distance ?? 10} ${{ meters: 'm', kilometers: 'km', miles: 'mi' }[config.unit] || config.unit}`
         },
         sp_neighbor_finder: {
-            title: 'Neighbor Finder', subtitle: 'Encuentra el candidato más próximo',
+            title: 'Buscar vecinos', subtitle: 'Encuentra el candidato más próximo',
             fields: [
                 { key: 'max_distance', label: 'Distancia máxima (metros)', type: 'text', value: '', placeholder: 'Sin límite' },
                 { key: 'distance_factor', label: 'Factor de distancia', type: 'text', value: '', placeholder: 'Opcional' },
@@ -1357,7 +1357,7 @@
             summary: (config) => String(config.max_distance ?? '').trim() ? `Máx. ${config.max_distance} m` : 'Sin límite'
         },
         sp_spatial_relator: {
-            title: 'Spatial Relator', subtitle: 'Relaciona Requestors con Suppliers',
+            title: 'Relación espacial', subtitle: 'Relaciona Requestors con Suppliers',
             fields: [
                 { key: 'mode', label: 'Relación espacial', type: 'select', value: 'intersects', options: [['intersects', 'Intersects'], ['contains', 'Contains'], ['within', 'Within'], ['crosses', 'Crosses'], ['touches', 'Touches'], ['overlaps', 'Overlaps'], ['equals', 'Equals'], ['disjoint', 'Disjoint']] },
                 { key: 'count_attr', label: 'Atributo de recuento', type: 'text', value: 'related_suppliers' },
@@ -1373,7 +1373,7 @@
             summary: (config) => `${config.mode || 'intersects'} · ${config.count_attr || 'related_suppliers'}`
         },
         reader_feature_reader: {
-            title: 'FeatureReader', subtitle: 'Lectura dinámica compatible con Desktop', storage: '[df-fr-config]',
+            title: 'Lector de entidades', subtitle: 'Lectura dinámica compatible con Desktop', storage: '[df-fr-config]',
             fields: [
                 { key: 'format', label: 'Formato', type: 'select', value: 'csv', options: [['csv', 'CSV'], ['xlsx', 'Excel'], ['geojson', 'GeoJSON'], ['kml', 'KML'], ['gpx', 'GPX'], ['shp', 'SHP'], ['gdb', 'GDB'], ['gpkg', 'GeoPackage'], ['parquet', 'Parquet']] },
                 { key: 'path_mode', label: 'Origen de ruta', type: 'select', value: 'attribute', options: [['attribute', 'Atributo iniciador'], ['static', 'Ruta fija'], ['template', 'Plantilla']] },
@@ -1397,7 +1397,7 @@
             summary: (config) => `${String(config.format || 'csv').toUpperCase()} · ${{ attribute: 'atributo', static: 'ruta fija', template: 'plantilla' }[config.path_mode] || config.path_mode}`
         },
         util_creator: {
-            title: 'Creator', subtitle: 'Genera entidades sin depender de una fuente', storage: '[df-creator-config]',
+            title: 'Crear entidad', subtitle: 'Genera entidades sin depender de una fuente', storage: '[df-creator-config]',
             fields: [
                 { key: 'count', label: 'Cantidad', type: 'number', value: 1, min: 1 },
                 { key: 'geometry_mode', label: 'Geometría', type: 'select', value: 'none', options: [['none', 'Sin geometría'], ['point', 'Punto']] },
@@ -1407,7 +1407,7 @@
             ], summary: (config) => `${config.count || 1} entidades · ${config.geometry_mode === 'point' ? 'punto' : 'sin geometría'}`
         },
         util_http_caller: {
-            title: 'HTTP Caller', subtitle: 'Petición HTTP ejecutada por el navegador', storage: '[df-http-config]',
+            title: 'Petición HTTP', subtitle: 'Petición HTTP ejecutada por el navegador', storage: '[df-http-config]',
             fields: [
                 { key: 'url', label: 'URL', type: 'text', value: '' }, { key: 'method', label: 'Método', type: 'select', value: 'GET', options: [['GET','GET'],['POST','POST'],['PUT','PUT'],['PATCH','PATCH'],['DELETE','DELETE']] },
                 { key: 'timeout', label: 'Timeout (s)', type: 'number', value: 15, min: 1 }, { key: 'auth', label: 'Autenticación', type: 'select', value: 'none', options: [['none','Ninguna'],['basic','Basic'],['bearer','Bearer'],['api_key','API key']] },
@@ -1417,7 +1417,7 @@
             ], summary: (config) => `${config.method || 'GET'} · ${config.url || 'sin URL'}`
         },
         util_rest_request: {
-            title: 'REST Request', subtitle: 'Endpoint REST con ruta y parámetros', storage: '[df-rest-config]',
+            title: 'Petición REST', subtitle: 'Endpoint REST con ruta y parámetros', storage: '[df-rest-config]',
             fields: [
                 { key: 'base_url', label: 'URL base', type: 'text', value: '' }, { key: 'path', label: 'Ruta', type: 'text', value: '' },
                 { key: 'method', label: 'Método', type: 'select', value: 'GET', options: [['GET','GET'],['POST','POST'],['PUT','PUT'],['PATCH','PATCH'],['DELETE','DELETE']] }, { key: 'timeout', label: 'Timeout (s)', type: 'number', value: 15, min: 1 },
@@ -1428,7 +1428,7 @@
             ], summary: (config) => `${config.method || 'GET'} · ${config.path || config.base_url || 'sin endpoint'}`
         },
         util_graphql_request: {
-            title: 'GraphQL Request', subtitle: 'Consulta GraphQL ejecutada por el navegador', storage: '[df-graphql-config]',
+            title: 'Consulta GraphQL', subtitle: 'Consulta GraphQL ejecutada por el navegador', storage: '[df-graphql-config]',
             fields: [
                 { key: 'endpoint', label: 'Endpoint', type: 'text', value: '' }, { key: 'operation_name', label: 'Operation name', type: 'text', value: '' },
                 { key: 'query', label: 'Query', type: 'textarea', value: '' }, { key: 'variables', label: 'Variables (JSON)', type: 'json', value: {} }, { key: 'headers', label: 'Cabeceras (JSON)', type: 'json', value: {} },
@@ -1440,26 +1440,26 @@
     };
 
     const READER_EDITOR_DEFINITIONS = {
-        reader_geojson: { title: 'GeoJSON Reader', subtitle: 'Fuente, esquema y CRS', fields: [
+        reader_geojson: { title: 'Lector GeoJSON', subtitle: 'Fuente, esquema y CRS', fields: [
             { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'union', options: [['union','Unión de campos'],['same_schema','Mismo esquema']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
         ] },
-        reader_kml: { title: 'KML Reader', subtitle: 'Fuente y esquema', fields: [
+        reader_kml: { title: 'Lector KML', subtitle: 'Fuente y esquema', fields: [
             { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'union', options: [['union','Unión de campos'],['same_schema','Mismo esquema']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
         ] },
-        reader_csv: { title: 'CSV Reader', subtitle: 'Delimitador, geometría y esquema', fields: [
+        reader_csv: { title: 'Lector CSV', subtitle: 'Delimitador, geometría y esquema', fields: [
             { key: 'delimiter', label: 'Delimitador', type: 'select', value: 'auto', options: [['auto','Detección automática'],[',','Coma'],[';','Punto y coma'],['\t','Tabulador']] },
             { key: 'lat_column', label: 'Campo latitud / Y', type: 'text', value: '' }, { key: 'lon_column', label: 'Campo longitud / X', type: 'text', value: '' }, { key: 'wkt_column', label: 'Campo WKT', type: 'text', value: '' },
             { key: 'schema_policy', label: 'Política multiarchivo', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
         ] },
-        reader_excel: { title: 'Excel Reader', subtitle: 'Hoja, geometría y esquema', fields: [
+        reader_excel: { title: 'Lector Excel', subtitle: 'Hoja, geometría y esquema', fields: [
             { key: 'sheet_name', label: 'Hoja (vacío = primera)', type: 'text', value: '' }, { key: 'lat_column', label: 'Campo latitud / Y', type: 'text', value: '' }, { key: 'lon_column', label: 'Campo longitud / X', type: 'text', value: '' }, { key: 'wkt_column', label: 'Campo WKT', type: 'text', value: '' },
             { key: 'schema_policy', label: 'Política multiarchivo', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS declarado', type: 'text', value: '' }
         ] },
-        reader_shp: { title: 'SHP Reader', subtitle: 'Conjunto Shapefile y CRS', fields: [
+        reader_shp: { title: 'Lector Shapefile', subtitle: 'Conjunto Shapefile y CRS', fields: [
             { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'same_schema', options: [['same_schema','Exigir mismo esquema'],['union','Unir campos']] }, { key: 'crs', label: 'CRS de reemplazo (opcional)', type: 'text', value: '' }
         ] },
-        reader_gpx: { title: 'GPX Reader', subtitle: 'Tracks, rutas y waypoints', fields: [ { key: 'crs', label: 'CRS', type: 'text', value: 'EPSG:4326' } ] },
-        reader_gdb: { title: 'GDB Reader', subtitle: 'Capas mediante backend', fields: [
+        reader_gpx: { title: 'Lector GPX', subtitle: 'Tracks, rutas y waypoints', fields: [ { key: 'crs', label: 'CRS', type: 'text', value: 'EPSG:4326' } ] },
+        reader_gdb: { title: 'Lector GDB', subtitle: 'Capas mediante backend', fields: [
             { key: 'selected_layers', label: 'Capas seleccionadas (JSON)', type: 'json', value: [] }, { key: 'schema_policy', label: 'Política de esquema', type: 'select', value: 'same_schema', options: [['same_schema','Mismo esquema'],['union','Unión de campos']] }, { key: 'crs', label: 'CRS de reemplazo (opcional)', type: 'text', value: '' }
         ] }
     };
