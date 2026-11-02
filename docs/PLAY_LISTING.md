@@ -63,3 +63,50 @@ JETL Studio es la versión móvil de JETL Desktop.
     desde la app o borrando los datos de la aplicación).
 - **Aplicación de noticias / sanitaria / financiera / gubernamental**: No.
 - **Funciones de seguridad (ID de publicidad)**: no usa el ID de publicidad.
+
+## Cuestionario de acceso a producción (borrador)
+
+Al pulsar «Solicitar acceso a producción» (tras 14 días seguidos con 12 testers o
+más en la prueba cerrada), Google pregunta por la prueba. Borrador preparado el 2 de
+noviembre de 2026; las preguntas exactas pueden variar: comprobar con «Vista previa
+de las preguntas» y responder con detalles concretos (Google desconfía de las
+respuestas genéricas). Sólo cuenta Android: no mencionar iPhone ni iPad.
+
+**Sobre la prueba**
+
+- **¿Cómo conseguiste testers?** Contactos personales y profesionales del sector SIG
+  y comunidades de desarrolladores que se prueban las apps entre sí. Los testers se
+  unían a un Google Group y aceptaban la prueba desde el enlace de participación.
+- **¿Fue fácil?** Al principio costó: parte de la gente desconfiaba de dar su correo.
+  Usar un Google Group, al que cada uno se apunta por su cuenta, lo resolvió.
+- **¿Cómo se usó la app y qué comentarios recibiste?** Los testers crearon flujos,
+  leyeron archivos GeoPackage y Parquet y vieron los resultados en el mapa, en móvil y
+  en tablet. Los comentarios llegaron por correo y mensajería: lectores que no leían a
+  la primera, capas que no se veían tras un geoproceso, mapa lento con archivos
+  grandes e interfaz poco adaptada a tablet y al móvil en horizontal.
+
+**Sobre los cambios**
+
+Durante la prueba se publicaron correcciones casi a diario:
+
+- lectura de GeoPackage (todas las tablas, una salida por tabla) y de Parquet;
+- los datos se pasan a EPSG:4326 al leerlos, para que los geoprocesos y el mapa
+  funcionen bien;
+- visor con MapLibre (WebGL), que mueve cientos de miles de entidades con fluidez;
+- color por capa en el mapa;
+- interfaz adaptada a tablet y al móvil en horizontal;
+- alojamiento cambiado para evitar bloqueos de red puntuales.
+
+**Sobre la app y su público**
+
+- **¿Para quién es?** Profesionales y estudiantes de SIG, topografía e ingeniería que
+  necesitan transformar datos geoespaciales desde el móvil o la tablet, también sin
+  conexión. Gratuita, sin anuncios y sin recogida de datos.
+- **¿Qué aporta?** Permite construir flujos ETL geoespaciales de forma visual y sin
+  servidor: todo se procesa en el dispositivo y los datos del usuario no salen de él.
+- **Instalaciones previstas el primer año:** una cifra prudente, p. ej. 100–1.000.
+
+**¿Cómo sabes que está lista?** Todos los fallos que encontraron los testers están
+corregidos y cubiertos por pruebas automáticas que se ejecutan antes de cada
+publicación. Se ha usado en Android de distintos tamaños, en vertical y en
+horizontal, sin cierres inesperados.
